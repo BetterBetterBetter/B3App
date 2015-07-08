@@ -1,0 +1,61 @@
+@import "mixins.less";
+
+.es-container {
+	.es-sidebar {
+		width: 100% !important;
+		padding: 0 !important;
+		background: transparent!important;
+		border: 0!important;
+	}
+}
+
+/*= Easysocial Dropdown Menu Module
+---------------------------------------------------------------------------------------------- */
+&.mod-es-dropdown-menu {
+	.mod-bd {
+
+		span.top-user-name {
+			display: none !important;
+		}
+
+		b {display: none !important;}
+	}	
+}
+
+ 
+
+
+
+
+&.mod-es-notifications {
+	.es-menu-item > a.active {
+		&:before,
+		&:after {
+			display: block;
+			content: "";
+			position: absolute;
+			left: 50%;
+			bottom: -10px;
+			margin-left: -8px;
+
+			border-left: 8px solid transparent;
+			border-right: 8px solid transparent;
+			border-bottom: 8px solid #ccc;
+			z-index: 99999999;
+		}
+
+		&:after {
+			border-bottom-color: #fff;
+			bottom: -11px;
+		}
+	}
+}
+
+&.popbox-notifications {
+	left: auto !important;
+	right: 10px;
+
+	.arrow {
+		display: none !important;
+	}
+}
