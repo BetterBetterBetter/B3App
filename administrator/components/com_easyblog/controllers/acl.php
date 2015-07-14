@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,221 +9,97 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport('joomla.application.component.controller');
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerAcl extends EasyBlogController
 {
-	function apply()
+	public function __construct($config = array())
+	{
+		parent::__construct($config);
+
+		$this->registerTask('apply', 'save');
+		$this->registerTask('save', 'save');
+	}
+
+	/**
+	 * Saves an acl
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function save()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'acl' );
+		$this->checkAccess('acl');
 
-		$mainframe	= JFactory::getApplication();
+		// get current task name.
+		$task = $this->getTask();
 
-		$cid = JRequest::getVar( 'cid' , '' , 'POST' );
-		$type = JRequest::getVar( 'type' , '' , 'POST' );
-		$add = JRequest::getVar( 'add' , '' , 'POST' );
+		$id = $this->input->get('id', 0, 'int');
+		$name = $this->input->get('name', '', 'cmd');
 
-		$result		= $this->_store();
+		// Ensure that the composite keys are provided.
+		if (empty($id)) {
 
-		$task = 'edit';
-		if($result['type']=='error')
-		{
-			$task = empty($add)? 'edit':'add';
+			$this->info->set('COM_EASYBLOG_ACL_INVALID_ID_ERROR', 'error');
+
+			return $this->app->redirect('index.php?option=com_easyblog&view=acls&layout=form&id=' . $id);
 		}
 
-		$mainframe->redirect( 'index.php?option=com_easyblog&c=acl&task='.$task.'&cid='.$cid.'&type='.$type , $result['message'] , $result['type'] );
-	}
+		// Get the data from the post
+		$data = $this->input->getArray('post');
 
-	function cancel()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'acl' );
+		// Get the text filters first.
+		$filter = EB::table('ACLFilter');
+		$state = $filter->load($id);
 
-		$mainframe	= JFactory::getApplication();
-
-		$mainframe->redirect( 'index.php?option=com_easyblog&view=acls' );
-	}
-
-	function edit()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'acl' );
-
-		JRequest::setVar( 'view', 'acl' );
-		JRequest::setVar( 'cid' , JRequest::getVar( 'cid' , '' , 'REQUEST' ) );
-		JRequest::setVar( 'type' , JRequest::getVar( 'type' , '' , 'REQUEST' ) );
-
-		parent::display();
-	}
-
-	function save()
-	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
-
-		// @task: Check for acl rules.
-		$this->checkAccess( 'acl' );
-
-		$mainframe	= JFactory::getApplication();
-
-		$result		= $this->_store();
-		$mainframe->redirect( 'index.php?option=com_easyblog&view=acls', $result['message'], $result['type'] );
-	}
-
-	function _store()
-	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
-
-		// @task: Check for acl rules.
-		$this->checkAccess( 'acl' );
-
-		$mainframe	= JFactory::getApplication();
-
-		$message	= '';
-		$type		= 'message';
-
-		if( JRequest::getMethod() == 'POST' )
-		{
-			$cid 		= JRequest::getVar( 'cid' , '' , 'POST' );
-			$acltype	= JRequest::getVar( 'type' , '' , 'POST' );
-			$name 		= JRequest::getVar( 'name' , '' , 'POST' );
-
-			if(!empty($cid) || !empty($acltype))
-			{
-				$postArray	= JRequest::get( 'post' );
-
-				// Store text filters first.
-				$filter		= EasyBlogHelper::getTable( 'AclFilter' );
-				
-				if( !$filter->load( $cid , $acltype ) )
-				{
-					$filter->set( 'content_id' , $cid );
-					$filter->set( 'type' , $acltype );
-				}
-
-				$filter->set( 'disallow_tags' , $postArray['disallow_tags' ] );
-				$filter->set( 'disallow_attributes' , $postArray['disallow_attributes' ] );
-				$filter->store();
-
-				$model = $this->getModel( 'Acl' );
-
-				$db = EasyBlogHelper::db();
-
-				if($model->deleteRuleset($cid, $acltype))
-				{
-					
-					$saveData	= array();
-
-					// Unset unecessary data.
-					unset( $postArray['task'] );
-					unset( $postArray['option'] );
-					unset( $postArray['c'] );
-					unset( $postArray['cid'] );
-					unset( $postArray['name'] );
-					unset( $postArray['type'] );
-					unset( $postArray['disallow_tags'] );
-					unset( $postArray['disallow_attributes'] );
-
-					foreach( $postArray as $index => $value )
-					{
-						if( $index != 'task' );
-						{
-							$saveData[ $index ]	= $value;
-						}
-					}
-
-					if( $model->insertRuleset( $cid, $acltype, $saveData ) )
-					{
-						$message	= JText::_( 'ACL settings successfully saved.' );
-					}
-					else
-					{
-						$message	= JText::_( 'There was an error while trying to save the ACL settings.' );
-						$type		= 'error';
-					}
-				}
-				else
-				{
-					$message	= JText::_( 'There was an error while trying to update the ACL.' );
-					$type		= 'error';
-				}
-			}
-			else
-			{
-				$message	= JText::_( 'Invalid ID or ACL type, please try again.' );
-				$type		= 'error';
-			}
-		}
-		else
-		{
-			$message	= JText::_('Invalid request method. This form needs to be submitted through a "POST" request.');
-			$type		= 'error';
+		if (!$state) {
+			$filter->content_id = $id;
+			$filter->type = 'group';
 		}
 
-		return array( 'message' => $message , 'type' => $type);
-	}
+		// Set the disallowed tags
+		$filter->disallow_tags = $data['disallow_tags'];
+		$filter->disallow_attributes = $data['disallow_attributes'];
+		$filter->store();
 
-	function add()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'acl' );
+		// Load the acl model
+		$model = EB::model('ACL');
 
-		JRequest::setVar( 'view', 'acl' );
-		JRequest::setVar( 'add' , true );
-		JRequest::setVar( 'type' , 'assigned' );
+		// Delete all existing rule set
+		$state = $model->deleteRuleset($id);
 
-		parent::display();
-	}
+		// Unset unecessary data form the post
+		unset($data['task']);
+		unset($data['option']);
+		unset($data['c']);
+		unset($data['id']);
+		unset($data['name']);
+		unset($data['disallow_tags']);
+		unset($data['disallow_attributes']);
 
-	function remove()
-	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		// Insert new rules
+		$state = $model->insertRuleset($id, $data);
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'acl' );
-		
-		$mainframe	= JFactory::getApplication();
+		if (!$state) {
+			$this->info->set('COM_EASYBLOG_ACL_ERROR_SAVING_ACL', 'error');
 
-		$bloggers	= JRequest::getVar( 'cid' , '' , 'POST' );
-
-		$message	= '';
-		$type		= 'message';
-
-		if( empty( $bloggers ) )
-		{
-			$message	= JText::_('Invalid blogger id');
-			$type		= 'error';
-		}
-		else
-		{
-			$model = $this->getModel( 'Acl' );
-			foreach( $bloggers as $id )
-			{
-				$ruleset = $model->getRuleSet('assigned', $id);
-
-				if(!empty($ruleset->id))
-				{
-					if( !$model->deleteRuleset($id, 'assigned') )
-					{
-						$message	= JText::_( 'Error removing blogger, ' . $ruleset->name );
-						$type		= 'error';
-						$mainframe->redirect( 'index.php?option=com_easyblog&view=acls' , $message , $type );
-						return;
-					}
-				}
-			}
-
-			$message	= JText::_('Blogger(s) deleted');
+			return $this->app->redirect('index.php?option=com_easyblog&view=acls&layout=form&id=' . $id);
 		}
 
-		$mainframe->redirect( 'index.php?option=com_easyblog&view=acls', $message , $type );
+		$url = 'index.php?option=com_easyblog&view=acls';
+		if ($task == 'apply') {
+			$url = 'index.php?option=com_easyblog&view=acls&layout=form&id=' . $id;
+		}
+
+		$this->info->set('COM_EASYBLOG_ACL_SAVE_SUCCESS', 'success');
+		return $this->app->redirect($url);
 	}
 }

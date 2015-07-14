@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="library" method="upgrade" version="2.5">
+    <name>jsocial</name>
+    <libraryname>jsocial</libraryname>
+    <author>Techjoomla</author>
+    <creationDate>October 2013</creationDate>
+    <copyright>Copyright (C) 2011</copyright>
+    <license>
+		http://www.gnu.org/licenses/gpl-2.0.html GNU/GPL
+    </license>
+    <authorEmail>extensions@techjoomla.com</authorEmail>
+	<authorUrl>http://www.techjoomla.com</authorUrl>
+    <version>1.0</version>
+    <description>
+		JSocial is an interface developed by techjoomla aimed at abstracting the common features across Joomla Social Networking Extensions like Easysocial, Jomsocial & Community Builder.
+
+    </description>
+    <files>
+        <folder>jsocial</folder>
+    </files>
+</extension>

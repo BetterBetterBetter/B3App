@@ -11,205 +11,182 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-jimport('joomla.application.component.controller');
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'oauth.php' );
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerFeeds extends EasyBlogController
 {
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
-		$this->registerTask( 'add' , 'edit' );
+		$this->registerTask('apply', 'save');
+		$this->registerTask('savenew', 'save');
 		$this->registerTask( 'publish' , 'publish' );
 		$this->registerTask( 'unpublish' , 'unpublish' );
 	}
 
-	function cancel()
+	public function cancel()
 	{
 		// @task: Check for acl rules.
 		$this->checkAccess( 'feeds' );
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=feeds' );
+		return $this->app->redirect( 'index.php?option=com_easyblog&view=feeds' );
 
-		return;
 	}
 
-	function addNew()
+	public function add()
 	{
+		// Check for request forgeries
+		EB::checkToken();
+
 		// @task: Check for acl rules.
-		$this->checkAccess( 'feeds' );
+		$this->checkAccess('feeds');
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=feeds&layout=form' );
-
-		return;
+		return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form');
 	}
 
-	function edit()
+	public function remove()
 	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'feeds' );
-
-		$document	= JFactory::getDocument();
-
-		$cid 	= JRequest::getVar( 'cid' , '' , 'REQUEST' );
-		JFactory::getApplication()->redirect( 'index.php?option=com_easyblog&view=feeds&layout=form&cid=' . $cid );
-	}
-
-	function remove()
-	{
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		// Check for request forgeries
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'feeds' );
+		$this->checkAccess('feeds');
 
 		$feeds	= JRequest::getVar( 'cid' , array(0) , 'POST' );
 
-		$message	= '';
-		$type		= 'message';
+		if (count($feeds) <= 0) {
 
-		if( count( $feeds ) <= 0 )
-		{
-			$message	= JText::_('COM_EASYBLOG_BLOGS_FEEDS_ERROR_INVALID_ID');
-			$type		= 'error';
-		}
-		else
-		{
+			$this->info->set('COM_EASYBLOG_BLOGS_FEEDS_ERROR_INVALID_ID', 'error');
 
-			for( $i = 0; $i < count($feeds); $i++)
-			{
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds');
+
+		} else {
+
+			for ($i = 0; $i < count($feeds); $i++) {
 				$id     = $feeds[$i];
 
-				$feed	= EasyBlogHelper::getTable( 'Feed' );
+				$feed	= EB::table('Feed');
 				$feed->load($id);
 
-				if( ! $feed->delete() )
-				{
-					$this->setRedirect( 'index.php?option=com_easyblog&view=feeds' , JText::_('COM_EASYBLOG_BLOGS_FEEDS_ERROR_DELETE') , 'error' );
-					return;
+				if (!$feed->delete()) {
+					$this->info->set('COM_EASYBLOG_BLOGS_FEEDS_ERROR_DELETE', 'error');
+
+					return $this->app->redirect('index.php?option=com_easyblog&view=feeds');
+
 				}
 			}
 
-			// all passed.
-			$message	= JText::_('COM_EASYBLOG_BLOGS_FEEDS_DELETE_SUCCESS');
-
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=feeds' , $message , $type );
+		$this->info->set('COM_EASYBLOG_BLOGS_FEEDS_DELETE_SUCCESS', 'success');
 
+		return $this->app->redirect('index.php?option=com_easyblog&view=feeds');
 
 	}
 
+	/**
+	 * Stores a new rss feed import
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
 	public function save()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'feeds' );
+		$this->checkAccess('feeds');
 
-		$document	= JFactory::getDocument();
-		$mainframe	= JFactory::getApplication();
+		$post	= JRequest::get('post');
+		$id		= JRequest::getInt('id');
 
-		$post	= JRequest::get( 'POST' );
-		$cid	= JRequest::getVar( 'cid' , '' , 'REQUEST' );
+		$feed	= EB::table('Feed');
+		$feed->load($id);
+		$feed->bind($post);
 
-		$feed	= EasyBlogHelper::getTable( 'Feed', 'Table' );
+		if (!$feed->item_creator) {
+			EB::info()->set('COM_EASYBLOG_BLOGS_FEEDS_ERROR_AUTHOR', 'error');
 
-		if( !empty($cid) )
-		{
-			$feed->load($cid);
+			$session 	= JFactory::getSession();
+			$session->set('feeds.data', $post, 'easyblog');
+
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form');
 		}
 
-		$feed->bind( $post );
+		if (!$feed->item_category) {
+			EB::info()->set('COM_EASYBLOG_BLOGS_FEEDS_ERROR_CATEGORY', 'error');
 
-		if( empty( $feed->item_creator ) )
-		{
-			$mainframe->enqueueMessage(JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_ERROR_AUTHOR' ), 'error');
+			$session 	= JFactory::getSession();
+			$session->set('feeds.data', $post, 'easyblog');
 
-			JRequest::set($post, 'POST');
-
-			$view	= $this->getView('Feeds', $document->getType());
-			$view->setLayout('form');
-
-			$view->display();
-			return;
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form');
 		}
 
-		if( empty( $feed->item_category ) )
-		{
-			$mainframe->enqueueMessage(JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_ERROR_CATEGORY' ), 'error');
+		if (!$feed->url) {
+			EB::info()->set('COM_EASYBLOG_BLOGS_FEEDS_ERROR_URL', 'error');
 
-			JRequest::set($post, 'POST');
-			JRequest::setVar('cid', $cid);
+			$session 	= JFactory::getSession();
+			$session->set('feeds.data', $post, 'easyblog');
 
-			$view	= $this->getView('Feeds', $document->getType());
-			$view->setLayout('form');
-			$view->display();
-			return;
-
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form');
 		}
 
-		if( empty( $feed->url ) )
-		{
-			$mainframe->enqueueMessage(JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_ERROR_URL' ), 'error');
+		if (!$feed->title) {
+			EB::info()->set('COM_EASYBLOG_BLOGS_FEEDS_ERROR_TITLE', 'error');
 
-			JRequest::set($post, 'POST');
-			JRequest::setVar('cid', $cid);
+			$session 	= JFactory::getSession();
+			$session->set('feeds.data', $post, 'easyblog');
 
-			$view	= $this->getView('Feeds', $document->getType());
-			$view->setLayout('form');
-			$view->display();
-			return;
-		}
-
-		if( empty( $feed->title ) )
-		{
-			$mainframe->enqueueMessage(JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_ERROR_TITLE' ), 'error');
-
-			JRequest::set($post, 'POST');
-			JRequest::setVar('cid', $cid);
-
-			$view	= $this->getView('Feeds', $document->getType());
-			$view->setLayout('form');
-			$view->display();
-			return;
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form');
 		}
 
 		// Store the allowed tags here.
-		$allowed		= JRequest::getVar( 'item_allowed_tags' , '' , 'REQUEST' , 'none' , JREQUEST_ALLOWRAW );
+		$allowed 		= JRequest::getVar('item_allowed_tags' , '' , 'REQUEST' , 'none' , JREQUEST_ALLOWRAW);
 		$copyrights		= JRequest::getVar( 'copyrights' , '' );
 		$sourceLinks	= JRequest::getVar( 'sourceLinks' , '0' );
 		$feedamount		= JRequest::getVar( 'feedamount' , '0' );
 		$autopost 		= JRequest::getVar( 'autopost' , 0 );
 
-		$params			= EasyBlogHelper::getRegistry( '' );
+		$params 	= EB::getRegistry();
 		$params->set( 'allowed'		, $allowed );
 		$params->set( 'copyrights'	, $copyrights );
 		$params->set( 'sourceLinks' , $sourceLinks );
 		$params->set( 'autopost'	, $autopost );
-		$params->set( 'feedamount' , $feedamount );
+		$params->set('feedamount' , $feedamount );
+		$params->set('item_get_fulltext', $this->input->get('item_get_fulltext', '', 'default'));
 		$feed->params	= $params->toString();
 
-		if( !$feed->store() )
-		{
-			$mainframe->enqueueMessage(JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_ERROR_SAVE' ), 'error');
+		$state 	= $feed->store();
 
-			JRequest::set($post, 'POST');
-			JRequest::setVar('cid', $cid);
+		if (!$state) {
+			EB::info()->set($feed->getError(), 'error');
 
-			$view	= $this->getView('Feeds', $document->getType());
-			$view->setLayout('form');
-			$view->display();
-			return;
+			$session 	= JFactory::getSession();
+			$session->set('feeds.data', $post, 'easyblog');
+
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form');
 		}
 
-		$mainframe->redirect( 'index.php?option=com_easyblog&view=feeds' , JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_SAVE_SUCCESS' ) , 'success' );
+		EB::info()->set('COM_EASYBLOG_BLOGS_FEEDS_SAVE_SUCCESS', 'success');
+
+		$task 	= $this->getTask();
+
+		if ($task == 'apply') {
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form&id=' . $feed->id);
+		}
+
+		if ($task == 'save') {
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds');
+		}
+
+		if ($task == 'savenew') {
+			return $this->app->redirect('index.php?option=com_easyblog&view=feeds&layout=form');
+		}
 	}
 
-	function publish()
+	public function publish()
 	{
 		// Check for request forgeries
 		JRequest::checkToken() or jexit( 'Invalid Token' );
@@ -222,64 +199,59 @@ class EasyBlogControllerFeeds extends EasyBlogController
 		$message	= '';
 		$type		= 'message';
 
-		if( count( $feeds ) <= 0 )
-		{
+		if (count($feeds) <= 0) {
 			$message	= JText::_('COM_EASYBLOG_BLOGS_FEEDS_ERROR_INVALID_ID');
 			$type		= 'error';
-		}
-		else
-		{
-			$model		= $this->getModel( 'Feeds' );
 
-			if( $model->publish( $feeds , 1 ) )
-			{
+		} else {
+
+			$model		= EB::model( 'Feeds' );
+
+			if ($model->publish($feeds, 1)) {
 				$message	= JText::_('Feed(s) published');
-			}
-			else
-			{
+			} else {
 				$message	= JText::_('Error publishing feed');
 				$type		= 'error';
 			}
 
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=feeds' , $message , $type );
+		$this->info->set($message, $type);
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=feeds');
+
 	}
 
 	function unpublish()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		JRequest::checkToken() or jexit('Invalid Token');
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'feeds' );
+		$this->checkAccess('feeds');
 
-		$feeds		= JRequest::getVar( 'cid' , array(0) , 'POST' );
+		$feeds		= JRequest::getVar('cid', array(0), 'POST');
 
 		$message	= '';
 		$type		= 'message';
 
-		if( count( $feeds ) <= 0 )
-		{
+		if (count($feeds) <= 0) {
 			$message	= JText::_('COM_EASYBLOG_BLOGS_FEEDS_ERROR_INVALID_ID');
 			$type		= 'error';
-		}
-		else
-		{
-			$model		= $this->getModel( 'Feeds' );
+		} else {
+			$model		= EB::model( 'Feeds' );
 
-			if( $model->publish( $feeds , 0 ) )
-			{
+			if ($model->publish($feeds, 0)) {
 				$message	= JText::_('Feed(s) unpublished');
-			}
-			else
-			{
+			} else {
 				$message	= JText::_('Error unpublishing feed');
 				$type		= 'error';
 			}
-
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=feeds' , $message , $type );
+		$this->info->set($message, $type);
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=feeds');
+
 	}
 }

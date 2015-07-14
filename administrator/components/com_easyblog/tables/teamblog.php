@@ -1,51 +1,43 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
-
-jimport('joomla.filesystem.file');
-jimport('joomla.filesystem.folder');
-
-require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'constants.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'router.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'image.php' );
+require_once(dirname(__FILE__) . '/table.php');
 
 class EasyBlogTableTeamBlog extends EasyBlogTable
 {
-	var $id 			= null;
-	var $title			= null;
-	var $description	= null;
-	var $published		= 1;
-	var $created		= null;
-	var $alias			= null;
-	var $access			= null;
-	var $avatar			= null;
+	public $id = null;
+	public $title = null;
+	public $description	= null;
+	public $published = null;
+	public $created = null;
+	public $alias = null;
+	public $access = null;
+	public $avatar = null;
+	public $allow_join = null;
 
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(& $db )
 	{
-		parent::__construct( '#__easyblog_team' , 'id' , $db );
+		parent::__construct('#__easyblog_team', 'id', $db);
 	}
 
-	function load( $key = null , $permalink = false )
+	public function load($key = null , $permalink = false)
 	{
-		if( !$permalink )
-		{
+		if (!$permalink) {
+
+			if (EB::cache()->exists($key, 'team')) {
+				return parent::bind(EB::cache()->get($key, 'team'));
+			}
+
 			return parent::load( $key );
 		}
 
@@ -70,13 +62,29 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 		return parent::load( $id );
 	}
 
-	function delete($pk = null)
+	/**
+	 * Override the parent's delete method as we want to apply our own logics
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function delete($pk = null)
 	{
-		if( parent::delete($pk) )
-		{
-			$this->deleteMembers();
-			return true;
-		}
+		$state = parent::delete($pk);
+
+		// After deleting the team, delete the team members and groups access as well
+		$model = EB::model('TeamBlogs');
+
+		// Delete members
+		$this->deleteMembers();
+
+		// Delete groups
+		$model->deleteGroupRelations($this->id);
+
+
+		return $state;
 	}
 
 	function deleteGroup( $groupId = '')
@@ -96,6 +104,116 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 		}
 	}
 
+	/**
+	 * Uploads a team avatar
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function uploadAvatar($file)
+	{
+		$config = EB::config();
+		$acl    = EB::acl();
+
+		// Default avatar file name
+		$default = 'default_team.png';
+
+		// Construct the storage path of the avatar
+		$path = rtrim($config->get('main_teamavatarpath'), '/');
+
+		// Set the relative path
+		$relativePath = $path;
+
+		// Set the absolute path
+		$absolutePath = JPATH_ROOT . '/' . $path;
+
+		// Check if the folder exists
+		EB::makeFolder($absolutePath);
+
+		// Generate a proper file name for the file
+		$fileName = md5($file['name'] . JFactory::getDate()->toSql());
+		$fileName .= EB::image()->getExtension($file['tmp_name']);
+
+		// Reassign the image name
+		$file['name'] = $fileName;
+
+		if (!isset($file['name'])) {
+			return $default;
+		}
+
+		// Check if the file upload itself contains errors.
+		if ($file['error'] != 0) {
+			$this->setError($file['error']);
+			return false;
+		}
+
+		// Construct the relative and absolute file paths
+		$relativeFile = $relativePath . '/' . $file['name'];
+		$absoluteFile = $absolutePath . '/' . $file['name'];
+
+		// Determine if the user can really upload this file
+		$error = '';
+		$state = EB::image()->canUpload($file, $error);
+
+		// If user is not allowed to upload image, return proper error
+		if (!$state) {
+			$this->setError($err);
+
+			return false;
+		}
+
+		// Get the old avatar first
+		$oldAvatar = $this->avatar;
+
+		$width  = EBLOG_AVATAR_LARGE_WIDTH;
+		$height = EBLOG_AVATAR_LARGE_HEIGHT;
+
+		// Load up the simple image library
+		$image = EB::simpleimage();
+		$image->load($file['tmp_name']);
+
+		// Resize the avatar to our specified width / height
+		$image->resizeToFill($width, $height);
+
+		// Store the file now
+		$image->save($absoluteFile, $image->image_type);
+
+		$this->avatar = $file['name'];
+
+		// Save the team again
+		$state = $this->store();
+
+		// If the team has avatar already, remove it
+		if ($oldAvatar && $oldAvatar != $default) {
+
+			$existingAbsolutePath = $absolutePath . '/' . $oldAvatar;
+
+			// Test if the file exists before deleting it
+			$exists = JFile::exists($existingAbsolutePath);
+
+			if ($exists) {
+				JFile::delete($existingAbsolutePath);
+			}
+		}
+
+		return $state;
+	}
+
+	/**
+	 * Method to unpublish teams
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	Array 	An array of ids
+	 * @return	boolean
+	 */
+	public function unpublish($pks = null, $state = false)
+	{
+		return $this->publish($pks, $state);
+	}
+
 	function deleteMembers($userId = '')
 	{
 		// Delete existing members first so we dont have to worry what's changed
@@ -112,34 +230,90 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 		}
 	}
 
-	function getMembers()
+	/**
+	 * Retrieves a list of team members from this team
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	Array
+	 */
+	public function getMembers()
 	{
-		if( $this->id != 0 )
-		{
-			$db		= EasyBlogHelper::db();
-			$query	= 'SELECT user_id FROM #__easyblog_team_users '
-					. 'WHERE `team_id`=' . $db->Quote( $this->id );
-			$db->setQuery( $query );
+		static $members = array();
 
-			return $db->loadResultArray();
+		if (!isset($members[$this->id])) {
+			$model = EB::model('TeamBlogs');
+
+			$members[$this->id] = $model->getMembers($this->id);
 		}
 
-		return false;
+		return $members[$this->id];
 	}
 
-	function getMemberCount()
+	/**
+	 * Returns the total number of members in a team including users from associated joomla groups.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAllMembersCount()
 	{
-		if( $this->id != 0 )
-		{
-			$db		= EasyBlogHelper::db();
-			$query	= 'SELECT count(user_id) FROM #__easyblog_team_users '
-					. 'WHERE `team_id`=' . $db->Quote( $this->id );
+		static $counter = array();
 
-			$db->setQuery( $query );
-			return $db->loadResult();
+		if (!isset($counter[$this->id])) {
+
+			if (EB::cache()->exists($this->id, 'teamblogs')) {
+				$data = EB::cache()->get($this->id, 'teamblogs');
+
+				if (isset($data['count'])) {
+					$counter[$this->id] = $data['count'];
+				} else {
+					$counter[$this->id] = '0';
+				}
+
+			} else {
+				$model = EB::model('TeamBlogs');
+				$counter[$this->id] = $model->getAllMembersCount($this->id);
+			}
+
 		}
 
-		return false;
+		return $counter[$this->id];
+	}
+
+
+	/**
+	 * Returns the total number of members in a team
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getMembersCount()
+	{
+		static $counter = array();
+
+		if (!isset($counter[$this->id])) {
+			$model = EB::model('TeamBlogs');
+
+			$counter[$this->id] = $model->getMembersCount($this->id);
+		}
+
+		return $counter[$this->id];
+	}
+
+
+	/**
+	 * Use @getMembersCount instead
+	 *
+	 * @deprecated	4.0
+	 */
+	public function getMemberCount()
+	{
+		return $this->getMembersCount();
 	}
 
 	/**
@@ -150,25 +324,54 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 	 *
 	 * @return	boolean				True if the user is an admin.
 	 **/
-	public function isTeamAdmin( $userId )
+	public function isTeamAdmin($userId = null)
 	{
-		$db		= EasyBlogHelper::db();
+		$user = JFactory::getUser($userId);
+		$db = EB::db();
 
 		// We need to test if the user has admin access.
-		$query	= 'SELECT COUNT(1) FROM `#__easyblog_team_users` WHERE `team_id`=' . $db->Quote( $this->id );
-		$query	.= ' AND `user_id`=' . $db->Quote( $userId ) . ' AND `isadmin`= ' . $db->Quote( 1 );
-		$db->setQuery( $query );
+		$query	= 'SELECT COUNT(1) FROM ' . $db->qn('#__easyblog_team_users') . ' WHERE `team_id`=' . $db->Quote($this->id);
+		$query	.= ' AND ' . $db->qn('user_id') . ' = ' . $db->Quote($user->id) . ' AND `isadmin`= ' . $db->Quote(1);
+		$db->setQuery($query);
 
-		$isAdmin	= $db->loadResult() > 0;
+		$isAdmin = $db->loadResult() > 0;
 
 		return $isAdmin;
 	}
 
-	function isMember($userId, $gid = '', $findTeamAccess = true)
+	/**
+	 * Determines if the user or group is part of a team
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isMember($userId, $gid = '', $findTeamAccess = true)
 	{
 		if( $this->id != 0 )
 		{
-			$db		= EasyBlogHelper::db();
+
+			// lets check from the cache first.
+			if (EB::cache()->exists($this->id, 'teamblogs')) {
+
+				if ($findTeamAccess) {
+					// since current logged in user able to see this team, mean the user has the access. just return true.
+					return true;
+				}
+
+				$data = EB::cache()->get($this->id, 'teamblogs');
+
+				if (isset($data['member'])) {
+					if (isset($data['member'][$userId])) {
+						return true;
+					}
+				} else {
+					return false;
+				}
+			}
+
+			$db		= EB::db();
 
 			$gids   = '';
 			if( !empty($gid) )
@@ -202,66 +405,97 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 
 			return $result;
 		}
+
 		return false;
 	}
 
 	/**
-	 * Overrides parent's bind method to add our own logic.
+	 * Binds the posted data with the object
 	 *
-	 * @param Array $data
-	 **/
-	function bind( $data, $ignore = array() )
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function bind($data, $ignore = array())
 	{
 		parent::bind( $data, $ignore );
 
 		if( empty( $this->created ) )
 		{
-			$date			= EasyBlogHelper::getDate();
+			$date			= EB::date();
 			$this->created	= $date->toMySQL();
 		}
 
-		jimport( 'joomla.filesystem.filter.filteroutput');
+		// we check the alias only when this teamblog is a new teamblog or the alias is empty
+		if (empty($this->id) || empty($this->alias)) {
+			jimport( 'joomla.filesystem.filter.filteroutput');
 
-		$i	= 1;
-		while( $this->aliasExists() || empty($this->alias) )
-		{
-			$this->alias	= empty($this->alias) ? $this->title : $this->alias . '-' . $i;
-			$i++;
+			$i	= 1;
+			while( $this->aliasExists() || empty($this->alias) )
+			{
+				$this->alias	= empty($this->alias) ? $this->title : $this->alias . '-' . $i;
+				$i++;
+			}
+
+			$this->alias = EBR::normalizePermalink($this->alias);
 		}
-
-		$this->alias 	= EasyBlogRouter::generatePermalink( $this->alias );
 	}
 
 	function aliasExists()
 	{
 		$db		= $this->getDBO();
 
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'alias' ) . '=' . $db->Quote( $this->alias );
+		$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__easyblog_team' ) . ' '
+				. 'WHERE ' . $db->nameQuote( 'alias' ) . '=' . $db->Quote( $this->alias );
 
 		if( $this->id != 0 )
 		{
-			$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
+			$query	.= ' AND ' . $db->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
 		}
 		$db->setQuery( $query );
 
 		return $db->loadResult() > 0 ? true : false;
 	}
 
-	function getAvatar()
+	/**
+	 * Determines if the team is featured
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isFeatured()
 	{
-	    $avatar_link    = '';
+		$featured = EB::isFeatured('teamblog', $this->id);
 
-        if($this->avatar == 'tdefault.png' || $this->avatar == 'default_teamblog.png' || $this->avatar == 'components/com_easyblog/assets/images/default_teamblog.png' || $this->avatar == 'components/com_easyblog/assets/images/tdefault.png' || empty($this->avatar))
-        {
-            $avatar_link   = 'components/com_easyblog/assets/images/default_teamblog.png';
-        }
-        else
-        {
-    		$avatar_link   = EasyImageHelper::getAvatarRelativePath('team') . '/' . $this->avatar;
-    	}
+		return $featured;
+	}
 
-		return rtrim(JURI::root(), '/') . '/' . $avatar_link;
+	/**
+	 * Retrieves the team blog's avatar
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	string
+	 */
+	public function getAvatar()
+	{
+		// Default team blog avatar
+		$link = '/components/com_easyblog/assets/images/default_teamblog.png';
+
+		if ($this->avatar) {
+
+			// Construct the relative path to the avatar
+			$link = '/' . EB::image()->getAvatarRelativePath('team') . '/' . $this->avatar;
+		}
+
+		// Reconstruct with the site url
+		$link = rtrim(JURI::root(), '/') . $link;
+
+
+		return $link;
 	}
 
 	/**
@@ -310,22 +544,35 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 	}
 
 	/**
+	 * Get the title of the team
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getTitle()
+	{
+		return JText::_($this->title);
+	}
+
+	/**
 	 * Retrieve a list of tags created by this team
 	 **/
 	public function getTags()
 	{
-		$db			= EasyBlogHelper::db();
+		$db			= EB::db();
 
-		$query		= 'SELECT a.* FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_tag' ) .  ' AS a '
-					. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post_tag' ) . ' AS b '
-					. 'ON b.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'tag_id' ) . '=a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . ' '
-					. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team_post' ) . ' AS c '
-					. 'ON c.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=b.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . ' '
-					. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' AS d '
-					. 'ON d.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '=c.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . ' '
-					. 'WHERE c.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'team_id' ) . '=' . $db->Quote( $this->id ) . ' '
-					. 'AND d.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( POST_ID_PUBLISHED ) . ' '
-					. 'GROUP BY a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' );
+		$query		= 'SELECT a.* FROM ' . $db->qn( '#__easyblog_tag' ) .  ' AS a '
+					. 'INNER JOIN ' . $db->qn( '#__easyblog_post_tag' ) . ' AS b '
+					. 'ON b.' . $db->qn( 'tag_id' ) . '=a.' . $db->qn( 'id' ) . ' '
+					. 'INNER JOIN ' . $db->qn( '#__easyblog_post' ) . ' AS d '
+					. 'ON d.' . $db->qn( 'id' ) . '=b.' . $db->qn( 'post_id' ) . ' '
+					. 'where d.' . $db->qn('source_type') . ' = ' . $db->Quote(EASYBLOG_POST_SOURCE_TEAM) . ' '
+					. 'AND d.' . $db->qn( 'source_id' ) . '=' . $db->Quote( $this->id ) . ' '
+					. 'AND d.' . $db->qn( 'published' ) . '=' . $db->Quote( EASYBLOG_POST_PUBLISHED ) . ' '
+					. 'AND d.' . $db->qn( 'state' ) . '=' . $db->Quote( EASYBLOG_POST_NORMAL ) . ' '
+					. 'GROUP BY a.' . $db->qn( 'id' );
 
 		$db->setQuery( $query );
 
@@ -334,7 +581,7 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 
 		foreach( $rows as $row )
 		{
-			$tag	= EasyBlogHelper::getTable( 'Tag' , 'Table' );
+			$tag	= EB::table('Tag');
 			$tag->bind( $row );
 			$tags[]	= $tag;
 		}
@@ -343,39 +590,52 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 	}
 
 	/**
-	 * Retrieve a list of tags created by this team
-	 **/
+	 * Retrieves the total number of posts available in this team
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function getPostCount()
 	{
-		$db     = EasyBlogHelper::db();
+		static $counter = array();
 
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' AS a '
-				. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team_post' ) . ' AS b '
-				. 'ON b.' .  EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . ' '
-				. 'WHERE b.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'team_id' ) . '=' . $db->Quote( $this->id ) . ' '
-				. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( 1 );
-		$db->setQuery( $query );
-		return $db->loadResult();
+		if (!isset($counter[$this->id])) {
+
+			if (EB::cache()->exists($this->id, 'teamblogs')) {
+				$data = EB::cache()->get($this->id, 'teamblogs');
+
+				if (isset($data['postcount'])) {
+					$counter[$this->id] = $data['postcount'];
+				} else {
+					$counter[$this->id] = '0';
+				}
+
+			} else {
+				$model = EB::model('TeamBlogs');
+				$counter[$this->id] = $model->getPostCount($this->id);
+			}
+
+		}
+
+		return $counter[$this->id];
 	}
 
 	/**
-	 * Retrieve a list of categories used and created by this team members
-	 **/
+	 * Retrieves a list of categories in this team
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function getCategories()
 	{
-		$db			= EasyBlogHelper::db();
+		$model = EB::model('TeamBlogs');
+		$total = $model->getCategories($this->id);
 
-		$query	= 'SELECT DISTINCT a.*, COUNT( b.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . ' ) AS ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_count' ) . ' '
-				. 'FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_category' ) . ' AS a '
-				. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' AS b '
-				. 'ON a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '=b.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'category_id' ) . ' '
-				. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team_post' ) . ' AS c '
-				. 'ON c.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=b.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . ' '
-				. 'WHERE c.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'team_id' ) . '=' . $db->Quote( $this->id ) . ' '
-				. 'GROUP BY a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' );
-
-		$db->setQuery($query);
-		return $db->loadObjectList();
+		return $total;
 	}
 
 	/*
@@ -391,11 +651,13 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 		    return false;
 		}
 
-	    $db		= $this->getDBO();
+	    $db		= EB::db();
 
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team_post' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=' . $db->Quote( $postId ) . ' '
-				. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'team_id' ) . '=' . $db->Quote( $this->id );
+		$query = 'select count(1) from ' . $db->qn('#__easyblog_post') . ' as a';
+		$query .= ' where a.' . $db->qn('id') . ' = ' . $db->Quote($postId);
+		$query .= ' and a.' . $db->qn('source_type') . ' = ' . $db->Quote(EASYBLOG_POST_SOURCE_TEAM);
+		$query .= ' and a.' . $db->qn('source_id') . ' = ' . $db->Quote($this->id);
+
 
 		$db->setQuery( $query );
 		$result	= $db->loadResult();
@@ -413,8 +675,146 @@ class EasyBlogTableTeamBlog extends EasyBlogTable
 		return EasyBlogHelper::getHelper( 'Feeds' )->getFeedURL( 'index.php?option=com_easyblog&view=teamblog&id=' . $this->id , true );
 	}
 
-	function getDescription($raw = false)
+	/**
+	 * Retrieves the alias of
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAlias()
+	{
+		$config = EB::config();
+		$alias = $this->alias;
+
+		if ($config->get('main_sef_unicode') || !EBR::isSefEnabled()) {
+			$alias = $this->id . '-' . $this->alias;
+		}
+
+		return $alias;
+	}
+
+	/**
+	 * Retrieves rss link for the category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getRssLink()
+	{
+		return EB::feeds()->getFeedURL('index.php?option=com_easyblog&view=teamblog&layout=listings&id=' . $this->id, false, 'teamblog');
+	}
+
+	/**
+	 * Retrieves the permalink of a team blog
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getPermalink()
+	{
+		$link = EBR::_('index.php?option=com_easyblog&view=teamblog&layout=listings&id=' . $this->id);
+
+		return $link;
+	}
+
+	/**
+	 * Retrieves the external permalink for this team
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getExternalPermalink()
+	{
+		static $link = array();
+
+		if (!isset($link[$this->id])) {
+
+			$url = 'index.php?option=com_easyblog&view=teamblog&layout=listings&id=' . $this->id;
+
+			// If blog post is being posted from the back end and SH404 is installed, we should just use the raw urls.
+			$sh404 = EBR::isSh404Enabled();
+
+			$link[$this->id] = EBR::getRoutedURL($url, true, true);
+
+			$app = JFactory::getApplication();
+
+			// If this is being submitted from the back end we do not want to use the sef links because the URL will be invalid
+			if ($app->isAdmin() && $sh404) {
+				$link[$this->id] = rtrim(JURI::root(), '/') . $link[$this->id];
+			}
+		}
+
+		return $link[$this->id];
+	}
+
+	public function getDescription($raw = false)
 	{
 		return $this->description;
+	}
+
+	/**
+	 * Retrieves a list of Joomla user groups that is linked to this team
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getGroups()
+	{
+		$model 	= EB::model('TeamBlogs');
+
+		$groups	= $model->getUserGroups($this->id);
+
+		return $groups;
+	}
+
+	/**
+	 * Determines if the team's content is viewable
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function viewable($userId = '')
+	{
+		$db 	= EB::db();
+
+		if (!$userId) {
+			$my 	= JFactory::getUser();
+		} else {
+			$my 	= JFactory::getUser($userId);
+		}
+
+		// For guests, we only allow them to view that is set to "Everyone"
+		if ((!$my->id && $this->access == 3) || $this->isMember($my->id)) {
+			return true;
+		}
+
+		// Try to check against the user groups
+		$userGroups 	= EB::getUserGids($my->id);
+
+		// Something is weird because the user doesn't belong to any groups.
+		if (!$userGroups) {
+			return false;
+		}
+
+		// Get a list of groups associated with this team
+		$groups = $this->getGroups();
+
+		if (in_array($userGroups, $groups)) {
+			return true;
+		}
+
+		return false;
 	}
 }

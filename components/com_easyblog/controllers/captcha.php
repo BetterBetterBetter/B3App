@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,32 +9,34 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( EBLOG_ROOT . DIRECTORY_SEPARATOR . 'controller.php' );
+require_once(dirname(__FILE__) . '/controller.php');
 
-class EasyBlogControllerCaptcha extends EasyBlogParentController
+class EasyBlogControllerCaptcha extends EasyBlogController
 {
 	/**
-	 * Generates a random captcha image
+	 * Generates the captcha image
 	 *
-	 **/
-	function display($cachable = false, $urlparams = false)
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function generate()
 	{
-		// @TODO: Run some cleaning query here to clear the database.
-		JTable::addIncludePath( EBLOG_TABLES );
+		$id = $this->input->get('id', '', 'int');
 
-		$id			= JRequest::getInt( 'captcha-id' , '' );
-		$captcha	= EasyBlogHelper::getTable( 'Captcha' , 'Table' );
+		// Load up the captcha object
+		$captcha = EB::table('Captcha');
 
-		// clearing the oudated keys.
+		// Clear outdated keys
 		$captcha->clear();
 
 		// load the captcha records.
-		$captcha->load( $id );
+		$captcha->load($id);
 
-		if( !$captcha->id )
-		{
+		if (!$captcha->id) {
 			return false;
 		}
 

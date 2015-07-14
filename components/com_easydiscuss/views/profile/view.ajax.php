@@ -103,6 +103,7 @@ class EasyDiscussViewProfile extends EasyDiscussView
 				else
 				{
 					require_once( $helperFile );
+					require_once(JPATH_ROOT . '/components/com_easyblog/router.php');
 
 					$blogModel 	= EasyBlogHelper::getModel( 'Blog' );
 					$blogs 		= $blogModel->getBlogsBy( 'blogger' , $profileId );

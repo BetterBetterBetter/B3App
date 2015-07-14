@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,49 +9,51 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewMetas extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	/**
+	 * Default method to display meta
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.meta' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
-			}
+		// Check for access
+		$this->checkAccess('easyblog.manage.meta');
+
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout($tpl);
 		}
-		//initialise variables
-		$document		= JFactory::getDocument();
-		$user			= JFactory::getUser();
-		$mainframe		= JFactory::getApplication();
 
-		JHTML::_('behavior.tooltip');
+		// Set the heading
+		$this->setHeading('COM_EASYBLOG_TITLE_METAS', '', 'fa-unlink');
 
-		$filter_state	= $mainframe->getUserStateFromRequest( 'com_easyblog.metas.filter_state'	, 'filter_state', 	'*', 'word' );
-		$search			= $mainframe->getUserStateFromRequest( 'com_easyblog.metas.search'			, 'search', 		'', 'string' );
+		$filter_state	= $this->app->getUserStateFromRequest( 'com_easyblog.metas.filter_state'	, 'filter_state', 	'*', 'word' );
+		$search			= $this->app->getUserStateFromRequest( 'com_easyblog.metas.search'			, 'search', 		'', 'string' );
 
-		$type			= $mainframe->getUserStateFromRequest( 'com_easyblog.metas.filter_type'		, 'filter_type', 	'', 'word' );
+		$type			= $this->app->getUserStateFromRequest( 'com_easyblog.metas.filter_type'		, 'filter_type', 	'', 'word' );
 
-		$search			= trim(JString::strtolower( $search ) );
-		$order			= $mainframe->getUserStateFromRequest( 'com_easyblog.metas.filter_order'	, 'filter_order', 	'id', 'cmd' );
-		$orderDirection	= $mainframe->getUserStateFromRequest( 'com_easyblog.metas.filter_order_Dir', 'filter_order_Dir',	'', 'word' );
+		$search			= trim(JString::strtolower($search));
+		$order			= $this->app->getUserStateFromRequest( 'com_easyblog.metas.filter_order'	, 'filter_order', 	'id', 'cmd' );
+		$orderDirection	= $this->app->getUserStateFromRequest( 'com_easyblog.metas.filter_order_Dir', 'filter_order_Dir',	'', 'word' );
 
 		//Get data from the model
-		$model			= $this->getModel( 'Metas' );
-
-		$metas			= $model->getData( $type );
+		$model = EB::model('Metas');
+		$metas = $model->getItems($type);
 
 		//filtering
 		$filter = new stdClass();
-		$filter->type 	= $this->getFilterType( $type );
-		$filter->search = $mainframe->getUserStateFromRequest( 'com_easyblog.meta.search', 'search', '', 'string' );
+		$filter->type 	= $type;
+		$filter->search = $this->app->getUserStateFromRequest( 'com_easyblog.meta.search', 'search', '', 'string' );
 
 		for( $i = 0 ; $i < count( $metas ); $i++ )
 		{
@@ -94,19 +96,57 @@ class EasyBlogViewMetas extends EasyBlogAdminView
 
 			}
 		}
-		$pagination 	= $model->getPagination( $type );;
 
-		$this->assignRef( 'meta' 		, $metas );
-		$this->assignRef( 'pagination'	, $pagination );
-		$this->assignRef( 'type', $type );
-		$this->assignRef( 'filter', $filter );
-		$this->assign( 'state'			, JHTML::_('grid.state', $filter_state ) );
+		// Get the pagination
+		$pagination  = $model->getPagination($type);
 
-		$this->assign( 'search'			, $search );
-		$this->assign( 'order'			, $order );
-		$this->assign( 'orderDirection'	, $orderDirection );
+		// Get the filter states
+		// $filterState = JHTML::_('grid.state', $filter_state);
+		$filterState = '';
 
-		parent::display($tpl);
+		//get the filter type
+		$filterType = $this->getFilterType();
+
+		$this->set('metas', $metas);
+		$this->set('pagination', $pagination);
+		$this->set('type', $type);
+		$this->set('filter', $filter);
+		$this->set('state', $filterState);
+		$this->set('filterType', $filterType);
+		$this->set('search', $search);
+		$this->set('order', $order);
+		$this->set('orderDirection', $orderDirection);
+
+		parent::display('metas/default');
+	}
+
+	/**
+	 * Displays the meta form
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function form($tpl = null)
+	{
+		$this->setHeading('COM_EASYBLOG_META_TAG_EDIT', '', 'fa-unlink');
+
+		// Get the meta id
+		$id = $this->input->get('id', '', 'int');
+
+		// Load the meta data
+		$meta = EB::table('Meta');
+		$meta->load($id);
+
+		// we need to add remove button if this meta is a post type.
+		if ($id && $meta->type == 'post') {
+			JToolBarHelper::trash('meta.remove');
+		}
+
+		$this->set('meta', $meta);
+
+		parent::display('metas/form');
 	}
 
 	public static function getIndexing($value, $i, $img1 = 'tick.png', $img0 = 'publish_x.png', $prefix = '')
@@ -132,7 +172,7 @@ class EasyBlogViewMetas extends EasyBlogAdminView
 		return $href;
 	}
 
-	function getFilterType( $filter_type='*' )
+	function getFilterTypeOld( $filter_type='*' )
 	{
 		$filter[] = JHTML::_('select.option', '', '- '. JText::_( 'COM_EASYBLOG_SELECT_TYPE' ) .' -' );
 		$filter[] = JHTML::_('select.option', 'blogger', JText::_( 'COM_EASYBLOG_BLOGGERS' ) );
@@ -140,13 +180,45 @@ class EasyBlogViewMetas extends EasyBlogAdminView
 		$filter[] = JHTML::_('select.option', 'post', JText::_( 'COM_EASYBLOG_POSTS' ) );
 		$filter[] = JHTML::_('select.option', 'team', JText::_( 'COM_EASYBLOG_TEAMS' ) );
 
-		return JHTML::_('select.genericlist', $filter, 'filter_type', 'class="inputbox" size="1" onchange="submitform( );"', 'value', 'text', $filter_type );
+		return JHTML::_('select.genericlist', $filter, 'filter_type', 'class="inputbox" onchange="submitform();"', 'value', 'text', $filter_type );
 	}
 
-	function registerToolbar()
+	function getFilterType( $filter_type='*' )
 	{
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_META_TAG' ), 'meta' );
+		// $filter = array( 'view' => JText::_('COM_EASYBLOG_VIEWS'),
+		// 				 'blogger' => JText::_('COM_EASYBLOG_BLOGGERS'),
+		// 				 'post' => JText::_('COM_EASYBLOG_POSTS'),
+		// 				 'team' => JText::_('COM_EASYBLOG_TEAMS')
+		// 			);
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
+		$filter = array( 'view',
+						 'blogger',
+						 'post',
+						 'team',
+						 'category'
+					);
+
+		return $filter;
+	}
+
+	public function registerToolbar()
+	{
+		if ($this->getLayout() == 'form') {
+			JToolBarHelper::title(JText::_('COM_EASYBLOG_META_TAG_EDIT'), 'meta');
+
+			JToolBarHelper::apply('meta.apply');
+			JToolBarHelper::save('meta.save');
+			JToolBarHelper::divider();
+
+			// trash button will be added at 'form' function.
+
+			JToolBarHelper::cancel('meta.cancel');
+
+		} else {
+			JToolBarHelper::title(JText::_('COM_EASYBLOG_META_TAG'), 'meta');
+
+			JToolBarHelper::divider();
+			JToolbarHelper::deleteList(JText::_('COM_EASYBLOG_METAS_DELETE_META_CONFIRMATION'), 'meta.delete');
+		}
 	}
 }

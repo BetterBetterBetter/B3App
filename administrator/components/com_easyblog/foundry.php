@@ -11,7 +11,7 @@
 */
 defined( '_JEXEC' ) or die( 'Unauthorized Access' );
 
-class FD31_FoundryCompiler_EasyBlog extends FD31_FoundryCompiler_Foundry
+class FD50_FoundryCompiler_EasyBlog extends FD50_FoundryCompiler_Foundry
 {
 	public $name = 'EasyBlog';
 
@@ -41,7 +41,7 @@ class FD31_FoundryCompiler_EasyBlog extends FD31_FoundryCompiler_Foundry
 			}
 		}
 
-		$module = new FD31_FoundryModule($this->compiler, $adapterName, $moduleName, $moduleType);
+		$module = new FD50_FoundryModule($this->compiler, $adapterName, $moduleName, $moduleType);
 
 		return $module;
 	}
@@ -154,8 +154,9 @@ class FD31_FoundryCompiler_EasyBlog extends FD31_FoundryCompiler_Foundry
 				include( $path );
 				$contents 	= ob_get_contents();
 				ob_end_clean();
-				$template 	= new CodeThemes();
-				$contents	= $template->fetch( $name . '.ejs' );
+
+				$template = EB::template();
+				$contents = $template->output($name . '.ejs');
 			}
 		}
 

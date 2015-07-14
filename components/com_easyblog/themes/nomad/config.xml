@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <install version="1.5" type="template">
-	<name>Nomad</name>
-	<version>3.5</version>
-	<created>17/01/2012</created>
-	<updated>17/01/2012</updated>
-	<author>StackIdeas</author>
-	<description>COM_EASYBLOG_THEME_NOMAD_DESC</description>
+	<name>Nomad </name>
+	<version>4.0</version>
+	<created>01/05/2014</created>
+	<updated>01/05/2014</updated>
+	<author>Stack Ideas Sdn Bhd</author>
+	<description>COM_EASYBLOG_THEME_WIREFRAME_DESC</description>
+
 	<params addpath="/administrator/components/com_easyblog/elements">
 		<param type="themes" name="parent" label="COM_EASYBLOG_THEME_PARENT_THEME" description="COM_EASYBLOG_THEME_PARENT_THEME_DESC" />
 		<param type="themes" name="parent_css" label="COM_EASYBLOG_THEME_PARENT_CSS" description="COM_EASYBLOG_THEME_PARENT_CSS_DESC" />
@@ -71,7 +72,6 @@
 			<option value="1">Yes</option>
 			<option value="0">No</option>
 		</param>
-
 		<param type="radio" name="show_bloggerstats" label="COM_EASYBLOG_THEME_SHOW_BLOGGER_STATISTIC" description="COM_EASYBLOG_THEME_SHOW_BLOGGER_STATISTIC_DESC" default="0">
 			<option value="1">Yes</option>
 			<option value="0">No</option>
@@ -80,7 +80,6 @@
 			<option value="1">Yes</option>
 			<option value="0">No</option>
 		</param>
-
 		<param type="radio" name="show_categorystats" label="COM_EASYBLOG_THEME_SHOW_CATEGORY_STATISTIC" description="COM_EASYBLOG_THEME_SHOW_CATEGORY_STATISTIC_DESC" default="1">
 			<option value="1">Yes</option>
 			<option value="0">No</option>
@@ -115,7 +114,6 @@
 	<config>
 		<fields addpath="/administrator/components/com_easyblog/elements">
 			<fieldset name="basic">
-
 				<field type="themes" name="parent" label="COM_EASYBLOG_THEME_PARENT_THEME" description="COM_EASYBLOG_THEME_PARENT_THEME_DESC" />
 				<field type="themes" name="parent_css" label="COM_EASYBLOG_THEME_PARENT_CSS" description="COM_EASYBLOG_THEME_PARENT_CSS_DESC" />
 
@@ -177,12 +175,10 @@
 					<option value="1">Yes</option>
 					<option value="0">No</option>
 				</field>
-
 				<field type="radio" name="show_blogger_filterbar" label="COM_EASYBLOG_THEME_SHOW_BLOGGER_FILTER_BAR" description="COM_EASYBLOG_THEME_SHOW_BLOGGER_FILTER_BAR_DESC" default="1">
 					<option value="1">Yes</option>
 					<option value="0">No</option>
 				</field>
-
 				<field type="radio" name="show_bloggerstats" label="COM_EASYBLOG_THEME_SHOW_BLOGGER_STATISTIC" description="COM_EASYBLOG_THEME_SHOW_BLOGGER_STATISTIC_DESC" default="0">
 					<option value="1">Yes</option>
 					<option value="0">No</option>
@@ -200,7 +196,6 @@
 					<option value="1">Yes</option>
 					<option value="0">No</option>
 				</field>
-
 				<field type="radio" name="show_teamblogstats" label="COM_EASYBLOG_THEME_SHOW_TEAMBLOG_STATISTIC" description="COM_EASYBLOG_THEME_SHOW_TEAMBLOG_STATISTIC_DESC" default="0">
 					<option value="1">Yes</option>
 					<option value="0">No</option>

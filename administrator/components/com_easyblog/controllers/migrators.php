@@ -11,7 +11,7 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-jimport('joomla.application.component.controller');
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerMigrators extends EasyBlogController
 {
@@ -23,18 +23,50 @@ class EasyBlogControllerMigrators extends EasyBlogController
 		// @task: Check for acl rules.
 		$this->checkAccess( 'migrator' );
 
-		$db 	= EasyBlogHelper::db();
+		$layout = $this->input->get('layout', '', 'cmd');
 
-		$query 	= 'TRUNCATE TABLE ' . $db->nameQuote( '#__easyblog_migrate_content' );
+		$db 	= EB::db();
+		$sql = $db->sql();
+
+		$mapping = array('joomla' => 'com_content',
+						'wordpressjoomla' => 'com_wordpress',
+						'wordpress' => 'xml_wordpress',
+						'k2' => 'com_k2',
+						'zoo' => 'com_zoo',
+						'blogger' => 'xml_blogger'
+					);
+
+		$component = '';
+
+		if ($layout) {
+			//let map the layout with component.
+			if (isset($mapping[$layout]) && $mapping[$layout]) {
+				$component = $mapping[$layout];
+			}
+		}
+
+		if ($component) {
+			// delete only associated records from the component.
+			$query = 'delete from ' . $db->nameQuote( '#__easyblog_migrate_content' ) . ' where ' . $db->nameQuote('component') . ' = ' . $db->Quote($component);
+		} else {
+			// truncate all
+			$query 	= 'TRUNCATE TABLE ' . $db->nameQuote( '#__easyblog_migrate_content' );
+		}
+
 		$db->setQuery( $query );
 
 		$db->Query();
 
-		if( $db->getError() )
-		{
-			JFactory::getApplication()->redirect( 'index.php?option=com_easyblog&view=migrators' , JText::_( 'COM_EASYBLOG_PURGE_ERROR') , 'error' );
+		$link = 'index.php?option=com_easyblog&view=migrators';
+		if ($layout) {
+			$link .= '&layout=' . $layout;
 		}
 
-		JFactory::getApplication()->redirect( 'index.php?option=com_easyblog&view=migrators' , JText::_( 'COM_EASYBLOG_PURGE_SUCCESS' ) );
+		if( $db->getError() )
+		{
+			JFactory::getApplication()->redirect( $link , JText::_( 'COM_EASYBLOG_PURGE_ERROR') , 'error' );
+		}
+
+		JFactory::getApplication()->redirect( $link , JText::_( 'COM_EASYBLOG_PURGE_SUCCESS' ) );
 	}
 }

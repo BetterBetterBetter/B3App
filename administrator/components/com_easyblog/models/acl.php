@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,12 +9,11 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
+require_once(dirname(__FILE__) . '/model.php');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'parent.php' );
-
-class EasyBlogModelAcl extends EasyBlogModelParent
+class EasyBlogModelAcl extends EasyBlogAdminModel
 {
 	/**
 	 * Category total
@@ -50,12 +49,12 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 		$this->setState('limitstart', $limitstart);
 	}
 
-	function getTotal($type)
+	function getTotal()
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_total))
 		{
-			$query = $this->_buildQuery($type);
+			$query = $this->_buildQuery();
 			$this->_total = $this->_getListCount($query);
 		}
 
@@ -68,13 +67,13 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 	 * @access public
 	 * @return integer
 	 */
-	function getPagination($type)
+	function getPagination()
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_pagination))
 		{
 			jimport('joomla.html.pagination');
-			$this->_pagination = new JPagination( $this->getTotal($type), $this->getState('limitstart'), $this->getState('limit') );
+			$this->_pagination = new JPagination( $this->getTotal(), $this->getState('limitstart'), $this->getState('limit') );
 		}
 
 		return $this->_pagination;
@@ -96,33 +95,34 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 	function getRules($key='')
 	{
 		$db = EasyBlogHelper::db();
-		$sql = 'SELECT * FROM '.EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_acl').' WHERE `published`=1 ORDER BY `id` ASC';
+		$sql = 'SELECT * FROM '.$db->nameQuote('#__easyblog_acl').' WHERE `published`=1 ORDER BY `id` ASC';
 		$db->setQuery($sql);
 
 		return $db->loadObjectList($key);
 	}
 
-	function deleteRuleset($cid, $type)
+	public function deleteRuleset($cid)
 	{
-		if(empty($cid) || empty($type))
-		{
+		if (empty($cid)) {
 			return false;
 		}
 
 		$db = EasyBlogHelper::db();
 
-		$sql = 'DELETE FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_acl_group') . ' WHERE '. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('content_id') . ' = ' . $db->quote($cid) . ' AND `type` = ' . $db->quote($type);
+		$sql = 'DELETE FROM ' . $db->nameQuote('#__easyblog_acl_group') . ' WHERE '. $db->nameQuote('content_id') . ' = ' . $db->quote($cid) . ' AND `type` = ' . $db->quote('group');
 		$db->setQuery($sql);
 		$result = $db->query();
 
 		return $result;
 	}
 
-	function insertRuleset($cid, $type, $saveData)
+	function insertRuleset($cid, $saveData)
 	{
 		$db = EasyBlogHelper::db();
 
 		$rules = $this->getRules('action');
+
+		$type = 'group';
 
 		$newruleset = array();
 
@@ -135,7 +135,7 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 
 		if(!empty($newruleset))
 		{
-			$sql = 'INSERT INTO ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_acl_group') . ' (`content_id`, `acl_id`, `status`, `type`) VALUES ';
+			$sql = 'INSERT INTO ' . $db->nameQuote('#__easyblog_acl_group') . ' (`content_id`, `acl_id`, `status`, `type`) VALUES ';
 			$sql .= implode(',', $newruleset);
 			$db->setQuery($sql);
 
@@ -145,52 +145,97 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 		return true;
 	}
 
-	function getRuleSet($type, $cid, $add=false)
+	/**
+	 * Retrieve a list of acl groups
+	 *
+	 * @since	1.2
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getGroups()
 	{
-		$db = EasyBlogHelper::db();
+		$db 	= EB::db();
 
-		$rulesets = new stdClass();
-		$rulesets->rules = new stdClass();
+		$query 	= 'SELECT DISTINCT(' . $db->nameQuote('group') . ') FROM ' . $db->nameQuote('#__easyblog_acl');
+		$db->setQuery($query);
 
-		//get rules
-		$rules = $this->getRules('id');
-		foreach($rules as $rule)
-		{
-			$rulesets->rules->{$rule->action} = (INT)$rule->default;
+		$groups	= $db->loadColumn();
+
+		return $groups;
+	}
+
+	/**
+	 * Retrieve a list of rules on the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getInstalledRules($cid, $add = false)
+	{
+		$db					= EB::db();
+		$ruleset			= new stdClass();
+		$ruleset->rules		= array();
+
+		$query	= 'SELECT * FROM ' . $db->nameQuote('#__easyblog_acl');
+		$db->setQuery($query);
+		$rules	= $db->loadObjectList();
+
+		// Need to group up the rules accordingly.
+		foreach ($rules as &$rule) {
+			$ruleset->rules[$rule->group][$rule->action]	= (int) $rule->default;
 		}
 
-		if(!$add)
-		{
-			//get user
-			$query = $this->_buildQuery($type, $cid);
+		if (!$add) {
+
+			$query 	= $this->buildQuery($cid);
+
 			$db->setQuery($query);
-			$row = $db->loadObject();
-			$rulesets->id 	= $row->id;
-			$rulesets->name = $row->name;
-			$rulesets->level = '0';
 
-			//get acl group ruleset
-			$sql = 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_acl_group') . ' WHERE '. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('content_id') . ' = ' . $db->quote($cid) .' AND '. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('type') . ' = ' . $db->quote($type);
-			$db->setQuery($sql);
-			$row = $db->loadAssocList();
+			$row	= $db->loadObject();
 
-			if(count($row) > 0)
-			{
-				foreach($row as $data)
-				{
-					if(isset($rules[$data['acl_id']]))
-					{
-						$action = $rules[$data['acl_id']]->action;
-						$rulesets->rules->{$action} = $data['status'];
+			// Add identifier for this rule set
+			$ruleset->id 	= $row->id;
+			$ruleset->name	= $row->name;
+			$ruleset->level	= 0;
+
+			// Get the stored acl group ruleset
+			$query 	= 'SELECT a.*, b.' . $db->nameQuote('group') . ', b.' . $db->nameQuote('action') . ' FROM ' . $db->nameQuote('#__easyblog_acl_group') . ' AS a '
+					. 'INNER JOIN ' . $db->nameQuote('#__easyblog_acl') . ' AS b '
+					. 'ON a.' . $db->nameQuote('acl_id') . ' = b.' . $db->nameQuote('id') . ' '
+					. 'WHERE ' . $db->nameQuote('content_id') . '=' . $db->Quote($cid) . ' '
+					. 'AND ' . $db->nameQuote('type') . '=' . $db->Quote('group');
+			$db->setQuery($query);
+
+			$row = $db->loadObjectList();
+
+			if(count($row) > 0) {
+
+				foreach ($row as $data) {
+
+					if (isset($ruleset->rules[$data->group][$data->action])) {
+
+						$ruleset->rules[$data->group][$data->action]	= $data->status;
 					}
 				}
 			}
 		}
 
+		return $ruleset;
+	}
+
+	function getRuleSet($cid, $add=false)
+	{
+		$db = EasyBlogHelper::db();
+
+
+
 		return $rulesets;
 	}
 
-	function getRuleSets($type='group', $cid='')
+	function getRuleSets($cid='')
 	{
 		$db 		= EasyBlogHelper::db();
 
@@ -199,10 +244,12 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 
 		$rules = $this->getRules('id');
 
-		//get user
-		$query = $this->_buildQuery($type, $cid);
+		$type = 'group';
 
-		$pagination = $this->getPagination( $type );
+		//get user
+		$query = $this->_buildQuery($cid);
+
+		$pagination = $this->getPagination();
 		$rows = $this->_getList($query, $pagination->limitstart, $pagination->limit );
 
 		if(!empty($rows))
@@ -223,7 +270,7 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 			}
 
 			//get acl group ruleset
-			$sql = 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_acl_group') . ' WHERE '. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('type') . ' = ' . $db->quote($type) . ' AND `content_id` IN (' . implode( ' , ', $ids ) . ')';
+			$sql = 'SELECT * FROM ' . $db->nameQuote('#__easyblog_acl_group') . ' WHERE '. $db->nameQuote('type') . ' = ' . $db->Quote('group') . ' AND `content_id` IN (' . implode( ' , ', $ids ) . ')';
 			$db->setQuery($sql);
 			$acl = $db->loadAssocList();
 
@@ -240,40 +287,24 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 		return $rulesets;
 	}
 
-	function _buildQuery($type='group', $cid='')
+	public function buildQuery($cid = '')
 	{
-		$db			= EasyBlogHelper::db();
+		$db 	= EB::db();
 
-		switch($type)
-		{
-			case 'group':
-				if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
-				{
-					//$query	= 'SELECT `id`, `name` FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__core_acl_aro_groups') . ' a ';
-					$query = 'SELECT a.id, a.title AS `name`, COUNT(DISTINCT b.id) AS level';
-					$query .= ' , GROUP_CONCAT(b.id SEPARATOR \',\') AS parents';
-					$query .= ' FROM #__usergroups AS a';
-					$query .= ' LEFT JOIN `#__usergroups` AS b ON a.lft > b.lft AND a.rgt < b.rgt';
-				}
-				else
-				{
-					$query	= 'SELECT `id`, `name`, 0 as `level` FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__core_acl_aro_groups') . ' a ';
-				}
-				break;
-			case 'assigned':
-			default:
-				$query	= 'SELECT DISTINCT(a.`id`), a.`name`, 0 as `level` FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__users') . ' a LEFT JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_acl_group') . ' b ON a.`id` = b.`content_id` ';
-		}
+		$query = 'SELECT a.id, a.title AS `name`, COUNT(DISTINCT b.id) AS level';
+		$query .= ' , GROUP_CONCAT(b.id SEPARATOR \',\') AS parents';
+		$query .= ' FROM #__usergroups AS a';
+		$query .= ' LEFT JOIN `#__usergroups` AS b ON a.lft > b.lft AND a.rgt < b.rgt';
 
-		$where		= $this->_buildQueryWhere($type, $cid);
-		$orderby	= $this->_buildQueryOrderBy($type);
+		$where		= $this->_buildQueryWhere($cid);
+		$orderby	= $this->_buildQueryOrderBy();
 
 		$query .= $where . ' ' . $orderby;
 
 		return $query;
 	}
 
-	function _buildQueryWhere($type='group', $cid='')
+	function _buildQueryWhere($cid='')
 	{
 		$mainframe			= JFactory::getApplication();
 		$db					= EasyBlogHelper::db();
@@ -283,39 +314,13 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 
 		$where = array();
 
-		if(empty($cid))
+		if(empty($cid) && $search)
 		{
-			if ( $type )
-			{
-				if ( $type == 'group' )
-				{
-					if(EasyBlogHelper::getJoomlaVersion() < '1.6')
-					{
-						$where[] = '(a.`id` > 17 AND a.`id` < 26)';
-					}
-				}
-				else if( $type == 'assigned' )
-				{
-					$where[] = 'b.`type` = '.$db->quote($type);
-				}
-			}
-
-			if ($search)
-			{
-				$where[] = ' LOWER(a.`title`) LIKE \'%' . $search . '%\' ';
-			}
+			$where[] = ' LOWER( name ) LIKE \'%' . $search . '%\' ';
 		}
 		else
 		{
-			if ( $type == 'group' )
-			{
-				$where[] = 'a.`id` = ' . $db->quote($cid);
-			}
-			else if( $type == 'assigned' )
-			{
-				$where[] = 'a.`id` = '.$db->quote($cid);
-				$where[] = 'b.`type` = '.$db->quote($type);
-			}
+			$where[] = 'a.`id` = ' . $db->quote($cid);
 		}
 
 		$where = ( count( $where ) ? ' WHERE ' .implode( ' AND ', $where ) : '' );
@@ -323,22 +328,15 @@ class EasyBlogModelAcl extends EasyBlogModelParent
 		return $where;
 	}
 
-	function _buildQueryOrderBy($type = 'group')
+	function _buildQueryOrderBy()
 	{
 		$mainframe			= JFactory::getApplication();
 
 		$filter_order 		= $mainframe->getUserStateFromRequest( 'com_easyblog.acls.filter_order', 'filter_order', 'a.`id`', 'cmd' );
 		$filter_order_Dir	= $mainframe->getUserStateFromRequest( 'com_easyblog.acls.filter_order_Dir', 'filter_order_Dir', '', 'word' );
 
-		if(($type == 'group') && (EasyBlogHelper::getJoomlaVersion() >= '1.6'))
-		{
-			$orderby	 = ' GROUP BY a.id';
-			$orderby	.= ' ORDER BY a.lft ASC';
-		}
-		else
-		{
-			$orderby 	= ' ORDER BY '.$filter_order.' '.$filter_order_Dir;
-		}
+		$orderby	 = ' GROUP BY a.id';
+		$orderby	.= ' ORDER BY a.lft ASC';
 
 		return $orderby;
 	}

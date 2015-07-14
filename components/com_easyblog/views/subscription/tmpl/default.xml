@@ -4,10 +4,5 @@
 		<message>
 			<![CDATA[COM_EASYBLOG_MENU_SUBSCRIPTION_LAYOUT_DESC]]>
 		</message>
-		<view>latest</view>
 	</layout>
-	<state>
-		<name><![CDATA[COM_EASYBLOG_MENU_SUBSCRIPTION_LAYOUT]]></name>
-		<description><![CDATA[COM_EASYBLOG_MENU_SUBSCRIPTION_LAYOUT_DESC]]></description>
-	</state>
 </metadata>

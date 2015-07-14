@@ -1,144 +1,204 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php' );
+require_once(JPATH_COMPONENT . '/views.php');
 
 class EasyBlogViewTeamblogs extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	/**
+	 * Method to display all team blogs on the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tpl = null)
 	{
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
+		}
+
 		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.teamblog' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
+		$this->checkAccess('easyblog.manage.teamblog');
+
+		$this->setHeading('COM_EASYBLOG_TEAMBLOGS_TITLE', '', 'fa-group');
+
+		$filter_state	= $this->app->getUserStateFromRequest( 'com_easyblog.teamblogs.filter_state', 'filter_state', '*', 'word' );
+		$search			= $this->app->getUserStateFromRequest( 'com_easyblog.teamblogs.search', 			'search', 			'', 'string' );
+
+		$search			= trim(JString::strtolower( $search ) );
+		$order			= $this->app->getUserStateFromRequest( 'com_easyblog.teamblogs.filter_order', 		'filter_order', 	'a.id', 'cmd' );
+		$orderDirection	= $this->app->getUserStateFromRequest( 'com_easyblog.teamblogs.filter_order_Dir',	'filter_order_Dir',	'', 'word' );
+
+		//Get data from the model
+		$model  = EB::model('TeamBlogs');
+		$result = $model->getTeams();
+		$teams  = array();
+
+		if ($result) {
+			foreach ($result as $row) {
+				$team = EB::table('TeamBlog');
+				$team->bind($row);
+
+				$teams[] = $team;
 			}
 		}
 
-		//initialise variables
-		$document		= JFactory::getDocument();
-		$user			= JFactory::getUser();
-		$mainframe		= JFactory::getApplication();
+		$pagination = $model->getPagination();
 
-		$filter_state	= $mainframe->getUserStateFromRequest( 'com_easyblog.teamblogs.filter_state', 		'filter_state', 	'*', 'word' );
-		$search			= $mainframe->getUserStateFromRequest( 'com_easyblog.teamblogs.search', 			'search', 			'', 'string' );
+		$browse = $this->input->get('browse', 0);
+		$browsefunction = $this->input->get('browsefunction', 'insertTag');
 
-		$search			= trim(JString::strtolower( $search ) );
-		$order			= $mainframe->getUserStateFromRequest( 'com_easyblog.teamblogs.filter_order', 		'filter_order', 	'a.id', 'cmd' );
-		$orderDirection	= $mainframe->getUserStateFromRequest( 'com_easyblog.teamblogs.filter_order_Dir',	'filter_order_Dir',	'', 'word' );
+		$this->set('browse', $browse);
+		$this->set('browsefunction', $browsefunction);
+		$this->set('teams', $teams );
+		$this->set('pagination', $pagination );
+		$this->set('state', JHTML::_('grid.state', $filter_state ) );
+		$this->set('search', $search );
+		$this->set('order', $order );
+		$this->set('orderDirection', $orderDirection );
 
-		//Get data from the model
-		$teams			= $this->get( 'Teams' );
-		$pagination		= $this->get( 'Pagination' );
-
-
-		$browse			= JRequest::getInt( 'browse' , 0 );
-		$browsefunction = JRequest::getVar('browsefunction', 'insertTag');
-		$this->assign( 'browse' , $browse );
-		$this->assign( 'browsefunction' , $browsefunction );
-
-		$this->assignRef( 'teams' 		, $teams );
-		$this->assignRef( 'pagination'	, $pagination );
-		$this->assign( 'state'			, JHTML::_('grid.state', $filter_state ) );
-		$this->assign( 'search'			, $search );
-		$this->assign( 'order'			, $order );
-		$this->assign( 'orderDirection'	, $orderDirection );
-
-		parent::display($tpl);
+		parent::display('teamblogs/default');
 	}
 
-	function getMembersCount( $teamId )
+	/**
+	 * Displays the team blog form
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function form()
 	{
-		$db	= EasyBlogHelper::db();
+		// Try to load the team object
+		$id = $this->input->get('id', 0, 'int');
 
-		$query	= 'SELECT COUNT(1) FROM `#__easyblog_team_users` '
-				. 'WHERE `team_id`=' . $db->Quote( $teamId );
-		$db->setQuery( $query );
+		// Try to load up the team blog
+		$team = EB::table('TeamBlog');
+		$team->load($id);
 
-		$total 		= $db->loadResult();
-
-
-
-		// Now we need to calculate the group members.
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			$query	= 'SELECT COUNT(1) '
-					. 'FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team_groups' ) . ' AS a '
-					. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__user_usergroup_map' ) . ' AS b '
-					. 'ON a.`group_id` = b.`group_id` '
-					. 'WHERE a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'team_id' ) . ' = ' . $db->Quote( $teamId );
-		}
-		else
-		{
-			$query	= 'SELECT COUNT(c.`value`) '
-					. 'FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team_groups' ) . ' AS a '
-					. 'LEFT JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__core_acl_groups_aro_map' ) . ' AS b '
-					. 'ON a.`group_id` = b.`group_id` '
-					. 'INNER JOIN ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__core_acl_aro' ) . ' AS c '
-					. 'ON b.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'aro_id' ) . ' = c.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' )
-					. 'WHERE a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'team_id' ) . ' = ' . $db->Quote( $teamId );
+		if ($id) {
+			$this->setHeading('COM_EASYBLOG_EDITING_TEAMBLOG', '', 'fa-users');
+		} else {
+			$this->setHeading('COM_EASYBLOG_TEAMBLOGS_CREATE_TITLE', '', 'fa-users');
 		}
 
-		$db->setQuery( $query );
-		$groupsTotal	= $db->loadResult();
+		$blogAccess = array();
+		$blogAccess[] = JHTML::_('select.option', '1', JText::_( 'COM_EASYBLOG_TEAM_MEMBER_ONLY' ) );
+		$blogAccess[] = JHTML::_('select.option', '2', JText::_( 'COM_EASYBLOG_ALL_REGISTERED_USERS' ) );
+		$blogAccess[] = JHTML::_('select.option', '3', JText::_( 'COM_EASYBLOG_EVERYONE' ) );
+		$blogAccessList = JHTML::_('select.genericlist', $blogAccess, 'access', ' class="form-control"', 'value', 'text', $team->access );
 
-		if( !$groupsTotal )
-		{
-			return $total;
-		}
+		// Get the editor
+		$editor = JFactory::getEditor();
 
-		return $total + $groupsTotal;
+		// get meta tags
+		$metaModel = EB::model('Metas');
+		$meta = $metaModel->getMetaInfo(META_TYPE_TEAM, $id);
+
+		// Get a list of team members
+		$members = $team->getMembers();
+
+		// Get the groups associated with this team
+		$groups = $team->getGroups();
+
+		$this->set('groups', $groups);
+		$this->set('members', $members);
+		$this->set('editor', $editor);
+		$this->set('team', $team);
+		$this->set('meta', $meta);
+		$this->set('blogAccess', $blogAccessList);
+
+		parent::display('teamblogs/form');
 	}
 
-	function getPostCount( $id )
+	/**
+	 * Displays a list of team requests
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function requests()
 	{
-		$db	= EasyBlogHelper::db();
+		$this->setHeading('COM_EASYBLOG_TEAMBLOGS_REQUESTS_TITLE', '', 'fa-group');
 
-		$query	= 'SELECT COUNT(1) FROM #__easyblog_post '
-				. 'WHERE `created_by`=' . $db->Quote( $id );
-		$db->setQuery( $query );
+		// Retrieve all the team requests
+		$model 		= EB::model('TeamRequest');
+		$requests	= $model->getData();
 
-		return $db->loadResult();
-	}
-
-	public function getAccessHTML( $access )
-	{
-		if( $access == '1' )
-		{
-			return JText::_('COM_EASYBLOG_TEAM_MEMBER_ONLY');
+		if ($requests) {
+			foreach ($requests as &$request) {
+				$request->user 	= EB::user($request->user_id);
+			}
 		}
 
-		if( $access == '2')
-		{
-			return JText::_('COM_EASYBLOG_ALL_REGISTERED_USERS');
-		}
+		// Get the pagination
+ 		$pagination 	= $this->get( 'Pagination' );
 
-		return JText::_('COM_EASYBLOG_EVERYONE');
+ 		$this->set('requests', $requests);
+ 		$this->set('pagination', $pagination);
+
+		parent::display('teamblogs/requests');
 	}
 
-	function registerToolbar()
+	/**
+	 * Registers the toolbar at the back end.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return
+	 */
+	public function registerToolbar()
 	{
+		$layout 	= JRequest::getCmd('layout');
+
+		if ($layout == 'form') {
+
+			$id 	= JRequest::getInt('id');
+
+			if ($id) {
+				JToolBarHelper::title(JText::_('COM_EASYBLOG_EDITING_TEAMBLOG'), 'teamblogs' );
+			} else {
+				JToolBarHelper::title(JText::_('COM_EASYBLOG_CREATE_NEW_TEAM'), 'teamblogs');
+			}
+
+			JToolBarHelper::apply('teamblogs.apply');
+			JToolBarHelper::save('teamblogs.save');
+			JToolBarHelper::save2new('teamblogs.savenew');
+			JToolBarHelper::cancel('teamblogs.cancel');
+
+			return;
+		}
+
+		if ($layout == 'requests') {
+			JToolBarHelper::title( JText::_( 'COM_EASYBLOG_TEAMBLOGS_TITLE' ), 'teamblogs' );
+
+			JToolbarHelper::custom('teamblogs.approve', 'publish', '', JText::_('COM_EASYBLOG_TEAMBLOGS_APPROVE_REQUEST'));
+			JToolbarHelper::custom('teamblogs.reject', 'unpublish', '', JText::_('COM_EASYBLOG_TEAMBLOGS_REJECT_REQUEST'));
+			return;
+		}
+
 		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_TEAMBLOGS_TITLE' ), 'teamblogs' );
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
-		JToolbarHelper::divider();
 		JToolbarHelper::addNew();
 		JToolBarHelper::divider();
-		JToolbarHelper::publishList();
-		JToolbarHelper::unpublishList();
+		JToolbarHelper::publishList('teamblogs.publish');
+		JToolbarHelper::unpublishList('teamblogs.unpublish');
 		JToolBarHelper::divider();
-		JToolbarHelper::deleteList();
+		JToolbarHelper::deleteList(JText::_('COM_EASYBLOG_TEAMBLOGS_DELETE_CONFIRM'), 'teamblogs.remove');
 	}
 }

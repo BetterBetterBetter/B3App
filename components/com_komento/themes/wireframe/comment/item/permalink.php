@@ -13,5 +13,7 @@
 
 defined( '_JEXEC' ) or die( 'Restricted access' ); ?>
 <?php if( $system->config->get( 'enable_permalink' ) && !$system->config->get( 'datetime_permalink' ) ) { ?>
-<span class="kmt-permalink-wrap"><a class="kmt-permalink" href="<?php echo $row->permalink; ?>" alt="<?php echo JText::_( 'COM_KOMENTO_COMMENT_PERMALINK' ); ?>" title="<?php echo JText::_( 'COM_KOMENTO_COMMENT_PERMALINK' ); ?>"<?php if( $system->konfig->get( 'enable_schema' ) ) echo 'itemprop="url"'; ?>><?php echo JText::_( 'COM_KOMENTO_COMMENT_PERMALINK' ); ?></a></span>
+<div class="kmt-permalink-wrap">
+<a class="kmt-permalink" href="<?php echo $row->permalink; ?>" alt="<?php echo JText::_( 'COM_KOMENTO_COMMENT_PERMALINK' ); ?>" title="<?php echo JText::_( 'COM_KOMENTO_COMMENT_PERMALINK' ); ?>"<?php if( $system->konfig->get( 'enable_schema' ) ) echo 'itemprop="url"'; ?>><?php echo JText::_( 'COM_KOMENTO_COMMENT_PERMALINK' ); ?></a>
+</div>
 <?php } ?>

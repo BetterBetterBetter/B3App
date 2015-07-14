@@ -200,7 +200,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			// step 1 : create categery if not exist in eblog_categories
 			// step 2 : create user if not exists in eblog_users - create user through profile jtable load method.
 
-			$date           = EasyBlogHelper::getDate();
+			$date           = EB::date();
 			$blogObj    	= new stdClass();
 
 			//default
@@ -221,11 +221,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				$blogObj->category_id   = $eCat;
 			}
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
-			//load user profile
-			$profile->load( $row->created_by );
+			$profile	= EB::user($row->created_by);
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -294,8 +291,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			{
 				foreach( $k2Tags as $item )
 				{
-				    $now    = EasyBlogHelper::getDate();
-					$tag	= EasyBlogHelper::getTable( 'Tag', 'Table' );
+				    $now    = EB::date();
+					$tag	= EB::table('Tag');
 
 
 					if( $tag->exists( $item->name ) )
@@ -316,7 +313,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 					    $tag->store();
 					}
 
-					$postTag	= EasyBlogHelper::getTable( 'PostTag', 'Table' );
+					$postTag	= EB::table('PostTag');
 					$postTag->tag_id	= $tag->id;
 					$postTag->post_id	= $blog->id;
 					$postTag->created	= $now->toMySQL();
@@ -347,7 +344,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$jSession->set('EBLOG_MIGRATOR_JOOMLA_STAT', $migrateStat, 'EASYBLOG');
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $row->id;
 			$migrator->post_id		= $blog->id;
@@ -424,7 +421,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 			require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'mediamanager.php' );
 			$media 				= new EasyBlogMediaManager();
-			$result 			= $media->upload( $newPath , $targetURL , $file , '/' , 'user:' . $author->id );
+			$result 			= $media->upload($file, 'user:' . $author->id);
 			$result 			= json_encode( $result );
 
 			$blog->image 	= $result;
@@ -649,7 +646,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		{
 			// step 1 : create categery if not exist in eblog_categories
 			// step 2 : create user if not exists in eblog_users - create user through profile jtable load method.
-			$date           = EasyBlogHelper::getDate();
+			$date           = EB::date();
 			$blogObj    	= new stdClass();
 			$adminId        = ( empty($authorId) ) ? EasyBlogHelper::getDefaultSAIds() : $authorId;
 
@@ -670,11 +667,10 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				}
 			}
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
 			//load user profile
-			$profile->load( $adminId );
+			$profile	= EB::user($adminId);
+
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -717,7 +713,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$blogState  	= '1';
 			$isPrivate		= '0';
 
-			$blogObj->private       = $isPrivate;
+			$blogObj->access       = $isPrivate;
 			$blogObj->published		= $blogState;
 			$blogObj->publish_up 	= !empty( $data['post_date_gmt'] )? $data['post_date_gmt'] : $date->toMySQL();
 			$blogObj->publish_down	= '0000-00-00 00:00:00';
@@ -736,8 +732,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 			    foreach($wpTag as $item)
 			    {
-				    $now    = EasyBlogHelper::getDate();
-					$tag	= EasyBlogHelper::getTable( 'Tag', 'Table' );
+				    $now    = EB::date();
+					$tag	= EB::table('Tag');
 
 					if( $tag->exists( $item->title ) )
 					{
@@ -755,7 +751,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 					    $tag->store();
 					}
 
-					$postTag	= EasyBlogHelper::getTable( 'PostTag', 'Table' );
+					$postTag	= EB::table('PostTag');
 					$postTag->tag_id	= $tag->id;
 					$postTag->post_id	= $blog->id;
 					$postTag->created	= $now->toMySQL();
@@ -793,7 +789,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $contentId;
 			$migrator->post_id		= $blog->id;
@@ -853,7 +849,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 		require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'mediamanager.php' );
 		$media 				= new EasyBlogMediaManager();
-		$result 			= $media->upload( $dir , $userUploadPath , $file , '/', 'user' );
+		$result 			= $media->upload($file, 'user:' . $userid );
 
 		@JFile::delete( $file['tmp_name'] );
 
@@ -872,7 +868,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 	{
 	    require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'connectors.php' );
 
-	    $connector  = new EasyBlogConnectorsHelper();
+	    $connector  = EB::connector();
 		$connector->addUrl( $link );
 		$connector->execute();
 	    $content	= $connector->getResult( $link );
@@ -897,9 +893,9 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 					continue;
 				}
 
-				$now	= EasyBlogHelper::getDate();
+				$now	= EB::date();
 				$db		= EasyBlogHelper::db();
-				$commt	= EasyBlogHelper::getTable( 'Comment', 'Table' );
+				$commt	= EB::table('Comment');
 
 				//we need to rename the esname and esemail back to name and email.
 				$post               = array();
@@ -1106,7 +1102,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 	    $jSession 	= JFactory::getSession();
 
 		//log the entry into migrate table.
-		$xml = EasyBlogHelper::getTable( 'Xmldata', 'Table' );
+		$xml = EB::table('Xmldata');
 
 		$xml->post_id		= $postId;
 		$xml->session_id	= $jSession->getToken();
@@ -1281,7 +1277,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		{
 			// step 1 : create categery if not exist in eblog_categories
 			// step 2 : create user if not exists in eblog_users - create user through profile jtable load method.
-			$date           = EasyBlogHelper::getDate();
+			$date           = EB::date();
 			$blogObj    	= new stdClass();
 			$adminId        = ( empty($authorId) ) ? EasyBlogHelper::getDefaultSAIds() : $authorId;
 
@@ -1322,11 +1318,9 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				$blogObj->category_id   = $eCat;
 			}
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
 			//load user profile
-			$profile->load( $adminId );
+			$profile	= EB::user($adminId);
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -1370,7 +1364,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			}
 
 			$blogObj->blogpassword  = $data['post_password'];
-			$blogObj->private       = $isPrivate;
+			$blogObj->access       = $isPrivate;
 			$blogObj->published		= $blogState;
 			$blogObj->publish_up 	= !empty( $data['post_date_gmt'] )? $data['post_date_gmt'] : $date->toMySQL();
 			$blogObj->publish_down	= '0000-00-00 00:00:00';
@@ -1389,8 +1383,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 			    foreach($wpTag as $item)
 			    {
-				    $now    = EasyBlogHelper::getDate();
-					$tag	= EasyBlogHelper::getTable( 'Tag', 'Table' );
+				    $now    = EB::date();
+					$tag	= EB::table('Tag');
 
 					if( $tag->exists( $item->title ) )
 					{
@@ -1409,7 +1403,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 					    $tag->store();
 					}
 
-					$postTag	= EasyBlogHelper::getTable( 'PostTag', 'Table' );
+					$postTag	= EB::table('PostTag');
 					$postTag->tag_id	= $tag->id;
 					$postTag->post_id	= $blog->id;
 					$postTag->created	= $now->toMySQL();
@@ -1458,7 +1452,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $contentId;
 			$migrator->post_id		= $blog->id;
@@ -1512,7 +1506,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				// new image location
 				$newFile    = $folder . DIRECTORY_SEPARATOR . $filname;
 
-			    $connector  = new EasyBlogConnectorsHelper();
+			    $connector  = EB::connector();
 				$connector->addUrl( $attachementURL );
 				$connector->execute();
 			    $imageraw	= $connector->getResult( $attachementURL );
@@ -1612,7 +1606,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			// step 1 : create categery if not exist in eblog_categories
 			// step 2 : create user if not exists in eblog_users - create user through profile jtable load method.
 
-			$date           = EasyBlogHelper::getDate();
+			$date           = EB::date();
 			$blogObj    	= new stdClass();
 
 			//default
@@ -1630,11 +1624,9 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				$blogObj->category_id   = $eCat;
 			}
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
 			//load user profile
-			$profile->load( $row->post_author );
+			$profile	= EB::user($row->post_author);
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -1718,7 +1710,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			}
 
 			$blogObj->blogpassword  = $row->post_password;
-			$blogObj->private       = $isPrivate;
+			$blogObj->access       = $isPrivate;
 			$blogObj->published		= $blogState;
 			$blogObj->publish_up 	= !empty( $row->post_date )? $row->post_date : $date->toMySQL();
 			$blogObj->publish_down	= '0000-00-00 00:00:00';
@@ -1738,8 +1730,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 			    foreach($wpPostTag as $item)
 			    {
-				    $now    = EasyBlogHelper::getDate();
-					$tag	= EasyBlogHelper::getTable( 'Tag', 'Table' );
+				    $now    = EB::date();
+					$tag	= EB::table('Tag');
 
 					if( $tag->exists( $item->title ) )
 					{
@@ -1758,7 +1750,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 					    $tag->store();
 					}
 
-					$postTag	= EasyBlogHelper::getTable( 'PostTag', 'Table' );
+					$postTag	= EB::table('PostTag');
 					$postTag->tag_id	= $tag->id;
 					$postTag->post_id	= $blog->id;
 					$postTag->created	= $now->toMySQL();
@@ -1812,7 +1804,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $row->id;
 			$migrator->post_id		= $blog->id;
@@ -1830,9 +1822,9 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 	function _migrateWPComments($wpTableNamePrex, $postId, $blogId, $parentId, $item, $comments = array())
 	{
-		$now	= EasyBlogHelper::getDate();
+		$now	= EB::date();
 		$db		= EasyBlogHelper::db();
-		$commt	= EasyBlogHelper::getTable( 'Comment', 'Table' );
+		$commt	= EB::table('Comment');
 
 		//we need to rename the esname and esemail back to name and email.
 		$post               = array();
@@ -2013,7 +2005,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			// step 1 : create categery if not exist in eblog_categories
 			// step 2 : create user if not exists in eblog_users - create user through profile jtable load method.
 
-			$date           = EasyBlogHelper::getDate();
+			$date           = EB::date();
 			$blogObj    	= new stdClass();
 
 			//default
@@ -2033,11 +2025,10 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				$blogObj->category_id   = $eCat;
 			}
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
 			//load user profile
-			$profile->load( $row->created_by );
+			$profile	= EB::user($row->created_by);
+
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -2101,8 +2092,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			{
 			    foreach($myblogTags as $item)
 			    {
-				    $now    = EasyBlogHelper::getDate();
-					$tag	= EasyBlogHelper::getTable( 'Tag', 'Table' );
+				    $now    = EB::date();
+					$tag	= EB::table('Tag');
 
 					if( $tag->exists( $item->name ) )
 					{
@@ -2121,7 +2112,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 					    $tag->store();
 					}
 
-					$postTag	= EasyBlogHelper::getTable( 'PostTag', 'Table' );
+					$postTag	= EB::table('PostTag');
 					$postTag->tag_id	= $tag->id;
 					$postTag->post_id	= $blog->id;
 					$postTag->created	= $now->toMySQL();
@@ -2154,7 +2145,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $row->id;
 			$migrator->post_id		= $blog->id;
@@ -2239,7 +2230,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			// step 2: create categories / tags if needed.
 			// step 3: migrate comments if needed.
 
-			$date           = EasyBlogHelper::getDate();
+			$date           = EB::date();
 			$blogObj    	= new stdClass();
 
 			//default
@@ -2259,11 +2250,10 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				$blogObj->category_id   = $eCat;
 			}
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
 			//load user profile
-			$profile->load( $row->created_by );
+			$profile	= EB::user($row->created_by);
+
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -2337,8 +2327,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 				    foreach($resultComment as $itemComment)
 				    {
-	    				$now	= EasyBlogHelper::getDate();
-						$commt	= EasyBlogHelper::getTable( 'Comment', 'Table' );
+	    				$now	= EB::date();
+						$commt	= EB::table('Comment');
 
 
 						$commt->post_id      = $blog->id;
@@ -2394,7 +2384,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $row->id;
 			$migrator->post_id		= $blog->id;
@@ -2489,17 +2479,16 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			//      step 2.1: create folder if not exist.
 			// step 3: migrate comments if needed.
 
-			$date           = EasyBlogHelper::getDate();
+			$date           = EB::date();
 			$blogObj    	= new stdClass();
 
 			//default
 			$blogObj->category_id   = 1;  //assume 1 is the uncategorized id.
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
 			//load user profile
-			$profile->load( $row->user_id );
+			$profile	= EB::user($row->user_id);
+
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -2580,15 +2569,13 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 				{
 				    foreach($resultComment as $itemComment)
 				    {
-						$commentor	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-
-						//load user profile
-						$commentor->load( $itemComment->user_id );
+				    	//load user profile
+						$commentor	= EB::user($itemComment->user_id);
 
 						$user   = JFactory::getUser($itemComment->user_id );
 
-	    				$now	= EasyBlogHelper::getDate();
-						$commt	= EasyBlogHelper::getTable( 'Comment', 'Table' );
+	    				$now	= EB::date();
+						$commt	= EB::table('Comment');
 
 
 						$commt->post_id      = $blog->id;
@@ -2655,7 +2642,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $row->id;
 			$migrator->post_id		= $blog->id;
@@ -2778,30 +2765,30 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			// step 1 : create categery if not exist in eblog_categories
 			// step 2 : create user if not exists in eblog_users - create user through profile jtable load method.
 
-			$date = EasyBlogHelper::getDate();
-			$blogObj = new stdClass();
+			$date           = EB::date();
+			$blogObj    	= new stdClass();
 
 			//default
-			$blogObj->category_id = 1;  //assume 1 is the uncategorized id.
+			$blogObj->category_id   = 1;  //assume 1 is the uncategorized id.
 
-			if (!empty($row->catid)) {
+			if(! empty($row->catid))
+			{
 
 			    $joomlaCat  = $this->_getJoomlaCategory($row->catid);
 
 			    $eCat   	= $this->_isEblogCategoryExists($joomlaCat);
-				
-				if ($eCat === false) {
+				if($eCat === false)
+				{
 				    $eCat   = $this->_createEblogCategory($joomlaCat);
 				}
 
 				$blogObj->category_id   = $eCat;
 			}
 
-			$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blog		= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
 			//load user profile
-			$profile->load( $row->created_by );
+			$profile	= EB::user($row->created_by);
+
+			$blog		= EB::table('Blog');
 
 			//assigning blog data
 			$blogObj->created_by	= $profile->id;
@@ -2814,17 +2801,24 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			// Need to remap the access.
 			$access					= 0;
 
-			switch($row->access)
+            if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
+            {
+				switch($row->access)
+				{
+				    case 1:
+				        $access = 0;
+				        break;
+				    default:
+				        $access = 1;
+				        break;
+				}
+			}
+			else
 			{
-			    case 1:
-			        $access = 0;
-			        break;
-			    default:
-			        $access = 1;
-			        break;
+			   	$access = ($row->access == 2) ? 1 : $row->access;
 			}
 
-			$blogObj->private		= $access;
+			$blogObj->access		= $access;
 			if(empty($row->fulltext))
 			{
 				$blogObj->intro			= '';
@@ -2890,9 +2884,6 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$blog->bind($blogObj);
 			$blog->store();
 
-			// Migrate the tags now
-			$this->migrateContentTags($blog, $row);
-
 			// Run jomcomment migration here.
 			if( $jomcomment )
 			{
@@ -2902,13 +2893,11 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			//migrate meta description
 			$this->_migrateContentMeta($row->metakey, $row->metadesc, $blog->id);
 
-			//isfeatured! only applicable in joomla1.6
-			if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
-			{
-			    if($row->featured)
-			    {
-			        EasyBlogHelper::makeFeatured('post', $blog->id);
-			    }
+
+			if ($row->featured) {
+		      	// just call the model file will do as we do not want to create stream on featured action at this migration.
+				$modelF = EB::model('Featured');
+				$modelF->makeFeatured('post', $blog->id);
 			}
 
 			//update session value
@@ -2934,7 +2923,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $row->id;
 			$migrator->post_id		= $blog->id;
@@ -3006,7 +2995,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$migrateStat->user      = array();
 		}
 
-	    $category	= EasyBlogHelper::getTable( 'Category', 'Table' );
+	    $category	= EB::table('Category');
 
 	    $arr    = array();
 	    $arr['created_by']  = $this->_getSAUserId();
@@ -3062,7 +3051,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			return true;
 	    }
 
-	    $meta				= EasyBlogHelper::getTable( 'Meta', 'Table' );
+	    $meta				= EB::table('Meta');
 	    $meta->keywords		= $metaKey;
 	    $meta->description	= $metaDesc;
 	    $meta->content_id	= $blogId;
@@ -3072,64 +3061,6 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		return true;
 	}
 
-	/**
-	 * Migrates tags from Joomla articles into EasyBlog
-	 *
-	 * @since	5.0
-	 * @access	public
-	 * @param	string
-	 * @return	
-	 */
-	public function migrateContentTags(EasyBlogTableBlog $blog, $article)
-	{
-		if (!EasyBlogHelper::isJoomla30()) {
-			return false;
-		}
-		
-		$db = EasyBlogHelper::db();
-
-		$query = 'SELECT b.* FROM `#__contentitem_tag_map` AS a ';
-		$query .= 'INNER JOIN ' . $db->nameQuote('#__tags') . ' AS b ';
-		$query .= 'ON a.' . $db->nameQuote('tag_id') . ' = b.' . $db->nameQuote('id') . ' ';
-		$query .= 'WHERE a.`content_item_id` = ' . $db->Quote($article->id);
-		
-		$db->setQuery($query);
-
-		$result = $db->loadObjectList();
-
-		if (!$result) {
-			return;
-		}
-
-		$now = EasyBlogHelper::getDate();
-
-		foreach ($result as $row) {
-
-			// Create a new tag in EasyBlog if it doesn't exist yet.
-			$tag = EasyBlogHelper::getTable('Tag');
-			$exists = $tag->load($row->title, true);
-
-			// If the tag does not exist, create it first
-			if (!$exists) {
-
-				$tag->title = $row->title;
-				$tag->alias = $row->alias;
-				$tag->published = $row->published;
-				$tag->created_by = $row->created_user_id;
-
-				// Create the tag
-				$tag->store();
-			}
-
-			// If the tag exists, just associate the tag id with the post id.
-			$relation = EasyBlogHelper::getTable('PostTag');
-			$relation->tag_id = $tag->id;
-			$relation->post_id = $blog->id;
-			$relation->created = $now->toSql();
-			$relation->store();
-		}
-	}
-
 	function _migrateLyftenTags()
 	{
 	    //this will plot all lyften bloggie tags into easyblog's tags
@@ -3137,7 +3068,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 	    $db 	= EasyBlogHelper::db();
 	    $suId   = $this->_getSAUserId();
-	    $now	= EasyBlogHelper::getDate();
+	    $now	= EB::date();
 
 	    $query  = 'insert into `#__easyblog_tag` (`created_by`, `title`, `alias`, `created`, `published`)';
 		$query  .= ' select ' . $db->Quote($suId) . ', `name`, `slug`, '. $db->Quote($now->toMySQL()).', ' . $db->Quote('1');
@@ -3164,7 +3095,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 	    $db 	= EasyBlogHelper::db();
 	    $suId   = $this->_getSAUserId();
-	    $now	= EasyBlogHelper::getDate();
+	    $now	= EB::date();
 
 		$query  = ' select `title`, `slug`, `published`';
 		$query  .= ' from `#__bloggies_categories`';
@@ -3179,7 +3110,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		{
 		    $catObj     = $results[$i];
 
-		    $category	= EasyBlogHelper::getTable( 'Category', 'Table' );
+		    $category	= EB::table('Category');
 
 		    $arr    = array();
 		    $arr['created_by']  = $suId;
@@ -3212,7 +3143,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		$query	.= ' WHERE NOT EXISTS (';
 		$query	.= ' SELECT content_id FROM `#__easyblog_migrate_content` AS b WHERE b.`content_id` = a.`id` and `component` = ' . $db->Quote('com_k2.comments');
 		$query	.= ' ) ';
-		$query	.= 'AND a.' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'itemID' ) . ' = ' . $db->Quote( $k2obj->id ) . ' ORDER BY a.`id` ASC';
+		$query	.= 'AND a.' . $db->nameQuote( 'itemID' ) . ' = ' . $db->Quote( $k2obj->id ) . ' ORDER BY a.`id` ASC';
 
 		$db->setQuery( $query );
 
@@ -3239,7 +3170,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$post['email']      = $comment->commentEmail;
 			$post['url']        = $comment->commentURL;
 
-            $table		= EasyBlogHelper::getTable( 'Comment' );
+            $table		= EB::table('Comment');
             $table->bindPost($post);
 
             //the rest info assign here.
@@ -3254,7 +3185,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
             $table->store();
 
 			//log the entry into migrate table.
-			$migrator = EasyBlogHelper::getTable( 'Migrate', 'Table' );
+			$migrator = EB::table('Migrate');
 
 			$migrator->content_id	= $comment->id;
 			$migrator->post_id		= $table->id;
@@ -3272,9 +3203,9 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 	{
 		$db		= EasyBlogHelper::db();
 
-		$query	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__jomcomment' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'contentid' ) . ' = ' . $db->Quote( $contentId ) . ' '
-				. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'option' ) . ' = ' . $db->Quote( $option ) . ' '
+		$query	= 'SELECT * FROM ' . $db->nameQuote( '#__jomcomment' ) . ' '
+				. 'WHERE ' . $db->nameQuote( 'contentid' ) . ' = ' . $db->Quote( $contentId ) . ' '
+				. 'AND ' . $db->nameQuote( 'option' ) . ' = ' . $db->Quote( $option ) . ' '
 				. 'ORDER BY `id` ASC';
 
 		$db->setQuery( $query );
@@ -3301,7 +3232,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$post['email']      = $comment->email;
 			$post['url']        = $comment->website;
 
-            $table		= EasyBlogHelper::getTable( 'Comment' );
+            $table		= EB::table('Comment');
             $table->bindPost($post);
 
             //the rest info assign here.
@@ -3343,8 +3274,8 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		{
 		    $itemComment   = $results[$i];
 
-			$commt		= EasyBlogHelper::getTable( 'Comment', 'Table' );
-			$now		= EasyBlogHelper::getDate();
+			$commt		= EB::table('Comment');
+			$now		= EB::date();
 
 			$commt->post_id      = $blogId;
 			$commt->comment      = $itemComment->comment;
@@ -3389,7 +3320,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 
 		foreach( $results as $result )
 		{
-			$new = EasyBlogHelper::getTable( 'Comment', 'Table' );
+			$new = EB::table('Comment');
 
 			$new->post_id		= $blogId;
 			$new->comment		= $parent->comment;
@@ -3469,7 +3400,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 					$break = 1;
 
 					// get the last rgt in kmt to append subsequent comments
-					$model = EasyBlogHelper::getModel( 'comment' );
+					$model = EB::model( 'comment' );
 					$latestComment = $model->getLatestComment( $blogId );
 
 					if( $latestComment )
@@ -3489,7 +3420,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$parent->rgt = $base + 1;
 
 			// store the comement
-			$new = EasyBlogHelper::getTable( 'Comment', 'Table' );
+			$new = EB::table('Comment');
 			$new->post_id		= $blogId;
 			$new->comment		= $parent->comment;
 			$new->title			= $parent->contenttitle;
@@ -3533,13 +3464,13 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		foreach( $children as $child )
 		{
 			// set the node to the parent as default
-			$parent = EasyBlogHelper::getTable( 'Comment', 'Table' );
+			$parent = EB::table('Comment');
 			$parent->load( $newId );
 			$node = $parent->lft;
 
 			// check and see if the parent comment (has already migrated to easyblog) contains any child comment existing or not
 			// if this parent comment contains child comment, then use the latest child comment's as node
-			$model = EasyBlogHelper::getModel( 'comments' );
+			$model = EB::model( 'comments' );
 			$latest = $model->getLatestComment( $blogId, $newId );
 			if( !empty( $latest ) )
 			{
@@ -3554,7 +3485,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 			$child->rgt = $node + 2;
 
 			// store the comment
-			$new		= EasyBlogHelper::getTable( 'Comment', 'Table' );
+			$new		= EB::table('Comment');
 			$new->post_id		= $blogId;
 			$new->parent_id		= $newId;
 			$new->comment		= $child->comment;

@@ -184,6 +184,10 @@ class EasyDiscussController extends EasyDiscussControllerParent
 
 		$appsLib->triggerEvent( 'onSystemStart' , array() );
 
+		// Since Jomsocial 4.0 render their icon on the page
+        $svgFile = CFactory::getPath('template://assets/icon/joms-icon.svg');
+        include_once $svgFile;		
+
 		ob_start();
 		if( class_exists( 'CToolbarLibrary' ) )
 		{

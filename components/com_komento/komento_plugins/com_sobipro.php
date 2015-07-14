@@ -74,7 +74,8 @@ class KomentoComsobipro extends KomentoExtension
 					. ' LEFT JOIN ' . $db->nameQuote( '#__sobipro_field') . ' AS c ON c.fid = b.fid'
 					. ' WHERE a.id = ' . $db->quote( $cid )
 					. ' AND a.oType = ' . $db->quote( 'entry' )
-					. ' AND c.nid = ' . $db->quote( 'field_name' );
+					. ' AND c.nid = ' . $db->quote( 'field_title' );
+					//. ' AND c.nid = ' . $db->quote( 'field_name' );
 			$db->setQuery($query);
 
 			$result = $db->loadObject();

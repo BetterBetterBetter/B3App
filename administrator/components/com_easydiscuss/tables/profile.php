@@ -567,8 +567,9 @@ class DiscussProfile extends JTable
 		$query	= 'SELECT COUNT(a.`id`) AS CNT, a.`user_id` FROM `#__discuss_posts` AS a ';
 		$query	.= ' WHERE a.`user_id` IN (' . $ids . ')';
 		$query	.= ' AND a.`published` = 1';
-		$query	.= ' AND a.`parent_id` != 0';
+		$query	.= ' AND a.`parent_id` > 0';
 		$query	.= ' GROUP BY a.`user_id`';
+		$query 	.= ' ORDER BY NULL';
 
 		$db->setQuery($query);
 
@@ -606,7 +607,7 @@ class DiscussProfile extends JTable
 			$query	= 'SELECT COUNT(a.`id`) AS CNT FROM `#__discuss_posts` AS a ';
 			$query	.= ' INNER JOIN #__discuss_posts AS b ';
 			$query	.= ' ON a.`parent_id`=b.`id`';
-			$query	.= ' AND a.`parent_id` != 0';
+			$query	.= ' AND a.`parent_id` > 0';
 			$query	.= ' WHERE a.`user_id` = ' . $db->Quote($this->id);
 			$query	.= ' AND a.`published` = 1';
 			$query	.= ' AND b.`published` = 1';

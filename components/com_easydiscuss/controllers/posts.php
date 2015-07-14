@@ -347,7 +347,7 @@ class EasyDiscussControllerPosts extends EasyDiscussController
 
 		// Set the replyContent
 		$emailData['replyContent']		= $emailContent;
-		
+
 		$notify->addQueue( $email, $emailSubject, '', $emailTemplate, $emailData);
 		// sending notification to person who made the reply end.
 
@@ -553,7 +553,7 @@ class EasyDiscussControllerPosts extends EasyDiscussController
 		if( $post->published == DISCUSS_ID_PUBLISHED && $category->canPublicAccess() && $post->parent_id == '0')
 		{
 			$post->autopost();
-		}		
+		}
 
 		// @trigger: onBeforeSave
 		$isNew	= (bool) $post->id;
@@ -987,7 +987,7 @@ class EasyDiscussControllerPosts extends EasyDiscussController
 		$post->published	= DISCUSS_ID_PUBLISHED;
 
 		// Detect if post should be moderated.
-		if( $config->get( 'main_moderatepost' ) && !DiscussHelper::isSiteAdmin( $post->user_id ) && !DiscussHelper::isModerateThreshold( $post->user_id ) )
+		if( $config->get( 'main_moderatepost' ) && !DiscussHelper::isSiteAdmin( $my->id ) && !DiscussHelper::isModerateThreshold( $my->id ) )
 		{
 			$post->published 	= DISCUSS_ID_PENDING;
 		}
@@ -1375,7 +1375,7 @@ class EasyDiscussControllerPosts extends EasyDiscussController
 
 		if (!empty($redirect)) {
 			$redirect 	= base64_decode( $redirect );
-			return $this->setRedirect( $redirect );			
+			return $this->setRedirect( $redirect );
 		}
 
 		$redirectionOption = $config->get( 'main_post_redirection' );
@@ -1549,7 +1549,7 @@ class EasyDiscussControllerPosts extends EasyDiscussController
 	 * @since	3.2
 	 * @access	public
 	 * @param	string
-	 * @return	
+	 * @return
 	 */
 	public function saveReply()
 	{

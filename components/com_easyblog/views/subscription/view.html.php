@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,87 +9,70 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-jimport( 'joomla.html.toolbar' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewSubscription extends EasyBlogView
 {
-	function display( $tmpl = null )
+	/**
+	 * Displays a list of subscriptions the user belongs to.
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function display($tpl = null)
 	{
-		$mainframe		= JFactory::getApplication();
-		$document		= JFactory::getDocument();
-		$config			= EasyBlogHelper::getConfig();
-		$my				= JFactory::getUser();
-		$postTable		= EasyBlogHelper::getTable('Blog'		, 'Table');
-		$bloggerTable	= EasyBlogHelper::getTable('Profile'		, 'Table');
-		$catTable		= EasyBlogHelper::getTable('Category'	, 'Table');
-		$teamTable		= EasyBlogHelper::getTable('TeamBlog'	, 'Table');
+		// Check for acl
+		$this->checkAcl('allow_subscription');
 
-		$document->setTitle( JText::_( 'COM_EASYBLOG_SUBSCRIPTIONS_PAGE_TITLE' ) );
+		// Do not allow guests to access this page
+		if ($this->my->guest) {
+			return EB::requireLogin();
+		}
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'subscription' ) )
-	    	$this->setPathway( JText::_( 'COM_EASYBLOG_SUBSCRIPTIONS_BREADCRUMB' ) );
+		// Set the title of the page
+		$this->doc->setTitle(JText::_('COM_EASYBLOG_SUBSCRIPTIONS_PAGE_TITLE'));
 
-		$subscription = array();
-		if(!empty($my->id))
-		{
-			$subs = EasyBlogHelper::getSubscriptionbyUser($my->id);
+		// Add pathway
+		if (!EBR::isCurrentActiveMenu('subscription')) {
+	    	$this->setPathway(JText::_('COM_EASYBLOG_SUBSCRIPTIONS_BREADCRUMB'));
+	    }
 
-			if(!empty($subs))
-			{
-				foreach($subs as $sub)
-				{
-					$temp = new stdClass();
-					$temp->id			= $sub->id;
-					$temp->type			= $sub->type;
-					$temp->unsublink	= EasyBlogHelper::getUnsubscribeLink($sub, false);
+	    // Ensure that the user has access to manage subscriptions
+	    if (!$this->acl->get('allow_subscription')) {
+	    	return JError::raiseError(500, JText::_('COM_EASYBLOG_YOU_DO_NOT_HAVE_PERMISSION_TO_VIEW'));
+	    }
 
-					switch($sub->type)
-					{
-						case 'sitesubscription':
-							$temp->name = '';
-							$temp->link = '';
-							break;
-						case 'subscription':
-							$postTable 	= EasyBlogHelper::getTable( 'Blog' );
-							$postTable->load($sub->cid);
-							$temp->name = $postTable->title;
-							$temp->link = EasyBlogRouter::_('index.php?option=com_easyblog&view=entry&id='.$postTable->id, false);
-							break;
-						case 'bloggersubscription':
-							$bloggerTable 	= EasyBlogHelper::getTable( 'Profile' );
-							$bloggerTable->load($sub->cid);
-							$temp->name = $bloggerTable->getName();
-							$temp->link = $bloggerTable->getProfileLink();
-							break;
-						case 'categorysubscription':
-							$catTable 	= EasyBlogHelper::getTable( 'Category' );
-							$catTable->load($sub->cid);
-							$temp->name = $catTable->title;
-							$temp->link = EasyBlogRouter::_('index.php?option=com_easyblog&view=categories&layout=listings&id='.$catTable->id, false);
-							break;
-						case 'teamsubscription':
-							$teamTable 	= EasyBlogHelper::getTable( 'TeamBlog' );
-							$teamTable->load($sub->cid);
-							$temp->name = $teamTable->title;
-							$temp->link = EasyBlogRouter::_('index.php?option=com_easyblog&view=teamblog&layout=listings&id='.$teamTable->id, false);
-							break;
-						default:
-							//dont do anything if it is an unrecognize type.
-					}
+		// Get a list of subscriptions the user has
+		$model = EB::model('Subscriptions');
+		$result = $model->getSubscriptionsByUser($this->my->id);
+		$subscriptions = array();
+		$groups = array();
 
-					$subscription[$sub->type][] = $temp;
+		if ($result) {
+			foreach ($result as $row) {
+				
+				$type = $row->utype;
+				$groups[] = $type;
+
+				if (!isset($subscriptions[$type])) {
+					$subscriptions[$row->utype] = array();
 				}
+
+				// Get the formatted type title
+				$row->object = $row->getObject();
+				
+				$subscriptions[$row->utype][] = $row;
 			}
 		}
 
-		$theme		= new CodeThemes();
-		$theme->set('my'			, $my );
-		$theme->set('subscription'	, $subscription );
-		$html		= $theme->fetch( 'subscription.php' );
+		// dump($subscriptions);
+		$this->set('groups', $groups);
+		$this->set('subscriptions', $subscriptions);
 
-		echo $html;
+		parent::display('subscription/default');
 	}
 }

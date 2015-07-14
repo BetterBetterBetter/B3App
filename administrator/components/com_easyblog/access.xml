@@ -10,7 +10,6 @@
 		<action name="easyblog.manage.pending" title="COM_EASYBLOG_JACL_MANAGE_PENDING" description="COM_EASYBLOG_JACL_MANAGE_PENDING_DESC" />
 		<action name="easyblog.manage.tag" title="COM_EASYBLOG_JACL_MANAGE_TAGS" description="COM_EASYBLOG_JACL_MANAGE_TAGS_DESC" />
 		<action name="easyblog.manage.comment" title="COM_EASYBLOG_JACL_MANAGE_COMMENTS" description="COM_EASYBLOG_JACL_MANAGE_COMMENTS_DESC" />
-		<action name="easyblog.manage.trackback" title="COM_EASYBLOG_JACL_MANAGE_TRACKBACKS" description="COM_EASYBLOG_JACL_MANAGE_TRACKBACKS_DESC" />
 		<action name="easyblog.manage.teamblog" title="COM_EASYBLOG_JACL_MANAGE_TEAMS" description="COM_EASYBLOG_JACL_MANAGE_TEAMS_DESC" />
 		<action name="easyblog.manage.acl" title="COM_EASYBLOG_JACL_MANAGE_ACL" description="COM_EASYBLOG_JACL_MANAGE_ACL_DESC" />
 		<action name="easyblog.manage.meta" title="COM_EASYBLOG_JACL_MANAGE_META" description="COM_EASYBLOG_JACL_MANAGE_META_DESC" />
@@ -21,5 +20,6 @@
 		<action name="easyblog.manage.theme" title="COM_EASYBLOG_JACL_MANAGE_THEMES" description="COM_EASYBLOG_JACL_MANAGE_THEMES_DESC" />
 		<action name="easyblog.manage.report" title="COM_EASYBLOG_JACL_MANAGE_REPORTS" description="COM_EASYBLOG_JACL_MANAGE_REPORTS_DESC" />
 		<action name="easyblog.manage.updater" title="COM_EASYBLOG_JACL_MANAGE_UPDATER" description="COM_EASYBLOG_JACL_MANAGE_UPDATER_DESC" />
+		<action name="easyblog.manage.maintenance" title="COM_EASYBLOG_JACL_MANAGE_UPDATER" description="COM_EASYBLOG_JACL_MANAGE_UPDATER_DESC" />
 	</section>
 </access>

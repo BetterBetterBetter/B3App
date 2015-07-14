@@ -862,5 +862,17 @@ class DiscussEasySocialHelper
 		return $state;
 	}
 
+	public function deleteDiscussStream($post)
+	{
+		if (!$this->exists() || !$this->config->get('integration_easysocial_activity_new_question')) {
+			return;
+		}
+
+		$stream = Foundry::stream();
+		$state = $stream->delete($post->id, 'discuss');
+
+		return $state;
+	}
+
 
 }

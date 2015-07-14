@@ -12,9 +12,6 @@
  */
 defined('_JEXEC') or die('Restricted access');
 ?>
-
-<?php if( $system->config->get( 'main_frontend_statistics' ) ){ ?>
-<?php if( $canViewStatistic ){ ?>
 <div class="discuss-statistic">
 	<h3><?php echo JText::_( 'COM_EASYDISCUSS_BOARD_STATISTICS' );?></h3>
 
@@ -65,5 +62,3 @@ defined('_JEXEC') or die('Restricted access');
 		<?php } ?>
 	</div>
 </div>
-<?php } ?>
-<?php } ?>

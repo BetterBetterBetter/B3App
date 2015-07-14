@@ -11,38 +11,55 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-jimport( 'joomla.html.pane' );
-require( EBLOG_ADMIN_ROOT . '/views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewSettings extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.setting' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
-			}
-		}
-		//initialise variables
-		$document	= JFactory::getDocument();
-		$user		= JFactory::getUser();
+		// Check for access
+		$this->checkAccess('easyblog.manage.settings');
 
-		$config		= EasyBlogHelper::getConfig();
-		$jconfig	= JFactory::getConfig();
+		$layout 	= $this->getLayout();
 
-		$dstOptions	= array();
-		$iteration 	= -12;
-		for( $i = 0; $i <= 24; $i++ )
-		{
-			$dstOptions[]	= JHTML::_('select.option', $iteration, $iteration);
-			$iteration++;
+		$this->set('config', $this->config);
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
 		}
 
-		$dstList = JHTML::_('select.genericlist',  $dstOptions, 'main_dstoffset', 'class="inputbox" size="1"', 'value', 'text', $config->get('main_dstoffset', 0));
+		// Someone is trying to access index.php?option=com_easyblog&view=settings
+		$this->general();
+	}
+
+	public function general()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_GENERAL', '', 'fa-wrench');
+
+		$this->set('namespace', 'settings/general/default');
+
+		parent::display('settings/form');
+	}
+
+	public function media()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_MEDIA', '', 'fa-picture-o');
+
+		$this->set('namespace', 'settings/media/default');
+		parent::display('settings/form');
+	}
+
+	public function seo()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_SEO', '', 'fa-cloud');
+
+		$this->set('namespace', 'settings/seo/default');
+		parent::display('settings/form');
+	}
+
+	public function comments()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_COMMENTS', '', 'fa-comments-o');
 
 		//check if jomcomment installed.
 		$jcInstalled = false;
@@ -52,21 +69,19 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 		}
 
 		//check if jcomments installed.
-		$jcommentInstalled = false;
+		$jComment 		= false;
 		$jCommentFile 	= JPATH_ROOT . '/components/com_jcomments/jcomments.php';
-		
-		if( JFile::exists( $jCommentFile ) )
-		{
-			$jcommentInstalled = true;
+
+		if (JFile::exists($jCommentFile)) {
+			$jComment = true;
 		}
 
 		//check if rscomments installed.
-		$rscommentInstalled = false;
+		$rsComment 		= false;
 		$rsCommentFile 	= JPATH_ROOT . '/components/com_rscomments/rscomments.php';
 
-		if( JFile::exists( $rsCommentFile ) )
-		{
-			$rscommentInstalled = true;
+		if (JFile::exists($rsCommentFile)) {
+			$rsComment = true;
 		}
 
 		// @task: Check if easydiscuss plugin is installed and enabled.
@@ -74,25 +89,159 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 
 		$komento		= JPluginHelper::isEnabled( 'content' , 'komento' );
 
-		$defaultSAId	= EasyBlogHelper::getDefaultSAIds();
+		$this->set('easydiscuss', $easydiscuss);
+		$this->set('komento', $komento);
+		$this->set('jcInstalled', $jcInstalled);
+		$this->set('jComment', $jComment);
+		$this->set('rsComment', $rsComment);
 
-		$joomlaVersion	= EasyBlogHelper::getJoomlaVersion();
+		$this->set('namespace', 'settings/comments/default');
+		parent::display('settings/form');
+	}
 
-		$socialButtonsOrder	= $this->getSocialButtonOrder();
+	public function storage()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_REMOTE_STORAGE', '', 'fa-cloud-download');
 
-		$this->assignRef( 'jConfig' 			, $jconfig );
-		$this->assignRef( 'config' 				, $config );
-		$this->assignRef( 'dstList' 			, $dstList );
-		$this->assignRef( 'jcInstalled' 		, $jcInstalled );
-		$this->assignRef( 'easydiscuss'			, $easydiscuss );
-		$this->assignRef( 'komento'				, $komento );
-		$this->assignRef( 'jcommentInstalled' 	, $jcommentInstalled );
-		$this->assignRef( 'rscommentInstalled' 	, $rscommentInstalled );
-		$this->assignRef( 'defaultSAId' 		, $defaultSAId );
-		$this->assignRef( 'joomlaversion' 		, $joomlaVersion );
-		$this->assignRef( 'socialButtonsOrder' , $socialButtonsOrder );
+		$buckets = array();
 
-		parent::display($tpl);
+		if ($this->config->get('amazon_enable') && $this->config->get('amazon_key') && $this->config->get('amazon_secret')) {
+
+			$amazon = EB::amazon();
+
+			$buckets = $amazon->getBuckets();
+		}
+
+		$this->set('buckets', $buckets);
+		$this->set('namespace', 'settings/storage/default');
+		parent::display('settings/form');
+	}
+
+	public function dropbox()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_DROPBOX', '', 'fa-dropbox');
+
+		$this->set('namespace', 'settings/dropbox/default');
+		parent::display('settings/form');
+	}
+
+	public function layout()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_LAYOUT', '', 'fa-desktop');
+
+		// Get the category params
+		$params = $this->config;
+
+		// Get the param forms from the view manifest file
+		$manifest = JPATH_ROOT . '/components/com_easyblog/views/entry/tmpl/default.xml';
+		$postform = EB::form()->render($manifest, $params, true, 'layout_');
+		$this->set('postform', $postform);
+
+
+		$this->set('namespace', 'settings/layout/default');
+		parent::display('settings/form');
+	}
+
+	public function notifications()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_NOTIFICATIONS', '', 'fa-bell-o');
+
+		$this->set('namespace', 'settings/notifications/default');
+		parent::display('settings/form');
+	}
+
+	public function integrations()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_INTEGRATIONS', '', 'fa-sitemap');
+		$this->set('namespace', 'settings/integrations/default');
+		parent::display('settings/form');
+	}
+
+	public function social()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_SOCIAL_INTEGRATIONS', '', 'fa-share-square');
+
+		$this->set('namespace', 'settings/social/default');
+		parent::display('settings/form');
+	}
+
+	public function mailchimp()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_MAILCHIMP', '', 'fa-share-square');
+
+		$this->set('namespace', 'settings/mailchimp/default');
+		parent::display('settings/form');
+	}
+
+	public function sendy()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_SENDY', '', 'fa-paper-plane-o');
+
+		$this->set('namespace', 'settings/sendy/default');
+		parent::display('settings/form');
+	}
+
+	public function system()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_SYSTEM', '', 'fa-flask');
+
+		$ownerIds = EB::getDefaultSAIds();
+
+		$this->set('ownerIds', $ownerIds);
+		$this->set('namespace', 'settings/system/default');
+
+		parent::display('settings/form');
+	}
+
+	public function reporting()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_REPORTING', '', 'fa-exclamation-triangle');
+
+
+		$this->set('namespace', 'settings/reporting/default');
+		parent::display('settings/form');
+	}
+
+	public function remote()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_REMOTE_PUBLISHING', '', 'fa-rocket');
+
+
+		$this->set('namespace', 'settings/remote/default');
+		parent::display('settings/form');
+	}
+
+	public function mailbox()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_MAILBOX_PUBLISHING', '', 'fa-envelope');
+
+
+		$this->set('namespace', 'settings/mailbox/default');
+		parent::display('settings/form');
+	}
+
+	public function antispam()
+	{
+		$this->setHeading('COM_EASYBLOG_TITLE_SETTINGS_ANTISPAM', '', 'fa-ambulance');
+
+		$this->set('namespace', 'settings/antispam/default');
+		parent::display('settings/form');
+	}
+
+	public function users()
+	{
+		$this->setHeading('COM_EASYBLOG_SETTINGS_TAB_AUTHORS');
+
+		$this->set('namespace', 'settings/users/default');
+		parent::display('settings/form');
+	}
+
+	public function teamblogs()
+	{
+		$this->setHeading('COM_EASYBLOG_SETTINGS_TAB_TEAMBLOGS');
+
+		$this->set('namespace', 'settings/teamblogs/default');
+		parent::display('settings/form');
 	}
 
 	public function getSocialButtonOrder()
@@ -112,54 +261,7 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 		return $socialButtonOrders;
 	}
 
-	function getEditorList( $selected )
-	{
-		$db		= EasyBlogHelper::db();
-
-		// compile list of the editors
-		if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
-		{
-			$query = 'SELECT `element` AS value, `name` AS text'
-					.' FROM `#__extensions`'
-					.' WHERE `folder` = "editors"'
-					.' AND `type` = "plugin"'
-					.' AND `enabled` = 1'
-					.' ORDER BY ordering, name'
-					;
-		}
-		else
-		{
-			$query = 'SELECT element AS value, name AS text'
-					.' FROM #__plugins'
-					.' WHERE folder = "editors"'
-					.' AND published = 1'
-					.' ORDER BY ordering, name'
-					;
-		}
-
-		//echo $query;
-
-		$db->setQuery($query);
-		$editors = $db->loadObjectList();
-
-		if(count($editors) > 0)
-		{
-			if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
-			{
-				$lang = JFactory::getLanguage();
-				for($i = 0; $i < count($editors); $i++)
-				{
-					$editor = $editors[$i];
-					$lang->load($editor->text . '.sys', JPATH_ADMINISTRATOR, null, false, false);
-					$editor->text   = JText::_($editor->text);
-				}
-			}
-		}
-
-		return JHTML::_('select.genericlist',  $editors , 'layout_editor', 'class="inputbox" size="1"', 'value', 'text', $selected );
-	}
-
-	function getThemes( $selectedTheme = 'default' )
+	public function getThemes( $selectedTheme = 'default' )
 	{
 		$html	= '<select name="layout_theme" class="inputbox">';
 
@@ -180,11 +282,11 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 		return $html;
 	}
 
-	function getDashboardThemes( $selectedTheme = 'system' )
+	public function getDashboardThemes( $selectedTheme = 'system' )
 	{
 		$html	= '<select name="layout_dashboard_theme" class="inputbox">';
 
-		$model	= $this->getModel( 'Settings' );
+		$model	= $EB::model( 'Settings' );
 		$themes	= $model->getThemes( true );
 
 		for( $i = 0; $i < count( $themes ); $i++ )
@@ -200,7 +302,15 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 		return $html;
 	}
 
-	function getBloggerThemes()
+	/**
+	 * Retrieves a list of themes available for bloggers
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getBloggerThemes()
 	{
 		$config = EasyBlogHelper::getConfig();
 
@@ -215,10 +325,10 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 
 		$previouslyAvailable = $config->get('layout_availablebloggertheme');
 
-		return JHTML::_('select.genericlist', $options, 'layout_availablebloggertheme[]', 'multiple="multiple" style="width: 200px;height: 200px;"', 'value', 'text', explode('|', $previouslyAvailable) );
+		return JHTML::_('select.genericlist', $options, 'layout_availablebloggertheme[]', 'multiple="multiple" class="form-control" style="height: 200px;"', 'value', 'text', explode('|', $previouslyAvailable) );
 	}
 
-	function getEmailsTemplate()
+	public function getEmailsTemplate()
 	{
 		JHTML::_('behavior.modal' , 'a.modal' );
 		$html	= '';
@@ -271,7 +381,7 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 		return $html;
 	}
 
-	function editEmailTemplate()
+	public function editEmailTemplate()
 	{
 		$file		= JRequest::getVar('file', '', 'GET');
 		$filepath	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'themes' . DIRECTORY_SEPARATOR . 'default' . DIRECTORY_SEPARATOR . $file;
@@ -284,8 +394,7 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 
 		if(!empty($msg))
 		{
-			$document = JFactory::getDocument();
-			$document->addStyleSheet( JURI::root() . '/components/com_easyblog/assets/css/common.css' );
+			EasyBlogHelper::addStyleSheet('/components/com_easyblog/assets/css/common.css');
 		?>
 			<div id="eblog-message" class="<?php echo $msgType; ?>"><?php echo $msg; ?></div>
 		<?php
@@ -330,7 +439,7 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 
 		for( $i = 1; $i <= 10; $i++ )
 		{
-			$listLength[] = JHTML::_('select.option', $i , JText::_( $i ) );	
+			$listLength[] = JHTML::_('select.option', $i , JText::_( $i ) );
 		}
 
 		$listLength[] = JHTML::_('select.option', '15', JText::_( '15' ) );
@@ -339,39 +448,16 @@ class EasyBlogViewSettings extends EasyBlogAdminView
 		$listLength[] = JHTML::_('select.option', '30', JText::_( '30' ) );
 		$listLength[] = JHTML::_('select.option', '50', JText::_( '50' ) );
 		$listLength[] = JHTML::_('select.option', '100', JText::_( '100' ) );
-		return JHTML::_('select.genericlist', $listLength, $key , 'size="1" class="inputbox"', 'value', 'text', $selected );
+		return JHTML::_('select.genericlist', $listLength, $key , ' class="inputbox"', 'value', 'text', $selected );
 	}
 
-	function registerToolbar()
+	public function registerToolbar()
 	{
 		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_HOME_SETTINGS' ), 'settings' );
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
+		JToolBarHelper::apply('settings.save');
 		JToolbarHelper::divider();
-		JToolbarHelper::custom( 'export' , 'export' , '' , JText::_( 'COM_EASYBLOG_EXPORT_SETTINGS' ) , false );
-		JToolbarHelper::custom( 'import' , 'import' , '' , JText::_( 'COM_EASYBLOG_IMPORT_SETTINGS' ) , false );
-		JToolbarHelper::divider();
-		JToolBarHelper::apply();
-		JToolBarHelper::save();
-		JToolBarHelper::divider();
-		JToolBarHelper::cancel();
-	}
-
-	public function export()
-	{
-		$this->checkAccess( 'setting' );
-
-		$db 	= JFactory::getDBO();
-
-		$query 	= 'SELECT `params` FROM ' . $db->quoteName( '#__easyblog_configs' ) . ' WHERE `name` = ' . $db->Quote( 'config' );
-		$db->setQuery( $query );
-
-		$data 	= $db->loadResult();
-		var_dump( $data );exit;
-	}
-
-	function registerSubmenu()
-	{
-		return 'submenu.php';
+		JToolbarHelper::custom('export', 'download', '', JText::_('COM_EASYBLOG_EXPORT_SETTINGS'), false);
+		JToolbarHelper::custom('import', 'upload', '', JText::_('COM_EASYBLOG_IMPORT_SETTINGS'), false);
 	}
 }

@@ -1,0 +1,846 @@
+#cop_tr {
+display:none;
+}
+
+#qtc_admin {
+float:left;
+width:60%;
+}
+
+/*For CART view*/
+#qtc_formactions {
+padding-left:160px;
+}
+
+#qtc_loginmsg {
+float:left;
+width:40%;
+}
+
+/* added by Vidyasagar to remove inline style from Registration*/
+#qtc_maindiv {
+width:100%;
+}
+
+#qtc_orderblocs {
+clear:both;
+}
+
+#qtc_orderinfo {
+float:left;
+margin-right:8px;
+width:43%;
+}
+
+.btn_margin {
+margin:2px 1px 2px 0 !important;
+}
+
+.cartitems {
+height:150px;
+overflow-y:scroll;
+}
+
+.category_product_div_size {
+float:left;
+height:190px;
+width:160px;
+}
+
+.checkout-heading {
+background:none repeat scroll 0 0 #D9EDF7;
+border:1px solid #DBDEE1;
+color:#555555;
+font-size:17px;
+font-weight:bold;
+margin-bottom:15px;
+padding:8px;
+}
+
+.clr {
+clear:both;
+}
+
+.com_q2c_img_128_128 {
+height:128px!important;
+width:128px!important;
+}
+
+.com_qtc_header_img {
+border:#999 1px solid!important;
+height:100px!important;
+width:580px!important;
+}
+
+.com_qtc_img_border {
+border:#999 1px solid!important;
+}
+
+.com_qtc_mediaAdd_button {
+position:relative;
+right:-83%;
+top:-144px;
+}
+
+.com_qtc_mediaRemove_button {
+position:relative;
+right:-88%;
+top:-130px;
+}
+
+.com_qtc_media_repeat_block {
+padding:2% 0 0 1%;
+}
+
+.com_qtc_prod_img {
+border:#999 1px solid!important;
+height:85px!important;
+width:85px!important;
+}
+
+.com_qtc_prod_img100by100 {
+border:#999 1px solid!important;
+height:100px!important;
+width:100px!important;
+}
+
+.com_qtc_prod_img50by50 {
+border:#999 1px solid!important;
+height:50px!important;
+width:50px!important;
+}
+
+.com_qtc_repeating_block {
+border:1px dotted;
+padding:2% 0 0 1%;
+width:80%;
+}
+
+/*vm*/
+.com_quick2cart_ajax_loading {
+text-align:center;
+}
+
+.com_quick2cart_ajax_loading_img {
+height:72px!important;
+width:72px!important;
+}
+
+.com_quick2cart_ajax_loading_text {
+font-weight:bold;
+}
+
+.curr_margin {
+margin:0 5px 5px 0 !important;
+}
+
+.default_product_div_size {
+float:left;
+height:190px;
+width:110px;
+}
+
+/* filter search css added by kk */
+.filter-search #search_list {
+margin-bottom:0!important;
+}
+
+.floatleft {
+float:left;
+}
+
+.paddleft {
+padding-left:8px;
+}
+
+.q2c_pin_image {
+height: auto;
+width: 100%;
+}
+
+.q2c_justify {
+text-align: justify;
+}
+
+.q2c-btn-wrapper {
+display: inline-block;
+margin: 0 0 5px 5px;
+}
+
+/* added by kk for registration view */
+.q2c-registration .form-horizontal .control-label {
+text-align:left!important;
+width:140px!important;
+}
+
+.q2c-registration .form-horizontal .controls {
+margin-left:151px!important;
+}
+
+.q2c-registration-btn {
+text-align:right;
+}
+
+/** This adds border */
+.qtcAddBorderToWrapper {
+border:1px solid hsl(0,0%,87%);
+margin-top:5px;
+padding:5px;
+}
+
+.qtcChekoutCurrSelect {
+float:right;
+margin-top:5px;
+}
+
+.qtc_addInvalidate_border .invalid {
+border-color:#e9322d!important;
+}
+
+.qtc_addProduct .tabbable ul li {
+/*background:none repeat scroll 0 0 transparent!important;*/ /*^manoj - to fix chosen list issue*/
+list-style:none outside none!important; /* FOR JA template li styling applied */
+}
+
+.qtc_container .qtc_count {
+margin-bottom:0!important;
+}
+
+.qtc_count {
+margin-bottom:0!important;
+width:43px !important;
+}
+
+.qtc_count,.qtc_itemcount,.qtc_buy modal {
+float:left;
+}
+
+.qtc_dropdown_menu ul {
+list-style-position:outside;
+list-style-type:none!important;
+margin:0!important;
+padding:0!important;
+}
+
+/*For ORDER view */
+.qtc_orderemail {
+background-color:#cccccc;
+}
+
+.qtc_ordersite {
+float:left;
+margin-right:8px;
+width:43%;
+}
+
+.qtc_orderstateinfo {
+float:left;
+width:43%;
+}
+
+.qtc_prod_detail_div {
+border:1px solid #ededed!important;
+margin:2px;
+}
+
+.qtc_removeBottomMargin {
+margin-bottom:0!important;
+}
+
+.qtcattributePopUp .row-fluid .span4 {
+float:left!important;
+width:31.9149%!important;
+}
+
+.qtcmod_store_div_size {
+float:left;
+height:136px;
+width:115px;
+}
+
+.quick2cart_coat .checkout-content {
+overflow:auto;
+padding:0 0 15px;
+}
+
+.quick2cart_coat .checkout-content .buttons {
+clear:both;
+}
+
+.quick2cart_coat .checkout-heading a {
+cursor:pointer;
+float:right;
+font-weight:normal;
+margin-top:1px;
+text-decoration:none;
+}
+
+.remove_cart:hover {
+color:red;
+cursor:pointer;
+}
+
+.table-responsive {
+margin-bottom:15px;
+overflow-x:auto;
+overflow-y:hidden;
+width:100%;
+}
+
+/* start image Slider css*/
+.q2c-wrapper #gallery {
+left:0;
+list-style:none outside none;
+position:relative;
+top:0;
+}
+
+.q2c-wrapper #gallery li {
+float:left;
+margin:2px;
+}
+
+.q2c-wrapper #gallery-next {
+left:inherit;
+right:0;
+}
+
+.q2c-wrapper #gallery-prev {
+left:0;
+}
+
+.q2c-wrapper #gallery-prev,#gallery-next {
+cursor:pointer;
+font-size:15px;
+height:25px;
+position:absolute;
+top:50%;
+width:24px;
+z-index:120;
+}
+
+.q2c-wrapper #gallery-wrap {
+margin:0 auto;
+overflow:hidden;
+position:relative;
+}
+
+.q2c-wrapper #qtc_center_margin {
+text-align:center;
+}
+
+.q2c-wrapper #qtc_mainwrapper .qtc_select {
+width:161px!important;
+}
+
+.q2c-wrapper .adminlist {
+width:100%;
+}
+
+.q2c-wrapper .btn-mini {
+margin:2px 3px;
+}
+/*
+.q2c-wrapper .btn-primary,.q2c-wrapper .btn-primary:hover,.q2c-wrapper .btn-warning,.q2c-wrapper .btn-warning:hover,.q2c-wrapper .btn-danger,.q2c-wrapper .btn-danger:hover,.q2c-wrapper .btn-success,.q2c-wrapper .btn-success:hover,.q2c-wrapper .btn-info,.q2c-wrapper .btn-info:hover,.q2c-wrapper .btn-inverse,.q2c-wrapper .btn-inverse:hover {
+color:#FFFFFF!important;
+} */
+
+.q2c-wrapper .btn_height {
+height:28px;
+}
+
+.q2c-wrapper .cart-popup {
+background:none repeat scroll 0 0 #FAFAFA;
+border:1px solid #DDDDDD;
+border-radius:4px 4px 4px 4px;
+box-shadow:0 0 20px rgba(0,0,0,0.5);
+cursor:wait;
+margin-left:10px;
+margin-top:-30px;
+padding:10px 20px;
+position:absolute;
+z-index:9999;/*+manoj*/
+}
+
+.q2c-wrapper .cart-popup .cart-popup_close {
+cursor:pointer;
+position:absolute;
+right:5px;
+text-align:center;
+top:5px;
+width:18px;
+}
+
+.q2c-wrapper .descreaseTopMargin {
+margin-top:-5px!important;
+}
+
+.q2c-wrapper .fieldset_block {
+border:1px solid #CCCCCC;
+margin:5px;
+padding:5px;
+}
+
+.q2c-wrapper .filediv {
+margin-bottom:5px;
+}
+
+.q2c-wrapper .form-horizontal .control-label {
+margin-top:0!important;
+}
+
+.q2c-wrapper .form-horizontal .qtc_controls_text {
+padding-top:5px;
+}
+
+.q2c-wrapper .icon-minus:before {
+content:none!important;
+}
+
+.q2c-wrapper .icon-plus:before {
+content:none!important;
+}
+
+.q2c-wrapper .modal {
+background-clip:padding-box;
+/*background-color:inherit;*/ /*^manoj*/
+border:medium none!important;
+border-radius:6px 6px 6px 6px;
+box-shadow:none!important;
+left:50%;
+margin-left:auto!important;
+outline:0 none;
+position:inherit!important;
+top:10%;
+width:auto!important;
+z-index:1050;
+}
+
+.q2c-wrapper .nav-tabs {
+list-style-type:none!important;
+}
+
+.q2c-wrapper .nav-tabs > li {
+margin-bottom:-1px!important;
+}
+
+.q2c-wrapper .qtcMediaWrapper {
+padding-top:15px!important;
+}
+
+.q2c-wrapper .qtcMediaWrapper .form-horizontal .control-label {
+width:100px!important;
+}
+
+.q2c-wrapper .qtcMediaWrapper .form-horizontal .controls {
+margin-left:120px!important;
+}
+
+.q2c-wrapper .qtcProdPgDownLink {
+margin-left:38px;
+margin-top:10px;
+}
+
+.q2c-wrapper .qtc_ForLiStyle li {
+background:none repeat scroll 0 0 transparent!important;
+list-style:none outside none!important; /* FOR JA template li styling applied */
+}
+
+/* For backend add product view*/
+.q2c-wrapper .qtc_att_hide {
+display:none;
+}
+
+.q2c-wrapper .qtc_checkbox_style {
+margin-top:-1px;
+}
+
+.q2c-wrapper .qtc_currencey_textbox input[type="text"] {
+height:20px!important;
+padding:4px 6px!important;
+}
+
+.q2c-wrapper .qtc_dashboard_hr {
+margin:5px!important;
+}
+
+.q2c-wrapper .qtc_float_right {
+float:right!important;
+}
+
+.q2c-wrapper .qtc_formActionAlign {
+text-align:center;
+}
+
+/*.q2c-wrapper .qtc_icon-minus {*/
+.q2c-wrapper .qtc_icon-minus {
+background-position:-433px -96px !important;
+}
+
+/*.q2c-wrapper .qtc_icon-ok-circle {*/
+.q2c-wrapper .qtc_icon-ok-circle {
+background-position:-192px -96px !important;
+}
+
+/*.q2c-wrapper .qtc_icon-plus {*/
+.q2c-wrapper .qtc_icon-plus {
+background-position:-408px -96px !important;
+}
+
+/*.q2c-wrapper .qtc_icon-qtcminus {*/
+.q2c-wrapper .qtc_icon-qtcminus {
+background-position:-24px -96px !important;
+}
+
+/*.q2c-wrapper .qtc_icon-qtcplus {*/
+.q2c-wrapper .qtc_icon-qtcplus {
+background-position:0 -96px !important;
+}
+
+/*.q2c-wrapper .qtc_icon-remove-circle {*/
+.q2c-wrapper .qtc_icon-remove-circle {
+background-position:-168px -96px !important;
+}
+
+/*.q2c-wrapper .qtc_icon-shopping-cart {*/
+.q2c-wrapper .qtc_icon-shopping-cart {
+background-position:-360px -120px !important;
+}
+
+/*.q2c-wrapper .qtc_icon-white {*/
+.q2c-wrapper .qtc_icon-white {
+background-image:url(../../../../media/techjoomla_strapper/img/glyphicons-halflings-white.png);
+/*background-image:url(./../../../../media/techjoomla_strapper/img/glyphicons-halflings.png);*/
+}
+
+.q2c-wrapper .qtc_left_margin {
+margin-left:5px!important;
+}
+
+.q2c-wrapper .qtc_left_top {
+margin-top:5px!important;
+}
+
+/* For backend add product view*/
+.q2c-wrapper .qtc_media_hide {
+display:none;
+}
+
+.q2c-wrapper .qtc_modal .icon-edit:before {
+content:none!important;
+}
+
+/* start STORE OWNER OPTIONS for del edit publish */
+.q2c-wrapper .qtc_owner_opts {
+display:none;
+position:absolute;
+right:5px;
+top:5px;
+}
+
+.q2c-wrapper .qtc_owner_opts_dropdown {
+text-align:left!important;
+}
+
+.q2c-wrapper .qtc_padding_class_attributes {
+padding-top:5px;
+}
+
+/*.q2c-wrapper .qtc_pointerCusrsor {*/
+.q2c-wrapper .qtc_pointerCusrsor {
+cursor:pointer;
+}
+
+/* added by VBmundhe product page changes */
+.q2c-wrapper .qtc_prod_blog_page .form-horizontal .control-label {
+width:75px;
+}
+
+.q2c-wrapper .qtc_prod_blog_page .form-horizontal .controls {
+margin-left:90px;
+}
+
+/* added by vidyasagar for toolbar and thumbnail in J2.5 qtc_ForLiStyle */
+.q2c-wrapper .qtc_productblog ul li {
+/*background:none repeat scroll 0 0 transparent!important;* /*^manoj - for chosen select list*/
+list-style:none outside none!important; /* FOR JA template li styling applied */
+}
+
+.q2c-wrapper .qtc_publish {
+background-image:url(../images/tick.png);
+}
+
+.q2c-wrapper .qtc_putmargin5px {
+margin-right:5px!important;
+}
+
+.q2c-wrapper .qtc_putmarginLeft {
+margin-right:15px!important;
+}
+
+.q2c-wrapper .qtc_putmarginbottom {
+margin-bottom:5px!important;
+}
+
+.q2c-wrapper .qtc_putmarginright {
+margin-right:5px!important;
+}
+
+.q2c-wrapper .qtc_putmargintop {
+margin-top:5px!important;
+}
+
+.q2c-wrapper .qtc_right_margin {
+margin-right:5px!important;
+}
+
+.q2c-wrapper .qtc_textbox_small {
+/*width:25px!important;*/ width:40px!important;/* ^ manoj*/
+}
+
+/* FOR Beex_3 template toolbar popup is not working */
+/*.q2c-wrapper .qtc_toolbar .collapse {*/ /* ^ manoj*/
+/* Commented beacuase it affect for template "vw17 - Par défaut" */
+/*.qtc_toolbarDiv .qtc_toolbar .collapse {
+overflow:auto;
+}*/
+
+/*.q2c-wrapper .qtc_toolbar .nav {*/ /* ^ manoj*/
+.qtc_toolbarDiv .qtc_toolbar .nav {
+list-style:none outside none!important;
+/*margin-bottom:18px;*/ /* ^ manoj*/
+margin-left:0;
+display: inline-block; /* to avoid display each element on new line*/
+
+}
+
+.qtc_toolbarDiv .qtc_toolbar .navbar .nav > li {
+  position: relative;
+  display: inline-block;
+}
+.qtc_toolbarDiv .qtc_toolbar .navbar .nav-collapse { display: inline-block; }
+/*.q2c-wrapper .qtc_toolbar .navbar .nav > li > a {*/ /* ^ manoj*/
+.qtc_toolbarDiv .qtc_toolbar .navbar .nav > li > a {
+padding:9px!important;
+}
+
+/*.q2c-wrapper .qtc_toolbar .navbar-inner {*/ /* ^ manoj*/
+.qtc_toolbarDiv .qtc_toolbar .navbar-inner {
+height:auto!important; /*height: 40px;*/ /* FOR JA template toolbar ht ^ Sneha */
+}
+
+/*.q2c-wrapper .qtc_toolbar ul li {*/ /* ^ manoj*/
+.qtc_toolbarDiv .qtc_toolbar ul li {
+background:none repeat scroll 0 0 transparent!important; /* FOR JA template li styling applied */
+list-style:none outside none!important;
+overflow:visible!important; /* FOR JA template toolbar popup is not working */
+padding-left:5px!important; /* FOR JA template toolbar */
+}
+
+/*set font for toolbar*/
+.qtc_toolbarDiv .qtc_toolbar ul li {
+font-size: 11px;
+}
+/*.q2c-wrapper .qtc_toolbarDiv .navbar-inner {*/ /*^ manoj*/
+.qtc_toolbarDiv .navbar-inner {
+-webkit-box-shadow:none!important;
+background:hsl(0,0%,98%)!important;
+box-shadow:none!important;
+/*-moz-box-shadow: 0 0 0 0;
+-webkit-box-shadow: 0 0 0 0;
+box-shadow: 0 0 0 0;*/
+}
+
+.q2c-wrapper .qtc_unpublish {
+background-image:url(../images/publish_x.png);
+}
+
+.q2c-wrapper .radio_label input,.q2c-wrapper .radio_label label {
+float:none;
+}
+
+.q2c-wrapper .removeMargin {
+margin:0!important;
+}
+
+.q2c-wrapper .row-fluid .qtc_bottom {
+margin-bottom:10px;
+}
+
+/*.q2c-wrapper .span1 {*/
+.q2c-wrapper .span1 {
+min-width:50px!important;
+}
+
+.q2c-wrapper .table {
+width:100%;
+}
+
+/*^ commented by manoj*/
+/*.q2c-wrapper .table-bordered th,.q2c-wrapper .table-bordered td {
+border-left:medium none!important;
+}*/
+
+.q2c-wrapper .table-tool {
+font-weight:bold;
+padding:5px 10px;
+}
+
+.q2c-wrapper .textalign_left {
+text-align:left;
+}
+
+.q2c-wrapper .thumbnails > li.prodImg_wrapper {
+margin-bottom:1px!important;
+margin-left:2px!important;
+}
+
+.q2c-wrapper .thumbnails > li.product_wrapper {
+position:relative;
+}
+
+.q2c-wrapper .thumbnails > li.product_wrapper,.q2c-wrapper .thumbnails > li.store_wrapper {
+list-style:none outside none!important;
+margin-bottom:10px!important;
+margin-left:15px!important;
+}
+
+/* added By Vidyasagar to Remove inline style*//* added by vidyasagar for icon for 3.0*/
+/*.q2c-wrapper [class^="qtc_icon-"],.q2c-wrapper [class*=" qtc_icon-"] {*/
+.q2c-wrapper [class^="qtc_icon-"], [class*=" qtc_icon-"] {
+background-image:url(../../../../media/techjoomla_strapper/img/glyphicons-halflings.png);
+background-position:14px 14px;
+background-repeat:no-repeat;
+display:inline-block;
+height:14px;
+line-height:14px;
+margin-right:.3em;
+vertical-align:text-top;
+width:14px;
+}
+
+.q2c-wrapper h1,.q2c-wrapper h2,.q2c-wrapper h3,.q2c-wrapper h4,.q2c-wrapper h5,.q2c-wrapper h6 {
+color:inherit!important;
+font-family:inherit;
+font-weight:bold!important;
+text-rendering:optimizelegibility;
+}
+
+.q2c-wrapper h3 {
+font-size:18px!important;
+line-height:27px;
+}
+
+.q2c-wrapper table.adminlist td,table.adminlist th {
+padding:4px;
+}
+
+/*^ commented by manoj*/
+/*
+.q2c-wrapper tr,.q2c-wrapper td {
+border:medium none!important;
+}*/
+
+/*for auto suggest*/
+.q2c-wrapper ul.selections {
+margin:0!important;
+}
+
+span.qtc_itemcount {
+float:left;
+margin:0 0 0 3px;
+width:16px; /* + kk*/
+}
+
+span.qtc_itemcount input {
+background:none; /* + kk*/
+border:0;
+height:15px;
+padding:2px 4px;
+width:15px!important;
+}
+
+@media max-width 767px{
+	.table-responsive {
+	margin-bottom:15px;
+	overflow-x:auto;
+	overflow-y:hidden;
+	width:100%;
+	}
+}
+
+@media max-width 979px and min-width 768px{
+	.q2c-wrapper .qtc_toolbar .navbar-inner {
+	width:100%;
+	}
+}
+
+.qtc_action_button button
+{
+margin: 2px !important;
+}
+
+/*+manoj - for pagination selectlist*/
+.q2c-wrapper #limit {
+width: auto !important;
+}
+
+/* Widths */
+.q2c_width_1{width:1%;}
+.q2c_width_5{width:5%;}
+.q2c_width_10{width:10%;}
+.q2c_width_15{width:15%;}
+.q2c_width_20{width:20%;}
+.q2c_width_25{width:25%;}
+.q2c_width_30{width:30%;}
+.q2c_width_35{width:35%;}
+.q2c_width_50{width:50%;}
+.q2c_width_60{width:50%;}
+.q2c_width_70{width:70%;}
+.q2c_width_75{width:75%;}
+.q2c_width_auto{width: auto !important;}
+.q2c_AttoptionsMaxWidth{max-width: 150px !important;}
+
+/* product view and pins */
+.q2c_image{height: auto; width: 100%;}
+.q2c_pin_wrapper{background-color: #fff;}
+.q2c_pin_wrapper:hover {
+background: none repeat scroll 0 0 #FAFAFA;
+border-radius: 4px 4px 4px 4px;
+box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+.q2c_border{
+border: 1px solid #DDDDDD !important;
+padding: 15px;
+margin-bottom: 10px;
+}
+
+/*.q2c_border_box {
+border: 1px solid #DDDDDD !important;
+padding: 3px;
+}*/
+
+.q2c_horizontal_social_buttons{padding:10px 0 10px;}
+
+/*+manoj start*/
+/*Backported "list group" from bootstrap 3 by adding namespace "tj-"*/
+.tj-list-group {min-width:50px; margin-bottom: 20px; padding-left: 0;}
+.tj-list-group-item {position: relative; display: block; padding: 10px 15px; margin-bottom: -1px; background-color: #ffffff; border: 1px solid #dddddd;}
+.tj-list-group-item {position: relative; display: block; padding: 10px 15px; margin-bottom: -1px; background-color: #ffffff; border: 1px solid #dddddd;}
+.tj-list-group-item:first-child {border-top-right-radius: 4px; border-top-left-radius: 4px;}
+.tj-list-group-item:last-child {margin-bottom: 0; border-bottom-right-radius: 4px; border-bottom-left-radius: 4px;}
+.tj-list-group-item.active, .tj-list-group-item.active:hover, .tj-list-group-item.active:focus {z-index: 2; color: #ffffff; background-color: #0088cc; border-color: #0088cc;}
+.tj-list-group-item > .badge {float: right;}
+a.tj-list-group-item {color: #555555;}
+a.tj-list-group-item.active > .badge, .nav-pills > .active > a > .badge {color: #0088cc; background-color: #ffffff; text-shadow:0 0 0; /*^ manoj*/}
+a.tj-list-group-item:hover, a.tj-list-group-item:focus {text-decoration: none; color: #555555; background-color: #f5f5f5;}
+/*+ manoj - end*/
+
+/* List view publish buttons*/
+.q2c_button_publish{width:16px; height:16px; border:0;}
+
+.q2c-display-none{display:none;}
+.q2c-margin-top{margin-top:9px;}
+.q2c-wrapper .qtc_hideEle { display:none; }
+.q2c-wrapper #notify_chk {margin-bottom: 5px;  margin-top: 5px;}
+.q2c-wrapper  #multi_curr{max-width: 65px;}

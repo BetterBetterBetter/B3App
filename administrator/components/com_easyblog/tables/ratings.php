@@ -1,164 +1,121 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(dirname(__FILE__) . '/table.php');
 
 class EasyBlogTableRatings extends EasyBlogTable
 {
-	/*
-	 * The primary key for this table.
-	 * @var int
-	 */
-	var $id 					= null;
+	public $id = null;
+	public $uid = null;
+	public $type = null;
+	public $created_by = null;
+	public $sessionid = null;
+	public $value = null;
+	public $ip = null;
+	public $published = null;
+	public $created = null;
 
-	/**
-	 * Universal id
-	 * @var int
-	 */
-	var $uid		        = null;
-
-	/**
-	 * Rating type
-	 * @var string
-	 */
-	var $type					= null;
-
-	/*
-	 * site member id
-	 * @var int
-	 */
-	var $created_by				= null;
-
-	/*
-	 * Session id (optional)
-	 * @var string
-	 */
-	var $sessionid				= null;
-
-	/*
-	 * Contains the value of the rating
-	 * @var string
-	 */
-	var $value					= null;
-
-	/*
-	 * IP address of voter
-	 * @var string
-	 */
-	var $ip						= null;
-
-	/*
-	 * Created datetime of the tag
-	 * @var datetime
-	 */
-	var $published				= null;
-
-	/*
-	 * Created datetime of the tag
-	 * @var datetime
-	 */
-	var $created				= null;
-
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(&$db)
 	{
-		parent::__construct( '#__easyblog_ratings' , 'id' , $db );
+		parent::__construct('#__easyblog_ratings', 'id', $db);
 	}
 
-	public function fill( $userId , $postId , $type , $hash = '' )
+	/**
+	 * Determines if the user has already voted
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function hasVoted($userId, $postId, $type, $hash = '')
 	{
-		static $objects	= array();
+		$db = EB::db();
 
-		if( !isset( $objects[ $type ][ $postId ][ $userId ] ) )
-		{
-			$db		= $this->getDBO();
-			$query	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'created_by' ) . '=' . $db->Quote( $userId ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'uid' ) . '=' . $db->Quote( $postId ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'type' ) . '=' . $db->Quote( $type );
+		$query = array();
 
-			if( !empty($hash) )
-			{
-				$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'sessionid' ) . '=' . $db->Quote( $hash );
-			}
-			$db->setQuery( $query );
+		$query[] = 'SELECT * FROM ' . $db->quoteName($this->_tbl);
+		$query[] = 'WHERE ' . $db->quoteName('created_by') . '=' . $db->Quote($userId);
+		$query[] = 'AND ' . $db->quoteName('uid') . '=' . $db->Quote($postId);
 
-			$result	= $db->loadObject();
-
-			if (is_null($result))
-			{
-				return false;
-			}
-
-			$objects[ $type ][ $postId ][ $userId ] = $result;
+		if (!empty($hash)) {
+			$query[] = 'AND ' . $db->quoteName('sessionid') . '=' . $db->Quote($hash);
 		}
 
-		return parent::bind( $objects[ $type ][ $postId ][ $userId ] );
+		$query = implode(' ', $query);
+
+		$db->setQuery($query);
+
+		$result = $db->loadObject();
+
+		if (!$result) {
+			return false;
+		}
+
+		return $result;
 	}
 
+	/**
+	 * Saves a new rating item
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function store($updateNulls = false)
 	{
-		$config		= EasyBlogHelper::getConfig();
-		$state		= parent::store();
+		$config = EB::config();
+		$state = parent::store();
 
-		if( $this->type == 'entry' && $this->created_by )
-		{
-			$blog 	= EasyBlogHelper::getTable( 'Blog' );
-			$blog->load( $this->uid );
+		if ($this->type == 'entry' && $this->created_by) {
 
-			$author	= EasyBlogHelper::getTable( 'Profile' );
-			$author->load( $this->created_by );
+			// Load the post item
+			$post = EB::post($this->uid);
 
-			// Get list of users who subscribed to this blog.
-			$link	= $blog->getExternalBlogLink( 'index.php?option=com_easyblog&view=entry&id='. $blog->id );
+			// Get the author of the post
+			$author = $post->getAuthor();
 
-			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-			
-			if( $config->get( 'integrations_easysocial_notifications_ratings' ) && $easysocial->exists() )
-			{
-				$easysocial->notifySubscribers( $blog , 'ratings.add' );
-			}
+			// Get the link to the post
+			$link = $post->getExternalPermalink();
+
+			// Notify EasySocial users that someone rated their post
+			EB::easysocial()->notifySubscribers($post, 'ratings.add');
 
 			// Assign EasySocial points
-			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-			$easysocial->assignPoints( 'blog.rate' );
+			EB::easysocial()->assignPoints('blog.rate');
+			EB::easysocial()->assignPoints('blog.rated', $post->created_by);
 
-			$easysocial->assignPoints( 'blog.rated' , $blog->created_by );
-			
-			// @rule: Add notifications for jomsocial 2.6
-			if( $config->get( 'integrations_jomsocial_notification_rating' ) )
-			{
-				$target	= array( $blog->created_by );
-				EasyBlogHelper::getHelper( 'JomSocial' )->addNotification( JText::sprintf( 'COM_EASYBLOG_JOMSOCIAL_NOTIFICATIONS_NEW_RATING_FOR_YOUR_BLOG' , str_replace("administrator/","", $author->getProfileLink()), $author->getName() , $link  , $blog->title ) , 'easyblog_new_blog' , $target , $author , $link );
-			}
+			// Assign badge for users that report blog post.
+			// Only give points if the viewer is viewing another person's blog post.
+			EB::easysocial()->assignBadge('blog.rate', JText::_('COM_EASYBLOG_EASYSOCIAL_BADGE_RATED_BLOG'));
 
-			// @rule: Add notifications for easydiscuss
-			if( $config->get( 'integrations_jomsocial_notification_rating' ) )
-			{
-				$target	= array( $blog->created_by );
+			// Assign points for AUP
+			EB::aup()->assign('plgaup_easyblog_rate_blog', '', 'easyblog_rating', JText::_('COM_EASYBLOG_AUP_BLOG_RATED'));
+			// Add notifications for EasyDiscuss
+			// Add notifications
+			// EB::jomsocial()->addNotification(JText::sprintf('COM_EASYBLOG_JOMSOCIAL_NOTIFICATIONS_NEW_RATING_FOR_YOUR_BLOG', str_replace("administrator/","", $author->getProfileLink()), $author->getName() , $link  , $blog->title), 'easyblog_new_blog' , $target , $author , $link);
 
-				EasyBlogHelper::getHelper( 'EasyDiscuss' )
-						->addNotification( $blog ,
-									JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_NOTIFICATIONS_NEW_RATING_FOR_YOUR_BLOG' , $author->getName() , $blog->title) ,
-									EBLOG_NOTIFICATIONS_TYPE_RATING ,
-									array( $blog->created_by ) ,
+			// Add notifications for easydiscuss
+			if ($config->get('integrations_jomsocial_notification_rating')) {
+				$target	= array($post->created_by);
+
+				EB::easydiscuss()->addNotification($post,
+									JText::sprintf('COM_EASYBLOG_EASYDISCUSS_NOTIFICATIONS_NEW_RATING_FOR_YOUR_BLOG', $author->getName(), $post->title),
+									EBLOG_NOTIFICATIONS_TYPE_RATING,
+									array($post->created_by),
 									$this->created_by,
-									$link );
+									$link);
 			}
 		}
 

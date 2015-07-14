@@ -50,13 +50,13 @@ class KomentoDocumentHelper
 			// Attach configuration to headers
 			$configuration->attach();
 
-			if ($config->get('layout_inherit_kuro_css', true) && $config->get('layout_theme') != 'wireframe') {
+			if ($config->get('layout_inherit_kuro_css', 1) && $config->get('layout_theme') != 'wireframe') {
 				$document->addStylesheet( JURI::root() . 'components/com_komento/themes/kuro/css/style.css' );
 			}
 
 			// support for RTL sites
 			// forcertl = 1 for dev purposes
-			if( $document->direction == 'rtl' || JRequest::getInt( 'forcertl' ) == 1 )
+			if(($document->direction == 'rtl' || JRequest::getInt( 'forcertl' ) == 1) && $config->get('layout_theme') != 'wireframe')
 			{
 				$document->addStylesheet( JURI::root() . 'components/com_komento/themes/kuro/css/style-rtl.css' );
 			}

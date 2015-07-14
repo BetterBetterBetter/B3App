@@ -11,77 +11,182 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-jimport( 'joomla.filesystem.folder' );
-jimport( 'joomla.filesystem.file' );
-
-require_once( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php' );
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewMigrators extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	public function display($tpl = null)
 	{
 		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.migrator' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
+		$this->checkAccess('easyblog.manage.migrator');
+
+		$this->setHeading('COM_EASYBLOG_TITLE_MIGRATORS', '', 'fa-laptop');
+
+		$layout 	= $this->getLayout();
+
+		$this->set('config', $this->config);
+
+		$htmlcontent = '';
+
+		if (method_exists($this, $layout)) {
+			$htmlcontent = $this->$layout();
+			// return $this->$layout();
+			//
+		}
+
+		$this->set('htmlcontent', $htmlcontent);
+
+		parent::display('migrators/default');
+	}
+
+	public function blogger()
+	{
+		$this->setHeading('COM_EASYBLOG_MIGRATOR_BLOGGERXML', '', 'fa-laptop');
+
+		$bloggerxmlfiles  = $this->getXMLFiles( 'blogger' );
+		$lists	= JHTML::_('select.genericlist',  $bloggerxmlfiles, 'bloggerxmlfiles', 'class="form-control" data-xml-blogger', 'value', 'state', '');
+
+		$theme = EB::template();
+
+		$ebCategories = $this->getEasyBlogCategories();
+
+		$theme->set('categories', $ebCategories);
+		$theme->set('lists', $lists);
+		$output = $theme->output('admin/migrators/adapters/blogger');
+
+		return $output;
+		// parent::display('migrators/adapters/blogger');
+	}
+
+	public function k2()
+	{
+		$this->setHeading('COM_EASYBLOG_MIGRATOR_K2', '', 'fa-retweet');
+		$k2Installed		= $this->k2Exists();
+		$lists		= $this->getK2Categories();
+
+		$theme = EB::template();
+
+		$theme->set('lists', $lists);
+		$theme->set('k2Installed', $k2Installed);
+
+		$output = $theme->output('admin/migrators/adapters/k2');
+		return $output;
+
+		// parent::display('migrators/adapters/k2');
+	}
+
+	public function wordpress()
+	{
+		$this->setHeading('COM_EASYBLOG_MIGRATOR_WORDPRESS_IMPORTXML', '', 'fa-wordpress');
+
+		// get wp xml files
+		$wpxmlfiles  = $this->getXMLFiles( 'wordpress' );
+		$lists	= JHTML::_('select.genericlist',  $wpxmlfiles, 'wpxmlfiles', 'class="form-control" data-xml-wordpress', 'value', 'state', '');
+
+		$theme = EB::template();
+		$theme->set('lists', $lists);
+
+		$output = $theme->output('admin/migrators/adapters/wordpress');
+		return $output;
+
+		// parent::display('migrators/adapters/wordpress');
+	}
+
+	public function wordpressjoomla()
+	{
+		$this->setHeading('COM_EASYBLOG_MIGRATOR_WORDPRESSJOOMLA', '', 'fa-file-word-o');
+
+		//check if wordpress installed or not.
+		$lists	= array();
+		$wpInstalled		= $this->wpExists();
+		$wpBlogsList		= '';
+
+		if ($wpInstalled) {
+			$wpBlogsList		= $this->getWPBlogs();
+			$lists	= JHTML::_('select.genericlist',  $wpBlogsList, 'wpBlogId', 'class="form-control" data-blogid-wordpress', 'value', 'state', '');
+		}
+
+		$theme = EB::template();
+
+		$theme->set('wpInstalled', $wpInstalled);
+		$theme->set('wpBlogsList', $wpBlogsList);
+		$theme->set('lists', $lists);
+
+		$output = $theme->output('admin/migrators/adapters/wordpressjoomla');
+		return $output;
+
+		// parent::display('migrators/adapters/wordpressjoomla');
+	}
+
+	public function zoo()
+	{
+		$db	= EB::db();
+		$path	= JPATH_ROOT . '/administrator/components/com_zoo';
+
+		$this->setHeading('COM_EASYBLOG_MIGRATOR_ZOO', '', 'fa-retweet');
+
+		jimport('joomla.filesystem.folder');
+		$zooInstalled	= true;
+		$htmlList	= array();
+
+		$theme = EB::template();
+
+		if (!JFolder::exists($path)) {
+			$zooInstalled	= false;
+		}
+
+		if ($zooInstalled) {
+			$query	= 'SELECT * FROM `#__zoo_application`';
+			$query	.= ' WHERE `application_group` = '.$db->quote( 'blog' );
+
+			$db->setQuery($query);
+			$items	= $db->loadObjectList();
+
+			$htmlList[]		= JHTML::_( 'select.option' , '0' , ' -- Please select Application -- ' , 'value' , 'state' );
+
+			if (count($items) > 0) {
+				foreach( $items as $item)
+				{
+					$htmlList[]	= JHTML::_('select.option', $item->id, $item->name, 'value', 'state');
+				}
 			}
-		}
-		//initialise variables
-		$document	= JFactory::getDocument();
-		$user		= JFactory::getUser();
-		$mainframe	= JFactory::getApplication();
 
-		//check if myblog installed or not.
-		$myblogInstalled	= $this->myBlogExists();
-		$myBlogSection		= '';
-		if($myblogInstalled)
-		{
-			require_once(JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_myblog' . DIRECTORY_SEPARATOR . 'config.myblog.php');
-			$myblogConfig	= new MYBLOG_Config();
-			$myBlogSection	= $myblogConfig->get('postSection');
 		}
 
-		JHTML::_( 'behavior.tooltip' );
+		$lists	= JHTML::_('select.genericlist',  $htmlList, 'zooAppId', 'class="form-control" data-applicationid-zoo', 'value', 'state', '');
+
+		$theme = EB::template();
+
+		$theme->set('zooInstalled', $zooInstalled);
+		$theme->set('lists', $lists);
+
+		$output = $theme->output('admin/migrators/adapters/zoo');
+		return $output;
+
+		// parent::display('migrators/adapters/zoo');
+	}
+
+	public function joomla()
+	{
+		$this->setHeading('COM_EASYBLOG_MIGRATOR_JOOMLA', '', 'fa-joomla');
 
 		$categories[]	= JHTML::_('select.option', '0', '- '.JText::_('COM_EASYBLOG_MIGRATORS_SELECT_CATEGORY').' -');
 		$authors[]		= JHTML::_('select.option', '0', '- '.JText::_('COM_EASYBLOG_MIGRATORS_SELECT_AUTHOR').' -', 'created_by', 'name');
 
-		if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
-		{
-			$lists['sectionid'] = array();
+		$lists['sectionid'] = array();
 
-			$articleCat		= JHtml::_('category.options', 'com_content');
+		$articleCat		= JHtml::_('category.options', 'com_content');
 
-			$articleAuthors	= $this->get( 'ArticleAuthors16' );
-		}
-		else
-		{
-			// get list of sections for dropdown filter
-			$lists['sectionid'] = $this->section($myBlogSection, 'sectionId', -1, '');
-
-			// get article categories from model
-			$model	= $this->getModel( 'Migrators' );
-			$articleCat		= $model->getArticleCategories( $myBlogSection );
-
-			// get article authors from model
-			$articleAuthors		= $this->get( 'ArticleAuthors' );
-		}
+		$articleAuthors	= $this->get( 'ArticleAuthors16' );
 
 		$categories		= array_merge($categories, $articleCat);
-		$lists['catid'] = JHTML::_('select.genericlist',  $categories, 'catId', 'class="inputbox"', 'value', 'text', '');
+		$lists['catid'] = JHTML::_('select.genericlist',  $categories, 'catId', 'class="form-control" data-migrate-article-category', 'value', 'text', '');
 
 		$authors 	= array_merge($authors, $articleAuthors);
-		$lists['authorid'] = JHTML::_('select.genericlist',  $authors, 'authorId', 'class="inputbox"', 'created_by', 'name', 0);
-
+		$lists['authorid'] = JHTML::_('select.genericlist',  $authors, 'authorId', 'class="form-control" data-migrate-article-author', 'created_by', 'name', 0);
 
 		// state filter
 		$state			= $this->getDefaultState();
-
-		//$state			= array('P' => 'Published', 'U' => 'Unpublished', 'A' => 'Archived');
-
 		$articleState	= array();
 		foreach($state as $key => $val)
 		{
@@ -96,43 +201,36 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		$stateList[]	= JHTML::_('select.option', '*', '- '.JText::_('COM_EASYBLOG_MIGRATORS_SELECT_STATE').' -', 'value', 'state');
 
 		$stateList		= array_merge($stateList, $articleState);
-		$lists['state']	= JHTML::_('select.genericlist',  $stateList, 'stateId', 'class="inputbox"', 'value', 'state', '*');
+		$lists['state']	= JHTML::_('select.genericlist',  $stateList, 'stateId', 'class="form-control" data-migrate-article-state', 'value', 'state', '*');
 
-		//check if wordpress installed or not.
-		$lists['wpblogs']	= array();
-		$wpInstalled		= $this->wpExists();
-		$wpBlogsList		= '';
-		if($wpInstalled)
-		{
-			$wpBlogsList		= $this->getWPBlogs();
-			$lists['wpblogs']	= JHTML::_('select.genericlist',  $wpBlogsList, 'wpBlogId', 'class="inputbox"', 'value', 'state', '');
-		}
-
-		// Fetch K2 categories
-		$lists[ 'k2cats' ]		= $this->getK2Categories();
-		// get wp xml files
-		$wpxmlfiles  = $this->getXMLFiles( 'wordpress' );
-		$lists['wpxmlfiles']	= JHTML::_('select.genericlist',  $wpxmlfiles, 'wpxmlfiles', 'class="inputbox"', 'value', 'state', '');
-
-		$bloggerxmlfiles  = $this->getXMLFiles( 'blogger' );
-		$lists['bloggerxmlfiles']	= JHTML::_('select.genericlist',  $bloggerxmlfiles, 'bloggerxmlfiles', 'class="inputbox"', 'value', 'state', '');
-
-		$smartblogInstalled		= $this->smartBlogExists();
-		$lyftenbloggieInstalled	= $this->lyftenBloggieExists();
 		$jomcommentInstalled	= $this->jomcommentExists();
 
-		$this->assignRef( 'smartblogInstalled' , $smartblogInstalled );
-		$this->assignRef( 'lyftenbloggieInstalled' , $lyftenbloggieInstalled );
-		$this->assignRef( 'jomcommentInstalled' , $jomcommentInstalled );
-		$this->assignRef( 'myblogInstalled' , $myblogInstalled );
-		$this->assignRef( 'myBlogSection' 	, $myBlogSection );
-		$this->assignRef( 'wpInstalled' 	, $wpInstalled );
+		//check if myblog installed or not.
+		$myblogInstalled	= $this->myBlogExists();
+		$myBlogSection		= '';
 
-		$this->assignRef( 'lists' , $lists );
-		parent::display($tpl);
+		if ($myblogInstalled) {
+			require_once(JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_myblog' . DIRECTORY_SEPARATOR . 'config.myblog.php');
+			$myblogConfig	= new MYBLOG_Config();
+			$myBlogSection	= $myblogConfig->get('postSection');
+		}
+
+		$ebCategories		= $this->getEasyBlogCategories();
+
+		$theme = EB::template();
+
+		$theme->set( 'myBlogSection' , $myBlogSection );
+		$theme->set('jomcommentInstalled', $jomcommentInstalled);
+		$theme->set('lists', $lists);
+		$theme->set('ebCategories', $ebCategories);
+
+		$output = $theme->output('admin/migrators/adapters/article');
+
+		return $output;
+		// parent::display('migrators/adapters/article');
 	}
 
-	function section($excludeSection='', $name, $active = NULL, $javascript = NULL, $order = 'ordering', $uncategorized = true, $scope = 'content' )
+	public function section($excludeSection='', $name, $active = NULL, $javascript = NULL, $order = 'ordering', $uncategorized = true, $scope = 'content' )
 	{
 		$db = EasyBlogHelper::db();
 
@@ -143,8 +241,7 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		}
 
 		$excludeSQL = '';
-		if( !empty($excludeSection) )
-		{
+		if (!empty($excludeSection)) {
 			$excludeSQL = ' AND id != ' . $db->Quote($excludeSection);
 		}
 
@@ -153,89 +250,58 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		. ' WHERE published = 1'
 		. ' AND scope = ' . $db->Quote($scope)
 		. $excludeSQL
-		. ' ORDER BY ' . $order
-		;
-		$db->setQuery( $query );
-		$sections = array_merge( $categories, $db->loadObjectList() );
+		. ' ORDER BY ' . $order;
 
-		$category = JHTML::_('select.genericlist',   $sections, $name, 'class="inputbox" size="1" '. $javascript, 'value', 'text', $active );
+		$db->setQuery($query);
+		$sections = array_merge($categories, $db->loadObjectList());
+
+		$category = JHTML::_('select.genericlist',   $sections, $name, 'class="form-control" '. $javascript, 'value', 'text', $active);
 
 		return $category;
 	}
 
-	function getDefaultState()
+	public function getDefaultState()
 	{
 		$state			= null;
-		if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
-		{
+		if (EasyBlogHelper::getJoomlaVersion() >= '1.6') {
 			$state = array('1' => 'Published', '0' => 'Unpublished', '2' => 'Archived', '-2' => 'Trash');
 		}
-		else
-		{
+		else {
 			$state = array('P' => 'Published', 'U' => 'Unpublished', 'A' => 'Archived');
 		}
 		return $state;
 	}
 
-	function smartBlogExists()
+	public function k2Exists()
 	{
-		if(! JFile::exists(JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_blog' . DIRECTORY_SEPARATOR . 'blog.php'))
-		{
-			return false;
-		}
-		return true;
+		$path		= JPATH_ROOT . '/administrator/components/com_k2';
+		return JFolder::exists($path);
 	}
 
-	public function jomcommentExists()
-	{
-		return JFolder::exists( JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_jomcomment' );
-	}
-
-	function myBlogExists()
-	{
-		if(! JFile::exists(JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_myblog' . DIRECTORY_SEPARATOR . 'config.myblog.php'))
-		{
-			return false;
-		}
-		return true;
-	}
-
-	function lyftenBloggieExists()
-	{
-		if(! JFile::exists(JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_lyftenbloggie' . DIRECTORY_SEPARATOR . 'lyftenbloggie.php'))
-		{
-			return false;
-		}
-		return true;
-	}
-
-	function getWPBlogs()
+	public function getWPBlogs()
 	{
 		$db = EasyBlogHelper::db();
 
-		$query		= 'select * from `#__wp_blogs`';
-		$db->setQuery( $query );
+		$query = 'select * from `#__wp_posts` where `post_type` = ' . $db->Quote('post');
+		$db->setQuery($query);
 
-		$result		= $db->loadObjectList();
+		$result = $db->loadObjectList();
 
-		$htmlList	= array();
-		if( count($result) > 0)
-		{
-			foreach( $result as $item)
-			{
-				$htmlList[]	= JHTML::_('select.option', $item->blog_id, $item->domain . $item->path, 'value', 'state');
+		$htmlList = array();
+		if (count($result) > 0) {
+			$htmlList[]	= JHTML::_('select.option', '0', 'All', 'value', 'state');
+			foreach ($result as $item) {
+				$htmlList[]	= JHTML::_('select.option', $item->ID, $item->post_title, 'value', 'state');
 			}
 		}
 
-		if( count( $htmlList ) <= 0 )
-		{
+		if (count($htmlList) <= 0) {
 			//this could be single site wordpress.
 			$query  = 'SHOW TABLES LIKE ' . $db->Quote( '%wp_posts%' );
 			$db->setQuery( $query );
 
 			$result = $db->loadObjectList();
-			if( count( $result ) > 0 )
-			{
+			if (count( $result ) > 0) {
 				$htmlList[]	= JHTML::_('select.option', '1', 'Single site WordPress', 'value', 'state');
 			}
 		}
@@ -251,19 +317,33 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		$db->setQuery( $query );
 		$items	= $db->loadObjectList();
 
-
 		$lists	= array();
 
 		//default list
 		$lists[]	= JHTML::_( 'select.option' , '' , ' -- Please select category -- ' , 'value' , 'state' );
 
-		foreach( $items as $item )
-		{
+		foreach ($items as $item) {
 			$lists[]	= JHTML::_( 'select.option' , $item->id , $item->title , 'value' , 'state' );
 		}
 
-		return JHTML::_('select.genericlist',  $lists , 'categoryid', 'class="inputbox"', 'value', 'state', '');
+		return JHTML::_('select.genericlist',  $lists , 'categoryid', 'class="form-control" data-easyblog-category ', 'value', 'state', '');
 	}
+
+	public function jomcommentExists()
+	{
+		$path		= JPATH_ROOT . '/administrator/components/com_jomcomment';
+		return JFolder::exists($path);
+	}
+
+	public function myBlogExists()
+	{
+		$file	= JPATH_ROOT . 'administrator/components/com_myblog/config.myblog.php';
+		if (!JFile::exists($file)) {
+			return false;
+		}
+		return true;
+	}
+
 
 
 	public function getK2Categories()
@@ -271,9 +351,9 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		$db	= EasyBlogHelper::db();
 
 		jimport( 'joomla.filesystem.folder' );
+		$path		= JPATH_ROOT . '/administrator/components/com_k2';
 
-		if( !JFolder::exists( JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_k2' ) )
-		{
+		if (!JFolder::exists($path)) {
 			return false;
 		}
 
@@ -281,36 +361,32 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		$db->setQuery( $query );
 		$items	= $db->loadObjectList();
 
-		if( !$items )
-		{
+		if (!$items) {
 			return false;
 		}
 
 		$lists	= array();
 
-		foreach( $items as $item )
-		{
+		foreach ($items as $item) {
 			$lists[]	= JHTML::_( 'select.option' , $item->id , $item->name , 'value' , 'state' );
 		}
 
-		return JHTML::_('select.genericlist',  $lists , 'k2category', 'class="inputbox"', 'value', 'state', '');
+		return JHTML::_('select.genericlist',  $lists , 'k2category', 'class="form-control" data-migrate-k2-category', 'value', 'state', '');
 	}
 
-	function getXMLFiles( $type = 'wordpress' )
+	public function getXMLFiles( $type = 'wordpress' )
 	{
-		$fixedLocation	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'xmlfiles';
+		$fixedLocation	= JPATH_ROOT . '/administrator/components/com_easyblog/xmlfiles';
 
-		if( $type == 'blogger' )
-			$fixedLocation .= DIRECTORY_SEPARATOR . 'blogger';
+		if ($type == 'blogger')
+			$fixedLocation .= '/blogger';
 
 		$htmlList		= array();
 
-		if( JFolder::exists($fixedLocation) )
-		{
+		if (JFolder::exists($fixedLocation)) {
 			$files	= JFolder::files( $fixedLocation, '.xml');
 
-			if( count( $files ) > 0 )
-			{
+			if(count($files) > 0) {
 				foreach( $files as $file)
 				{
 					$htmlList[]	= JHTML::_('select.option', $file, $file , 'value', 'state');
@@ -320,26 +396,25 @@ class EasyBlogViewMigrators extends EasyBlogAdminView
 		return $htmlList;
 	}
 
-
-	function wpExists()
+	public function wpExists()
 	{
-		if(! JFile::exists(JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_wordpress' . DIRECTORY_SEPARATOR . 'admin.wordpress.php'))
-		{
+		$file	= JPATH_ROOT . '/administrator/components/com_wordpress/admin.wordpress.php';
+		if (!JFile::exists($file)) {
 			return false;
 		}
 		return true;
 	}
 
-	function registerToolbar()
+	public function registerToolbar()
 	{
 		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_MIGRATORS' ), 'migrators' );
 
 		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
 		JToolbarHelper::divider();
-		JToolBarHelper::custom( 'purge', 'delete.png', 'delete_f2.png', JText::_( 'COM_EASYBLOG_PURGE_HISTORY') , false );
+		JToolBarHelper::custom( 'migrators.purge', 'delete.png', 'delete_f2.png', JText::_( 'COM_EASYBLOG_PURGE_HISTORY') , false );
 	}
 
-	function registerSubmenu()
+	public function registerSubmenu()
 	{
 		return 'submenu.php';
 	}

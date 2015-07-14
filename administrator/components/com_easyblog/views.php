@@ -1,141 +1,234 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die();
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . 'views.php' );
-
-class EasyBlogAdminView extends EasyBlogViewParent
+class EasyBlogAdminView extends JViewLegacy
 {
+	protected $heading = null;
+	protected $desc = null;
+	protected $doc = null;
+	protected $my = null;
+	protected $app = null;
+	protected $config = null;
+	protected $jconfig = null;
+
 	public function __construct()
 	{
-		if( EasyBlogHelper::getJoomlaVersion() >= '3.0' )
-		{
-			JHtml::_('bootstrap.tooltip');
-			JHtml::_('behavior.multiselect');
-			JHtml::_('formbehavior.chosen', 'select');
-			JHtml::_('dropdown.init');	
+		$this->config = EB::getConfig();
+		$this->jconfig = JFactory::getConfig();
+		$this->app = JFactory::getApplication();
+		$this->doc = JFactory::getDocument();
+		$this->my = JFactory::getUser();
+		$this->input = EB::request();
+		$this->info = EB::info();
+
+		$this->theme = EB::getTemplate(null, array('view' => $this, 'admin' => true));
+
+		if ($this->doc->getType() == 'ajax') {
+			$this->ajax = EB::ajax();
 		}
 
 		parent::__construct();
 	}
 
 	/**
-	 * Determines if needed to load the bootstrap or joomla version
-	 * of the theme file.
+	 * Allows child classes to set heading of the page
 	 *
-	 * @since	3.7
+	 * @since	5.0
 	 * @access	public
-	 * @author	Mark Lee <mark@stackideas.com>
+	 * @param	string
+	 * @return
 	 */
-	public function getTheme()
+	public function setHeading($heading, $desc = '', $icon = '')
 	{
-		$version 	= EasyBlogHelper::getJoomlaVersion();
+		$this->heading = $heading;
 
-		if( $version >= '3.0' )
-		{
-		JHtmlSidebar::addEntry(
-			JText::_('COM_TEMPLATES_SUBMENU_STYLES'),
-			'index.php?option=com_templates&view=styles',
-			true
-		);
-		JHtmlSidebar::addEntry(
-			JText::_('COM_TEMPLATES_SUBMENU_TEMPLATES'),
-			'index.php?option=com_templates&view=templates',
-			false
-		);
-			if( method_exists( $this , 'addSidebar' ) )
-			{
-				$this->addSidebar();
+		if (empty($desc)) {
+			$this->desc = $heading . '_DESC';
+		}
+	}
+
+	/**
+	 * Checks if the current viewer can really access this section
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function checkAccess($rule)
+	{
+		if (!$this->my->authorise($rule , 'com_easyblog')) {
+			return JError::raiseWarning(404, JText::_('JERROR_ALERTNOAUTHOR'));
+		}
+	}
+
+	/**
+	 * Override parent's implementation
+	 *
+	 * @since	1.2
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tpl = null)
+	{
+		// Set the appropriate namespace
+		$namespace 	= 'admin/' . $tpl;
+
+		// Get the child contents
+		$output = $this->theme->output($namespace);
+
+		// Get the sidebar
+		$sidebar = $this->getSidebar();
+
+		// Determine if this is a tmpl view
+		$tmpl = $this->input->get('tmpl', '', 'word');
+
+		// Prepare the structure
+		$theme = EB::getTemplate();
+
+		// Get current version
+		$version = EB::getLocalVersion();
+
+		// Render a different structure prefix when tmpl=component
+		$prefix = $tmpl == 'component' ? 'eb-window' : '';
+
+		// Initialize all javascript frameworks
+		EB::init('admin');
+
+		// Collect all javascripts attached so that we can output them at the bottom of the page
+		$scripts = EB::scripts()->getScripts();
+
+		$theme->set('info', $this->info);
+		$theme->set('prefix', $prefix);
+		$theme->set('version', $version);
+		$theme->set('heading', $this->heading);
+		$theme->set('desc', $this->desc);
+		$theme->set('output', $output);
+		$theme->set('tmpl', $tmpl);
+		$theme->set('sidebar', $sidebar);
+		$theme->set('jscripts', $scripts);
+
+		$contents = $theme->output('admin/structure/default');
+
+		// If the toolbar registration exists, load it up
+		if (method_exists($this, 'registerToolbar')) {
+			$this->registerToolbar();
+		}
+
+		echo $contents;
+	}
+
+	/**
+	 * Proxy for setting a variable to the template.
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function set($key, $value = '')
+	{
+		$this->theme->set($key, $value);
+	}
+
+	/**
+	 * Processes counters from the menus.json
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getCounter($namespace)
+	{
+		static $counters = array();
+
+		list($model, $method) = explode('/', $namespace);
+
+		if (!isset($counters[$namespace])) {
+			$model = EB::model($model);
+
+			$counters[$namespace] = $model->$method();
+		}
+
+		return $counters[$namespace];
+	}
+
+	/**
+	 * Prepares the sidebar
+	 *
+	 * @since	1.2
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getSidebar()
+	{
+		$file = JPATH_COMPONENT . '/defaults/menus.json';
+		$contents = JFile::read($file);
+
+		$view = $this->input->get('view', '', 'cmd');
+		$layout = $this->input->get('layout', '', 'cmd');
+		$menus = json_decode($contents);
+
+		foreach ($menus as &$menu) {
+
+			if (!isset($menu->view)) {
+				$menu->link = 'index.php?option=com_easyblog';
+				$menu->view = '';
 			}
 
-			return 'bootstrap';
+			if (isset($menu->counter)) {
+				$menu->counter = $this->getCounter($menu->counter);
+			}
+
+			if (!isset($menu->link)) {
+				$menu->link = 'index.php?option=com_easyblog&view=' . $menu->view;
+			}
+
+			if (isset($menu->childs) && $menu->childs) {
+
+				foreach ($menu->childs as &$child) {
+
+					$child->link = 'index.php?option=com_easyblog&view=' . $menu->view;
+
+					if ($child->url) {
+						foreach ($child->url as $key => $value) {
+
+							if (!empty($value)) {
+								$child->link .= '&' . $key . '=' . $value;
+							}
+						}
+					}
+
+					// Processes items with counter
+					if (isset($child->counter)) {
+						$child->counter = $this->getCounter($child->counter);
+					}
+				}
+			}
 		}
 
-		return 'joomla';
+		$theme = EB::getTemplate();
+
+		$theme->set('layout', $layout);
+		$theme->set('view', $view);
+		$theme->set('menus', $menus);
+
+		$output = $theme->output('admin/structure/default.sidebar');
+
+		return $output;
 	}
 
-	function renderCheckbox( $configName , $state , $id = '' )
-	{
-		ob_start();
-
-		if( EasyBlogHelper::getJoomlaVersion() >= '3.0' )
-		{
-			$id 	= !empty( $id ) ? $id : $configName;
-		?>
-			<fieldset class="radio btn-group" id="<?php echo $id;?>">
-				<input type="radio" value="0" name="<?php echo $configName;?>" id="<?php echo $id;?>0" <?php echo $state == 0 ? ' checked="checked"' : '';?>/>
-				<label for="<?php echo $id;?>0" class="option-disable<?php echo $state == 1 ? ' selected' : '';?>"><?php echo JText::_( 'COM_EASYBLOG_NO_OPTION' ); ?></label>
-
-				<input type="radio" value="1" name="<?php echo $configName;?>" id="<?php echo $id;?>1" <?php echo $state == 1 ? ' checked="checked"' : '';?>/>
-				<label for="<?php echo $id;?>1" class="option-enable<?php echo $state == 0 ? ' selected' : '';?>"><?php echo JText::_( 'COM_EASYBLOG_YES_OPTION' );?></label>
-				
-			</fieldset>
-		<?php
-		}
-		else
-		{
-		?>
-			<label class="option-enable<?php echo $state == 1 ? ' selected' : '';?>"><span><?php echo JText::_( 'COM_EASYBLOG_YES_OPTION' );?></span></label>
-			<label class="option-disable<?php echo $state == 0 ? ' selected' : '';?>"><span><?php echo JText::_( 'COM_EASYBLOG_NO_OPTION' ); ?></span></label>
-			<input name="<?php echo $configName; ?>" value="<?php echo $state;?>" type="radio" id="<?php echo $configName; ?>" class="radiobox" checked="checked" />
-			<div style="clear:both;"></div>
-		<?php
-		}
-		
-		$html	= ob_get_contents();
-		ob_end_clean();
-
-		return $html;
-	}
-
-	public function renderFilters( $options = array() , $value , $element )
-	{
-		ob_start();
-
-		if( EasyBlogHelper::getJoomlaVersion() < '3.0' )
-		{
-		?>
-
-		<script type="text/javascript">
-		EasyBlog.ready(function($){
-			$(".eblog-filter").click(function(){
-
-				$('#' + $(this).data('element'))
-					.val($(this).data('key'));
-				submitform();
-			});
-		});
-		</script>
-
-		<?php foreach( $options as $key => $val ) { ?>
-		<a class="eblog-filter<?php echo $value == $key ? ' eblog-filter-active' : '';?>" href="javascript:void(0);" data-element="<?php echo $element;?>" data-key="<?php echo $key;?>"><?php echo JText::_( $val ); ?></a>
-		<?php } ?>
-		<input type="hidden" name="filter_type" id="filter_type" value="<?php echo $value;?>" />
-		<?php
-		}
-		else
-		{
-		?>
-		<select name="<?php echo $element;?>" onchange="this.document.submit();">
-			<?php foreach( $options as $key => $val ){ ?>
-			<option value="<?php echo $key;?>"><?php echo JText::_( $val ); ?></option>
-			<?php } ?>
-		</select>
-		<?php
-		}
-
-		$html	= ob_get_contents();
-		ob_end_clean();
-
-		return $html;
-	}
 }

@@ -267,26 +267,24 @@ class EasyDiscussModelCategory extends EasyDiscussModel
 		}
 
 
-		$query	= 'SELECT COUNT(b.`id`) AS `cnt`';
-		$query	.= ' FROM ' . $db->nameQuote( '#__discuss_category' ) . ' AS `a`';
-		$query	.= ' LEFT JOIN '. $db->nameQuote( '#__discuss_posts' ) . ' AS b';
-		$query	.= ' ON a.`id` = b.`category_id`';
-		$query	.= ' AND b.`published` = ' . $db->Quote('1');
-		$query	.= ' WHERE a.`published` = 1';
-		$query	.= ($isIdArray) ? ' AND a.`id` IN (' . $categoryId. ')' :  ' AND a.`id` = ' . $db->Quote($categoryId);
-		$query	.= ' GROUP BY a.`id` HAVING (COUNT(b.`id`) > 0)';
+		// $query	= 'SELECT COUNT(b.`id`) AS `cnt`';
+		// $query	.= ' FROM ' . $db->nameQuote( '#__discuss_category' ) . ' AS `a`';
+		// $query	.= ' LEFT JOIN '. $db->nameQuote( '#__discuss_posts' ) . ' AS b';
+		// $query	.= ' ON a.`id` = b.`category_id`';
+		// $query	.= ' AND b.`published` = ' . $db->Quote('1');
+		// $query	.= ' WHERE a.`published` = 1';
+		// $query	.= ($isIdArray) ? ' AND a.`id` IN (' . $categoryId. ')' :  ' AND a.`id` = ' . $db->Quote($categoryId);
+		// $query	.= ' GROUP BY a.`id` HAVING (COUNT(b.`id`) > 0)';
+		//
+
+		$query = 'select count(1) from `#__discuss_posts` as a';
+		$query .= ($isIdArray) ? ' WHERE a.`category_id` IN (' . $categoryId. ')' : ' where a.`category_id` = ' . $db->Quote($categoryId);
+		$query .= ' and a.published = 1';
 
 		$db->setQuery($query);
-		$result = $db->loadResultArray();
+		$result = $db->loadResult();
 
-		if(!empty($result))
-		{
-			return array_sum($result);
-		}
-		else
-		{
-			return '0';
-		}
+		return ($result) ? $result : 0;
 	}
 
 	/**

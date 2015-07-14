@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,39 +9,30 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewLogin extends EasyBlogView
 {
-	function display( $tmpl = null )
+	public function display($tmpl = null)
 	{
-		$mainframe = JFactory::getApplication();
+		// If user is already logged in, just redirect them
+		if (!$this->my->guest) {
 
-		$my = JFactory::getuser();
+			$this->info->set(JText::_('COM_EASYBLOG_YOU_ARE_ALREADY_LOGIN'), 'error');
 
-		if(empty($my->id))
-		{
-			$return = JRequest::getVar('return', '');
-			EasyBlogHelper::showLogin($return);
-			return;
+			return $this->app->redirect(EBR::_('index.php?option=com_easyblog'));
 		}
-		else
-		{
-			$showPermissionMsg = JRequest::getVar('showpermissionmsg', '');
 
-			if($showPermissionMsg)
-			{
-				EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_YOU_DO_NOT_HAVE_PERMISSION_TO_VIEW') , 'error' );
-			}
-			else
-			{
-				EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_YOU_ARE_ALREADY_LOGIN') , 'error' );
-				$mainframe->redirect(EasyBlogRouter::_('index.php?option=com_easyblog&view=latest'));
-			}
+		// Determines if there's any return url
+		$return = $this->input->get('return', '');
+
+		if (empty($return)) {
+			$return = base64_encode(EBR::_('index.php?option=com_easyblog', false));
 		}
+
+		$this->set('return', $return);
+		parent::display('login/default');
 	}
 }

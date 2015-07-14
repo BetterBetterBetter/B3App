@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,214 +9,187 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport('joomla.application.component.controller');
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'string.php' );
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerSettings extends EasyBlogController
 {
-	function apply()
+	public function __construct($options = array())
 	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
-
-		// @task: Check for acl rules.
-		$this->checkAccess( 'setting' );
-
-		$mainframe	= JFactory::getApplication();
-
-		$result		= $this->_store();
-		$layout		= JRequest::getString( 'active' , '' );
-		$child		= strtolower(JRequest::getString( 'activechild' , '' ));
-		$mainframe->redirect( 'index.php?option=com_easyblog&view=settings&active=' . $layout . '&activechild=' . $child , $result['message'] , $result['type'] );
+		parent::__construct($options);
 	}
 
-	function save()
+	/**
+	 * Saves the settings
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return
+	 */
+	public function save()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'setting' );
+		$this->checkAccess('setting');
 
-		$mainframe	= JFactory::getApplication();
+		// Get the settings model
+		$model = EB::model('Settings');
 
-		$result		= $this->_store();
-		$mainframe->redirect( 'index.php?option=com_easyblog' , $result['message'] , $result['type'] );
-	}
+		// Get the post data from the form
+		$post = $this->input->getArray('post');
+		$data = array();
 
-	public function saveApi()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'setting' );
+		// Get the current layout
+		$page = $this->input->get('page', '', 'cmd');
 
-		$model		= $this->getModel( 'Settings' );
-		$key		= JRequest::getVar( 'apikey' );
-		$from		= JRequest::getVar( 'from', '' );
+		// Clean the input
+		unset($post['task']);
+		unset($post['option']);
+		unset($post['page']);
 
-		$mainframe	= JFactory::getApplication();
+		foreach ($post as $key => $value) {
 
-		$model->save( array( 'apikey' => $key ) );
+			if (is_array($value)) {
+				$value 	= implode('|', $value);
+			}
 
-		if( empty( $from ) )
-		{
-			$mainframe->redirect( 'index.php?option=com_easyblog' , JText::_( 'COM_EASYBLOG_API_KEY_SAVED' ) );
+			// If this is a google adsense settings, make sure it's formatted correctly.
+			if ($key == 'integration_google_adsense_code') {
+				$value 	= str_ireplace(';"', '', $value);
+			}
+
+			if ($key == 'integration_google_adsense_responsive_code') {
+				$value = $this->input->get($key, '', 'raw');
+			}
+
+			$data[$key]	= $value;
 		}
-		else
-		{
-		    $mainframe->redirect( 'index.php?option=com_easyblog&view=updater' , JText::_( 'COM_EASYBLOG_API_KEY_SAVED' ) );
+
+		// If there's a settings change for EasySocial's privacy, update all the blog post accordingly.
+		if (isset($data['integrations_easysocial_privacy']) && $data['integrations_easysocial_privacy']) {
+			$model->updateBlogPrivacy(10);
 		}
-	}
 
-	function _store()
-	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
-
-		// @task: Check for acl rules.
-		$this->checkAccess( 'setting' );
-
-		$mainframe	= JFactory::getApplication();
-
-		$message	= '';
-		$type		= 'message';
-
-		if( JRequest::getMethod() == 'POST' )
-		{
-			$model		= $this->getModel( 'Settings' );
-			//$model->save( $key , $values );
-
-			$postArray	= JRequest::get( 'post' );
-			$saveData	= array();
-
-			// Unset unecessary data.
-			unset( $postArray['task'] );
-			unset( $postArray['option'] );
-			unset( $postArray['c'] );
-
-			foreach( $postArray as $index => $temp )
-			{
-				if(is_array($temp))
-				{
-					$value = implode('|', $temp);
-				}
-				else
-				{
-					$value = $temp;
-				}
-
-				if( $index == 'integration_google_adsense_code' )
-				{
-					$value	= str_ireplace( ';"' , '' , $value );
-				}
-
-				if( $index != 'task' );
-				{
-					$saveData[ $index ]	= $value;
-				}
-
-			}
-
-			$db		= EasyBlogHelper::db();
-
-			// @rule: If the privacy integrations with jomsocial is enabled, we need to ensure all blog posts are up to date with the
-			// correct privacy values.
-			if( $saveData['integrations_easysocial_privacy'] )
-			{
-				$query	= 'UPDATE ' . $db->nameQuote( '#__easyblog_post' ) . ' '
-						. 'SET ' . $db->nameQuote( 'private' ) . ' = ' . $db->Quote( 10 ) . ' '
-						. 'WHERE ' . $db->nameQuote( 'private' ) . ' = ' . $db->Quote( 1 );
-				$db->setQuery( $query );
-				$db->query();
-			}
-			else if( $saveData['main_jomsocial_privacy'] )
-			{
-				$query	= 'UPDATE ' . $db->nameQuote( '#__easyblog_post' ) . ' '
-						. 'SET ' . $db->nameQuote( 'private' ) . ' = ' . $db->Quote( 20 ) . ' '
-						. 'WHERE ' . $db->nameQuote( 'private' ) . ' = ' . $db->Quote( 1 );
-				$db->setQuery( $query );
-				$db->query();
-			}
-			else
-			{
-				$query	= 'UPDATE ' . $db->nameQuote( '#__easyblog_post' ) . ' '
-						. 'SET ' . $db->nameQuote( 'private' ) . ' = ' . $db->Quote( 1 ) . ' '
-						. 'WHERE ' . $db->nameQuote( 'private' ) . ' >= ' . $db->Quote( 10 );
-				$db->setQuery( $query );
-				$db->query();
-			}
-			//overwrite the main blog description value by using getVar to preserve the html tag
-			$saveData['main_description']	= JRequest::getVar( 'main_description', '', 'post', 'string', JREQUEST_ALLOWRAW );
-
-			//overwrite the addthis custom code value by using getVar to preserve the html tag
-			$saveData['social_addthis_customcode']	= JRequest::getVar( 'social_addthis_customcode', '', 'post', 'string', JREQUEST_ALLOWRAW );
-
-			if( $model->save( $saveData ) )
-			{
-				$message	= JText::_( 'COM_EASYBLOG_SETTINGS_STORE_SUCCESS' );
-			}
-			else
-			{
-				$message	= JText::_( 'COM_EASYBLOG_SETTINGS_STORE_ERROR' );
-				$type		= 'error';
-			}
+		// If there's a settings change for EasySocial's privacy, update all the blog post accordingly.
+		if (isset($data['main_jomsocial_privacy']) && $data['main_jomsocial_privacy']) {
+			$model->updateBlogPrivacy(20);
 		}
-		else
-		{
-			$message	= JText::_('COM_EASYBLOG_SETTINGS_STORE_INVALID_REQUEST');
-			$type		= 'error';
+
+		// Fix the blog description to allow raw html codes
+		if (isset($data['main_description'])) {
+			$data['main_description']	= JRequest::getVar( 'main_description', '', 'post', 'string', JREQUEST_ALLOWRAW);
 		}
+
+		// Updated addthis custom code to allow html codes
+		if (isset($data['social_addthis_customcode'])) {
+			$data['social_addthis_customcode']	= JRequest::getVar( 'social_addthis_customcode', '', 'post', 'string', JREQUEST_ALLOWRAW);
+		}
+
+
+		// Try to save the settings now
+		$state = $model->save($data);
+
+		$message = $state ? JText::_('COM_EASYBLOG_SETTINGS_STORE_SUCCESS') : JText::_('COM_EASYBLOG_SETTINGS_STORE_ERROR');
+		$type = $state ? 'success' : 'error';
+
+		// Set info
+		$this->info->set($message, $type);
 
 		// Clear the component's cache
 		$cache = JFactory::getCache('com_easyblog');
 		$cache->clean();
 
-		return array( 'message' => $message , 'type' => $type);
+		$url 		= 'index.php?option=com_easyblog&view=settings&layout=' . $page;
+
+		$this->app->redirect($url);
 	}
 
 	/**
-	* Cancels an edit operation
-	*/
-	function cancel()
+	 * Allows caller to save their api key
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function saveApi()
 	{
+		// Check for request forgeries
+		EB::checkToken();
+
 		// @task: Check for acl rules.
-		$this->checkAccess( 'setting' );
+		$this->checkAccess('setting');
 
-		$mainframe = JFactory::getApplication();
-		$mainframe->redirect('index.php?option=com_easyblog');
-	}
+		$model 	= EB::model('Settings');
+		$key 	= $this->input->get('apikey', '', 'default');
+		$from 	= $this->input->get('from', '', 'default');
+		$return = $this->input->get('return', '', 'default');
 
-	public function import()
-	{
-		$this->checkAccess( 'setting' );
+		// Save the apikey
+		$model->save(array('main_apikey' => $key));
 
-		$mainframe = JFactory::getApplication();
+		EB::info()->set(JText::_('COM_EASYBLOG_API_KEY_SAVED'), 'success');
 
-		$file 		= JRequest::getVar( 'file' , array() , 'FILES' );
-
-		if( !isset( $file[ 'tmp_name' ] ) || empty( $file[ 'tmp_name' ]) )
-		{
-			return $mainframe->redirect('index.php?option=com_easyblog&view=settings' , JText::_( 'COM_EASYBLOG_SETTINGS_IMPORT_ERROR_FILE_INVALID' ) , 'error' );
+		// If return is specified, respect that
+		if (!empty($return)) {
+			$return  = base64_decode($return);
+			$this->app->redirect($return);
 		}
 
-		$path 		= $file[ 'tmp_name' ];
-		$contents	= JFile::read( $path );
+		if (empty($from)) {
+			$this->app->redirect( 'index.php?option=com_easyblog' , JText::_( '' ) );
+		} else {
+		    $this->app->redirect( 'index.php?option=com_easyblog&view=updater' , JText::_( 'COM_EASYBLOG_API_KEY_SAVED' ) );
+		}
+	}
 
-		$table 		= EasyBlogHelper::getTable( 'Configs' );
-		$table->load( array( 'name' => 'config' ) );
+	/**
+	 * Allows user to import settings file
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function import()
+	{
+		// Check for request forgeries
+		EB::checkToken();
+
+		// @task: Check for acl rules.
+		$this->checkAccess('setting');
+
+		// Get the file data
+		$file = $this->input->files->get('file');
+
+		if (!isset($file['tmp_name']) || empty($file['tmp_name'])) {
+			$this->info->set('COM_EASYBLOG_SETTINGS_IMPORT_ERROR_FILE_INVALID', 'error');
+			return $this->app->redirect('index.php?option=com_easyblog&view=settings');
+		}
+
+		// Get the path to the temporary file
+		$path = $file['tmp_name'];
+		$contents = JFile::read($path);
+
+		// Load the configuration
+		$table = EB::table('Configs');
+		$table->load(array('name' => 'config'));
 
 		$table->params 	= $contents;
+
 		$table->store();
 
-		return $mainframe->redirect('index.php?option=com_easyblog&view=settings' , JText::_( 'COM_EASYBLOG_SETTINGS_IMPORT_SUCCESS' ) );
+		$this->info->set('COM_EASYBLOG_SETTINGS_IMPORT_SUCCESS', 'success');
+		return $this->app->redirect('index.php?option=com_easyblog&view=settings');
 	}
 
 	/**
 	* Save the Email Template.
 	*/
-	function saveEmailTemplate()
+	public function saveEmailTemplate()
 	{
 		// @task: Check for acl rules.
 		$this->checkAccess( 'setting' );

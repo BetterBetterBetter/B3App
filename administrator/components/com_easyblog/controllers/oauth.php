@@ -40,7 +40,7 @@ class EasyBlogControllerOauth extends EasyBlogController
 		if(! EasyBlogHelper::isLoggedIn())
 		{
 			$mainframe->enqueueMessage( JText::_('COM_EASYBLOG_YOU_MUST_LOGIN_FIRST') , 'error' );
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog' , false ) );
+			$this->setRedirect( EBR::_('index.php?option=com_easyblog' , false ) );
 			return;
 		}
 
@@ -84,13 +84,13 @@ class EasyBlogControllerOauth extends EasyBlogController
 			return;
 		}
 
-		$oauth				= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
+		$oauth				= EB::table('Oauth');
 		$oauth->user_id		= $userId;
 		$oauth->type		= $type;
-		$oauth->created		= EasyBlogHelper::getDate()->toMySQL();
+		$oauth->created		= EB::date()->toMySQL();
 
 		// Bind the request tokens
-		$param				= EasyBlogHelper::getRegistry('');
+		$param 	= EB::registry();
 		$param->set( 'token' , $request->token );
 		$param->set( 'secret' , $request->secret );
 
@@ -132,7 +132,7 @@ class EasyBlogControllerOauth extends EasyBlogController
 			return;
 		}
 
-		$oauth		= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
+		$oauth		= EB::table('Oauth');
 		$loaded		= $oauth->loadByUser( $my->id , $type );
 
 		$denied     = JRequest::getVar( 'denied' , '' );
@@ -159,7 +159,7 @@ class EasyBlogControllerOauth extends EasyBlogController
 			return;
 		}
 
-		$request	= EasyBlogHelper::getRegistry( $oauth->request_token );
+		$request 	= EB::registry($oauth->request_token);
 		$callback	= rtrim( JURI::root() , '/' ) . '/administrator/index.php?option=com_easyblog&c=oauth&task=grant&type=' . $type . $redirect . $callUri;
 
 
@@ -186,7 +186,7 @@ class EasyBlogControllerOauth extends EasyBlogController
 			return;
 		}
 
-		$param		= EasyBlogHelper::getRegistry('');
+		$param 	= EB::registry();
 		$param->set( 'token' 	, $access->token );
 		$param->set( 'secret'	, $access->secret );
 
@@ -243,7 +243,7 @@ class EasyBlogControllerOauth extends EasyBlogController
 			$this->setRedirect( $return );
 		}
 
-		$oauth		= EasyBlogHelper::getTable( 'OAuth' , 'Table' );
+		$oauth		= EB::table('OAuth');
 		$oauth->loadByUser( $my->id , $type );
 
 		// Revoke the access through the respective client first.

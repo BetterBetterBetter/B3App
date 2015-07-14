@@ -34,7 +34,7 @@ defined('_JEXEC') or die('Restricted access');
 				<?php
 				$total = $this->categories[ $i ]->getPostCount();
 				?>
-				['<?php echo $this->escape( $this->categories[ $i ]->title );?> (<?php echo $total;?>)', <?php echo $total;?>]
+				['<?php echo $this->escape(JText::_($this->categories[ $i ]->title, true));?> (<?php echo $total;?>)', <?php echo $total;?>]
 				<?php if( next( $this->categories ) !== false ){ ?>, <?php } ?>
 			<?php } ?>
 		]);

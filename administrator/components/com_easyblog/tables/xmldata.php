@@ -11,28 +11,20 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableXmldata extends EasyBlogTable
 {
+	public $id = null;
+	public $session_id = null;
+	public $filename = null;
+	public $post_id = null;
+	public $source = null;
+	public $data = null;
+	public $comments = null;
 
-	var $id 					= null;
-	var $session_id				= null;
-	var $filename				= null;
-	var $post_id				= null;
-	var $source					= null;
-	var $data					= null;
-	var $comments				= null;
-
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct($db)
 	{
 		parent::__construct( '#__easyblog_xml_wpdata' , 'id' , $db );
 	}
-
 }

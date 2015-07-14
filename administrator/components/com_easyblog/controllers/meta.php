@@ -1,88 +1,74 @@
 <?php
 /**
- * @package		EasyBlog
- * @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
- * @license		GNU/GPL, see LICENSE.php
- *
- * EasyBlog is free software. This version may have been modified pursuant
- * to the GNU General Public License, and as distributed it includes or
- * is derivative of works licensed under the GNU General Public License or
- * other free or open source software licenses.
- * See COPYRIGHT.php for copyright notices and details.
- */
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
+* @license		GNU/GPL, see LICENSE.php
+* EasyBlog is free software. This version may have been modified pursuant
+* to the GNU General Public License, and as distributed it includes or
+* is derivative of works licensed under the GNU General Public License or
+* other free or open source software licenses.
+* See COPYRIGHT.php for copyright notices and details.
+*/
+defined('_JEXEC') or die('Unauthorized Access');
 
-defined('_JEXEC') or die('Restricted access');
-
-jimport('joomla.application.component.controller');
-
-require_once( dirname(__FILE__ ) . DIRECTORY_SEPARATOR . 'controller.php' );
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerMeta extends EasyBlogController
 {
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
-		$this->registerTask( 'apply'			, 'save' );
-		$this->registerTask( 'addIndexing'		, 'saveIndexing' );
-		$this->registerTask( 'removeIndexing'	, 'saveIndexing' );
+		$this->registerTask('apply', 'save');
+		$this->registerTask('addIndexing', 'saveIndexing');
+		$this->registerTask('removeIndexing', 'saveIndexing');
+		$this->registerTask('delete', 'delete');
 	}
 
-	function save()
+	/**
+	 * Saves a new meta object
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function save()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'meta' );
+		$this->checkAccess('meta');
 
-		$mainframe	= JFactory::getApplication();
+		// Default return url
+		$return = JRoute::_('index.php?option=com_easyblog&view=metas' , false);
 
-		$message	= '';
-		$type		= 'message';
+		$post = $this->input->getArray('post');
 
-		$url		= JRoute::_( 'index.php?option=com_easyblog&view=metas' , false );
+		if (!isset($post['id']) || empty($post['id'])) {
+			$this->info->set('COM_EASYBLOG_INVALID_META_TAG_ID', 'error');
 
-		if( JRequest::getMethod() == 'POST' )
-		{
-			$post				= JRequest::get( 'post' );
-
-			if(empty($post['id']))
-			{
-				$mainframe->enqueueMessage(JText::_('COM_EASYBLOG_INVALID_META_TAG_ID'), 'error');
-
-				$url  = 'index.php?option=com_easyblog&view=metas';
-				$mainframe->redirect(JRoute::_($url, false));
-				return;
-			}
-
-			$meta		= EasyBlogHelper::getTable( 'meta', 'Table' );
-			$user		= JFactory::getUser();
-			$metaId		= JRequest::getVar( 'id' , '' );
-
-			if( !empty( $metaId ) )
-			{
-				$meta->load( $metaId );
-			}
-
-			$meta->bind( $post );
-			$meta->store();
-
-			$message	= JText::_( 'COM_EASYBLOG_META_SAVED' );
-
-			if( $this->getTask() == 'apply' )
-			{
-				$url 		= JRoute::_( 'index.php?option=com_easyblog&view=meta&id=' . $meta->id , false );
-			}
-		}
-		else
-		{
-			$message	= JText::_('Invalid request method. This form needs to be submitted through a "POST" request.');
-			$type		= 'error';
+			return $this->app->redirect($return);
 		}
 
+		$meta = EB::table('Meta');
+		$meta->load((int) $post['id']);
 
-		$mainframe->redirect( $url , $message , $type );
+		$meta->bind($post);
+
+		// Save the meta object
+		$meta->store();
+
+		$task = $this->getTask();
+
+		if ($task == 'apply') {
+			$return = 'index.php?option=com_easyblog&view=metas&layout=form&id=' . $meta->id;
+		}
+
+		$this->info->set('COM_EASYBLOG_META_SAVED', 'success');
+
+		return $this->app->redirect($return);
 	}
 
 	public function saveIndexing()
@@ -97,7 +83,7 @@ class EasyBlogControllerMeta extends EasyBlogController
 		$task 		= $this->getTask();
 		$cid 		= JRequest::getVar( 'cid' );
 
-		$meta 		= EasyBlogHelper::getTable( 'Meta' );
+		$meta 		= EB::table('Meta');
 		$meta->load( $cid[ 0 ] );
 
 		if( empty( $cid ) || !$meta->id )
@@ -115,15 +101,41 @@ class EasyBlogControllerMeta extends EasyBlogController
 	}
 
 	/**
-	* Cancels an edit operation
-	*/
-	function cancel()
+	 * Deletes metas from the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function delete()
 	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'meta' );
+		// Check for request forgeries
+		EB::checkToken();
 
-		$mainframe = JFactory::getApplication();
+		// Check for acl rules.
+		$this->checkAccess('meta');
 
-		$mainframe->redirect('index.php?option=com_easyblog&view=metas');
+		// Get the list of metas to be deleted
+		$ids = $this->input->get('cid', array(), 'array');
+
+		if (!$ids) {
+			$this->info->set(JText::_('Invalid meta id'), 'error');
+			return $this->app->redirect('index.php?option=com_easyblog&view=metas');
+		}
+
+		// Do whatever you need to do here
+		foreach ($ids as $id) {
+
+			$meta = EB::table('Meta');
+			$meta->load((int) $id);
+
+			// Delete the tag
+			$meta->delete();
+		}
+
+		$this->info->set('COM_EASYBLOG_METAS_META_REMOVED', 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=metas');
 	}
 }

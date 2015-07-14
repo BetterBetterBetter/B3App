@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,54 +9,33 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-class JElementTeamBlogs extends JElement
+require_once(__DIR__ . '/abstract.php');
+
+class JFormFieldTeamBlogs extends EasyBlogFormField
 {
-	var	$_name = 'Teamblogs';
+	protected $type = 'TeamBlogs';
 
-	function fetchElement($name, $value, &$node, $control_name)
+	protected function getInput()
 	{
-		require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'constants.php' );
-		require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
+		$title = JText::_('COM_EASYBLOG_SELECT_A_TEAM');
 
-		$mainframe	= JFactory::getApplication();
-		$db			= EasyBlogHelper::db();
-		$doc 		= JFactory::getDocument();
+		if ($this->value) {
+			$team = EB::table('TeamBlog');
+			$team->load($this->value);
 
-		require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'constants.php' );
-
-		// get only bloggers
-
-		$query	= 'SELECT a.`id`, a.`title` FROM ' . $db->nameQuote( '#__easyblog_team' ) . ' AS a';
-		$query	.= ' LEFT JOIN `#__easyblog_team_users` AS b ON a.`id` = b.`team_id` ';
-		$query	.= ' WHERE a.`published` = ' . $db->Quote( '1' );
-		$query	.= ' ORDER BY a.`id` DESC';
-
-		$db->setQuery($query);
-		$data		= $db->loadObjectList();
-
-		ob_start();
-		?>
-		<select name="<?php echo $control_name;?>[<?php echo $name;?>]">
-			<option value="0"<?php echo $value == 0 ? ' selected="selected"' :'';?>><?php echo JText::_('Select a team');?></option>
-		<?php
-
-		if(count($data) > 0)
-		{
-			foreach($data as $team)
-			{
-				$selected	= $team->id == $value ? ' selected="selected"' : '';
-			?>
-			<option value="<?php echo $team->id;?>"<?php echo $selected;?>><?php echo '(' . $team->id . ') ' . $team->title; ?></option>
-		<?php
-			}
+			$title = $team->title;
 		}
-		?>
-		</select>
-		<?php
-		$html	= ob_get_contents();
-		ob_end_clean();
-		return $html;
+
+		$theme = EB::template();
+		$theme->set('id', $this->id);
+		$theme->set('name', $this->name);
+		$theme->set('value', $this->value);
+		$theme->set('title', $title);
+
+		$output = $theme->output('admin/elements/teamblogs');
+
+		return $output;
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,38 +9,145 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
-
-jimport('joomla.filesystem.file');
-jimport('joomla.filesystem.folder');
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableTeamBlogRequest extends EasyBlogTable
 {
-	var $id			= null;
-	var $team_id	= null;
-	var $user_id	= null;
-	var $ispeding   = null;
-	var $created    = null;
+	public $id = null;
+	public $team_id	= null;
+	public $user_id	= null;
+	public $ispeding = null;
+	public $created = null;
 
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(& $db )
 	{
 		parent::__construct( '#__easyblog_team_request' , 'id' , $db );
 	}
 
+	/**
+	 * Determines if the current viewer can moderate this request
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function canModerate()
+	{
+		$team = $this->getTeam();
 
-	function exists()
+		return $team->isTeamAdmin() || EB::isSiteAdmin();
+	}
+
+	/**
+	 * Retrieves the team object
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getTeam()
+	{
+		static $teams = array();
+
+		if (!isset($teams[$this->team_id])) {
+
+			$team = EB::table('TeamBlog');
+			$team->load($this->team_id);
+
+			$teams[$this->team_id] = $team;
+		}
+
+		return $teams[$this->team_id];
+	}
+
+
+	/**
+	 * Retrieves the user object that initiated this request
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getUser()
+	{
+		static $users = array();
+
+		if (!isset($users[$this->user_id])) {
+			$user = EB::user($this->user_id);
+			$users[$this->user_id] = $user;
+		}
+
+		return $users[$this->user_id];
+	}
+
+	/**
+	 * Approves a team request
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function approve()
+	{
+		// Add the user into the team blog users listing
+		$teamUser = EB::table('TeamBlogUsers');
+		$teamUser->user_id = $this->user_id;
+		$teamUser->team_id = $this->team_id;
+
+		$state = $teamUser->store();
+
+		if (!$state) {
+			$this->setError($teamUser->getError());
+			return false;
+		}
+
+		// Send notifications to the user that he's been approved.
+		$this->notify();
+
+		// Once the request is approved, delete this record.
+		$this->delete();
+
+		return true;
+	}
+
+	/**
+	 * Rejects a team request
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function reject()
+	{
+		// Send notifications to the user that he's been rejected.
+		$this->notify(true);
+
+		// Once the request is approved, delete this record.
+		$this->delete();
+
+		return true;
+	}
+
+	/**
+	 * Determines if a request already exists on the site
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function exists()
 	{
 		$db		= EasyBlogHelper::db();
 
-		$query	= 'SELECT COUNT(1) FROM #__easyblog_team_request '
+		$query	= 'SELECT COUNT(1) FROM `#__easyblog_team_request` '
 				. 'WHERE `team_id`=' . $db->Quote( $this->team_id ) . ' '
 				. 'AND `user_id`=' . $db->Quote( $this->user_id ) . ' '
 				. 'AND `ispending` = ' . $db->Quote('1');
@@ -49,99 +156,104 @@ class EasyBlogTableTeamBlogRequest extends EasyBlogTable
 		return $db->loadResult() > 0 ? true : false;
 	}
 
+	/**
+	 * Notifies the admin that a new request to join the team
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
 	public function sendModerationEmail()
 	{
-		// @rule: Send email to the team admin's.
-		$team 	= EasyBlogHelper::getTable( 'TeamBlog' );
-		$team->load( $this->team_id );
+		// Send email to the team admin's.
+		$team = EB::table('TeamBlog');
+		$team->load($this->team_id);
 
-		$notification	= EasyBlogHelper::getHelper( 'Notification' );
-		$emails 		= array();
+		$notification = EB::notification();
+		$emails = array();
 
-		$config			= EasyBlogHelper::getConfig();
+		$config = EB::config();
 
-		if( $config->get( 'custom_email_as_admin' ) )
-		{
-			$notification->getCustomEmails( $emails );
+		if ($config->get('custom_email_as_admin')) {
+			$notification->getCustomEmails($emails);
+		} else {
+			$notification->getAdminEmails($emails);
 		}
-		else
-		{
-			$notification->getAdminEmails( $emails );
+
+		$notification->getTeamAdminEmails($emails, $team->id);
+
+		$user = EB::user($this->user_id);
+
+		if (!$emails) {
+			return false;
 		}
-		$notification->getTeamAdminEmails( $emails , $team->id );
-
-		$user 			= EasyBlogHelper::getTable( 'Profile' );
-		$user->load( $this->user_id );
-
-		$date			= EasyBlogDateHelper::dateWithOffSet( $this->created );
-
-		if( count( $emails ) > 0 )
-		{
-			$data 		= array(
-							'teamName'		=> $team->title,
-							'authorAvatar'	=> $user->getAvatar(),
-							'authorLink'	=> EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $user->id , false , true ),
-							'authorName'	=> $user->getName(),
-							'requestDate'	=> EasyBlogDateHelper::toFormat( $date , '%A, %B %e, %Y' ),
-							'reviewLink'	=> EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=dashboard&layout=teamblogs' , false , true )
-			);
-
-			// If blog post is being posted from the back end and SH404 is installed, we should just use the raw urls.
-			$sh404exists	= EasyBlogRouter::isSh404Enabled();
-
-			if( JFactory::getApplication()->isAdmin() && $sh404exists )
-			{
-				$data[ 'authorLink' ]	= JURI::root() . 'index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $user->id;
-				$data[ 'reviewLink' ]	= JURI::root() . 'index.php?option=com_easyblog&view=dashboard&layout=teamblogs';
-			}
-
-			$emailTitle	= JText::_( 'COM_EASYBLOG_TEAMBLOG_NEW_REQUEST' );
-
-			$notification->send( $emails , $emailTitle , 'email.teamblog.request' , $data );
-		}
-	}
-
-	public function sendApprovalEmail( $approvalType )
-	{
-		$user 		= EasyBlogHelper::getTable( 'Profile' );
-		$user->load( $this->user_id );
-
-		$team 		= EasyBlogHelper::getTable( 'TeamBlog' );
-		$team->load( $this->team_id );
-
-		$template 	= ( $approvalType ) ? 'email.teamblog.approved' : 'email.teamblog.rejected';
 
 
-		$obj 				= new stdClass();
-		$obj->unsubscribe	= false;
-		$obj->email 		= $user->user->email;
-
-		$emails				= array( $obj->email => $obj );
-
-		$data 				= array(
-										'teamName'			=> $team->title,
-										'teamDescription'	=> $team->getDescription(),
-										'teamAvatar'		=> $team->getAvatar(),
-										'teamLink'			=> EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=teamblog&layout=listings&id=' . $this->team_id , false , true )
+		$data = array(
+						'teamName' => $team->title,
+						'teamLink' => $team->getExternalPermalink(),
+						'authorAvatar'	=> $user->getAvatar(),
+						'authorLink'	=> EBR::getRoutedURL('index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $user->id, false, true),
+						'authorName'	=> $user->getName(),
+						'requestDate'	=> EB::date()->format(JText::_('DATE_FORMAT_LC1')),
+						'reviewLink'	=> EBR::getRoutedURL('index.php?option=com_easyblog&view=dashboard&layout=teamblogs', false, true)
 		);
 
 		// If blog post is being posted from the back end and SH404 is installed, we should just use the raw urls.
-		$sh404exists	= EasyBlogRouter::isSh404Enabled();
+		$sh404exists = EBR::isSh404Enabled();
 
-		if( JFactory::getApplication()->isAdmin() && $sh404exists )
-		{
-			$data[ 'teamLink' ]	= JURI::root() . 'index.php?option=com_easyblog&view=teamblog&layout=listings&id=' . $team->id;
+		$app = JFactory::getApplication();
+
+		if ($app->isAdmin() && $sh404exists) {
+			$data['authorLink'] = JURI::root() . 'index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $user->id;
+			$data['reviewLink']	= JURI::root() . 'index.php?option=com_easyblog&view=dashboard&layout=teamblogs';
 		}
 
-		$notification 		= EasyBlogHelper::getHelper( 'Notification' );
-		$notification->send( $emails , JText::_('COM_EASYBLOG_TEAMBLOG_JOIN_REQUEST') , $template , $data );
+		$subject = JText::sprintf('COM_EASYBLOG_TEAMBLOGS_JOIN_REQUEST', $team->title);
+
+		return $notification->send($emails, $subject, 'team.request', $data);
 	}
 
 	/**
-	 * Override parent's store method.
+	 * Sends notifications out
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
 	 */
-	public function store()
+	public function notify($reject = false)
 	{
-		return parent::store();
+		$notification = EB::notification();
+
+		// Load up the team blog
+		$team = EB::table('TeamBlog');
+		$team->load($this->team_id);
+
+		// Send email notifications to the requester
+		$requester = JFactory::getUser($this->user_id);
+
+		$data = array( 'teamName' => $team->title,
+						'teamDescription' => $team->getDescription(),
+						'teamAvatar' => $team->getAvatar(),
+						'teamLink' => EBR::getRoutedURL('index.php?option=com_easyblog&view=teamblog&layout=listings&id=' . $this->team_id , false , true)
+				);
+
+		
+		$template = $reject ? 'team.rejected' : 'team.approved';
+
+		// Load site language file
+		EB::loadLanguages();
+
+		$subject = $reject ? JText::sprintf('COM_EASYBLOG_TEAMBLOGS_REQUEST_REJECTED', $team->title) : JText::sprintf('COM_EASYBLOG_TEAMBLOGS_REQUEST_APPROVED', $team->title);
+
+		$obj = new stdClass();
+		$obj->unsubscribe = false;
+		$obj->email = $requester->email;
+
+		$emails = array($obj);
+
+		$notification->send($emails, $subject, $template, $data);
 	}
 }

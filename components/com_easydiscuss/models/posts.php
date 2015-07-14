@@ -99,7 +99,7 @@ class EasyDiscussModelPosts extends EasyDiscussModel
 	 * @since	3.0
 	 * @access	public
 	 * @param	string
-	 * @return	
+	 * @return
 	 */
 	public function deleteRepliesInFinder($postId)
 	{
@@ -112,7 +112,7 @@ class EasyDiscussModelPosts extends EasyDiscussModel
 		$query = implode(' ', $query);
 
 		$db->setQuery($query);
-		
+
 		return $db->Query();
 	}
 
@@ -225,6 +225,10 @@ class EasyDiscussModelPosts extends EasyDiscussModel
 			$query	.= ' AND a.`isresolve`=' . $db->Quote( 0 );
 		}
 
+		if ($filteractive == 'mine') {
+			$query .= ' AND a.`user_id`=' . $db->Quote($my->id);
+		}
+
 		$query	.= $queryExclude;
 
 		return $query;
@@ -253,7 +257,7 @@ class EasyDiscussModelPosts extends EasyDiscussModel
 
 		$filteractive = (empty($filter)) ? JRequest::getString('filter', 'allposts') : $filter;
 		$where = $this->_buildQueryWhere( $filter , $category, $featuredOnly , $exclude, $userId );
-		
+
 		$db = DiscussHelper::getDBO();
 
 		$orderby		= '';
@@ -984,9 +988,15 @@ class EasyDiscussModelPosts extends EasyDiscussModel
 				break;
 		}
 
-		$limitstart		= is_null( $limitstart ) ? $this->getState( 'limitstart') : $limitstart;
-		$limit			= is_null( $limit ) ? $this->getState( 'limit' ) : $limit;
-		$queryLimit		= ' LIMIT ' . $limitstart . ',' . $limit;
+		$limitstart = is_null($limitstart) ? (int) $this->getState('limitstart') : $limitstart;
+		$limit = is_null($limit) ? (int) $this->getState('limit') : $limit;
+
+		// Ensure that nobody can temper with the limit
+		if ($limit < 0) {
+			$limit = 10;
+		}
+
+		$queryLimit = ' LIMIT ' . $limitstart . ',' . $limit;
 
 		$query	= 'SELECT COUNT(1) FROM `#__discuss_posts` AS a';
 		$query	.= $queryWhere;
@@ -1181,9 +1191,13 @@ class EasyDiscussModelPosts extends EasyDiscussModel
 		if( is_array($tagId) && empty($tagId) )
 			return false;
 
-		$db			= DiscussHelper::getDBO();
-		$limit		= $this->getState('limit');
+		$db = DiscussHelper::getDBO();
+		$limit = (int) $this->getState('limit');
 		$limitstart = (empty($limitStart) ) ? $this->getState('limitstart') : $limitStart;
+
+		if ($limit < 0) {
+			$limit = 0;
+		}
 
 		$filteractive	= (empty($filter)) ? JRequest::getString('filter', 'allposts') : $filter;
 

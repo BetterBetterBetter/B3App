@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,128 +9,113 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'parent.php' );
+require_once(dirname(__FILE__) . '/model.php');
 
-/**
- * Content Component Article Model
- *
- * @package		Joomla
- * @subpackage	Content
- * @since 1.5
- */
-class EasyBlogModelPending extends EasyBlogModelParent
+class EasyBlogModelPending extends EasyBlogAdminModel
 {
-	/**
-	 * Blogs data array
-	 *
-	 * @var array
-	 */
-	var $_data = null;
+	public $data = null;
+	public $pagination = null;
+	public $total;
 
-	/**
-	 * Pagination object
-	 *
-	 * @var object
-	 */
-	var $_pagination = null;
-
-	/**
-	 * Configuration data
-	 *
-	 * @var int	Total number of rows
-	 **/
-	var $_total;
-
-	/**
-	 * Constructor
-	 *
-	 * @since 1.5
-	 */
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
-		$mainframe 	= JFactory::getApplication();
-
-		//get the number of events from database
-		$limit       	= $mainframe->getUserStateFromRequest('com_easyblog.blogs.limit', 'limit', $mainframe->getCfg('list_limit') , 'int');
-		$limitstart		= JRequest::getVar('limitstart', 0, '', 'int');
+		// Get the number of events from database
+		$limit = $this->app->getUserStateFromRequest('com_easyblog.pending.limit', 'limit', $this->app->getCfg('list_limit') , 'int');
+		$limitstart = $this->input->get('limitstart', 0, 'int');
 
 		$this->setState('limit', $limit);
 		$this->setState('limitstart', $limitstart);
-
-		// Get the filter request variables
-		//$this->setState('filter_order', JRequest::getCmd('filter_order', 'a.dates'));
-		//$this->setState('filter_order_dir', JRequest::getCmd('filter_order_Dir', 'ASC'));
 	}
 
-	function approveBlog( $id )
+	/**
+	 * Retrieves a list of pending posts
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getBlogs($userId = null)
 	{
-		$db 	= EasyBlogHelper::db();
+		if (!$this->data) {
+			$query = $this->buildQuery($userId);
 
-		$query = 'UPDATE `#__easyblog_post` SET `ispending`= ' . $db->Quote('0') . ' WHERE `id` = ' . $db->Quote($id) . ';';
-		$db->setQuery($query);
-
-		if (!($db->query())) {
-			JError::raiseError( 500, $db->stderr() );
-			return false;
+			$this->data = $this->_getList($query, $this->getState('limitstart'), $this->getState('limit'));
 		}
 
-		return true;
+		return $this->data;
 	}
 
-	function getBlogs( $userId = null )
+	/**
+	 * Builds the query for pending posts
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function buildQuery()
 	{
-		if(empty($this->_data) )
-		{
-			$query = $this->_buildQuery( $userId );
+		$db = EB::db();
 
-			$this->_data	= $this->_getList( $this->_buildQuery() , $this->getState('limitstart'), $this->getState('limit') );
+		$tagFilter = $this->input->get('tagid', '', 'int');
+
+
+		$categoryFilter = $this->app->getUserStateFromRequest('com_easyblog.pending.filter_category', 'filter_category', '', 'int');
+
+
+
+		$query = array();
+		$query[] = 'SELECT a.* FROM ' . $db->qn('#__easyblog_revisions') . ' AS a';
+		$query[] = ' inner join ' . $db->qn('#__easyblog_post') . ' as b on a.' . $db->qn('post_id') . ' = b.' . $db->qn('id');
+
+		if ($categoryFilter) {
+			$query[] = ' LEFT JOIN ' . $db->quoteName('#__easyblog_post_category') . ' AS cat';
+			$query[] = ' ON b.' . $db->quoteName('id') . ' = cat.' . $db->quoteName('post_id');
 		}
-		return $this->_data;
-	}
 
-	function _buildQuery()
-	{
-		// Get the WHERE and ORDER BY clauses for the query
-		$where		= $this->_buildQueryWhere();
-		$orderby	= $this->_buildQueryOrderBy();
-		$db			= EasyBlogHelper::db();
+		$query[] = $this->_buildQueryWhere();
 
-		$filter_tag			= JRequest::getInt( 'tagid' , '' );
+		$query = implode(' ', $query);
 
-
-		$query	= 'SELECT a.* FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_drafts' ) . ' AS a ';
-		$query	.= $where . ' ' . $orderby;
+		// echo $query;
 
 		return $query;
 	}
 
-	function _buildQueryWhere()
+	public function _buildQueryWhere()
 	{
-		$mainframe			= JFactory::getApplication();
 		$db					= EasyBlogHelper::db();
 
-		$search 			= $mainframe->getUserStateFromRequest( 'com_easyblog.blogs.search', 'search', '', 'string' );
+		$search 			= $this->app->getUserStateFromRequest( 'com_easyblog.pending.search', 'search', '', 'string' );
 		$search 			= $db->getEscaped( trim(JString::strtolower( $search ) ) );
+
+		$categoryFilter = $this->app->getUserStateFromRequest('com_easyblog.pending.filter_category', 'filter_category', '', 'int');
+
 
 		$where = array();
 
-		if ($search)
-		{
-			$where[] = ' LOWER( a.title ) LIKE \'%' . $search . '%\' ';
+		$where[] = ' a.`state` = ' . $db->Quote(EASYBLOG_REVISION_PENDING);
+
+
+		if ($search) {
+			$where[] = ' LOWER( b.title ) LIKE \'%' . $search . '%\' ';
 		}
 
-		$where[] = ' `pending_approval` = ' . $db->Quote('1');
+		if ($categoryFilter) {
+			$where[] = ' cat.`category_id` = ' . $db->Quote($categoryFilter);
+		}
 
 		$where 		= count( $where ) ? ' WHERE ' . implode( ' AND ', $where ) : '' ;
 
 		return $where;
 	}
 
-	function _buildQueryOrderBy()
+	public function _buildQueryOrderBy()
 	{
 		$mainframe			= JFactory::getApplication();
 
@@ -143,20 +128,44 @@ class EasyBlogModelPending extends EasyBlogModelParent
 	}
 
 	/**
-	 * Method to return the total number of rows
+	 * Retrieves total number of pending blog posts by a specific user
 	 *
-	 * @access public
-	 * @return integer
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	function getTotal()
+	public function getTotalPending($userId)
 	{
-		// Load total number of rows
-		if( empty($this->_total) )
-		{
-			$this->_total	= $this->_getListCount( $this->_buildQuery() );
+		$db = EB::db();
+
+		$query = 'SELECT COUNT(1) FROM ' . $db->quoteName('#__easyblog_revisions');
+		$query .= ' WHERE ' . $db->quoteName('state') . '=' . $db->Quote(EASYBLOG_REVISION_PENDING);
+		$query .= ' AND ' . $db->quoteName('created_by') . '=' . $db->Quote($userId);
+
+		$db->setQuery($query);
+
+		$total = $db->loadResult();
+
+		return $total;
+	}
+
+	/**
+	 * Retrieves the total number of pending posts
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getTotal()
+	{
+		if (!$this->total) {
+			$query = $this->buildQuery();
+			$this->total = $this->_getListCount($query);
 		}
 
-		return $this->_total;
+		return $this->total;
 	}
 
 	/**
@@ -165,38 +174,14 @@ class EasyBlogModelPending extends EasyBlogModelParent
 	 * @access public
 	 * @return integer
 	 */
-	function &getPagination()
+	public function getPagination()
 	{
-		// Lets load the content if it doesn't already exist
-		if ( empty( $this->_pagination ) )
-		{
+		if (!$this->pagination) {
 			jimport('joomla.html.pagination');
-			$this->_pagination = new JPagination( $this->getTotal(), $this->getState('limitstart'), $this->getState('limit') );
+
+			$this->pagination = new JPagination($this->getTotal(), $this->getState('limitstart'), $this->getState('limit'));
 		}
 
-		return $this->_pagination;
-	}
-
-	function publish( &$blogs , $publish = 1 )
-	{
-		if( count( $blogs ) > 0 )
-		{
-			$db		= EasyBlogHelper::db();
-
-			$blogs	= implode( ',' , $blogs );
-
-			$query	= 'UPDATE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' '
-					. 'SET ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( $publish ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . ' IN (' . $blogs . ')';
-			$db->setQuery( $query );
-
-			if( !$db->query() )
-			{
-				$this->setError($this->_db->getErrorMsg());
-				return false;
-			}
-			return true;
-		}
-		return false;
+		return $this->pagination;
 	}
 }

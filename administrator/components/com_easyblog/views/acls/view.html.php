@@ -1,100 +1,115 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewAcls extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.acl' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
-			}
+		// Check for access
+		$this->checkAccess('easyblog.manage.acl');
+
+		// Load layout if exists
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
 		}
 
-		//initialise variables
-		$document	= JFactory::getDocument();
-		$user		= JFactory::getUser();
-		$mainframe	= JFactory::getApplication();
+		$this->setHeading('COM_EASYBLOG_TITLE_ACL', '', 'fa-lock');
 
-		JHTML::_('behavior.tooltip');
-
-		$model 		= EasyBlogHelper::getModel( 'Acl' , true );
-
-		$config		= EasyBlogHelper::getConfig();
-
-		$type = $mainframe->getUserStateFromRequest( 'com_easyblog.acls.filter_type', 'filter_type', 'group', 'word' );
-
-		//filtering
+		// Filtering
 		$filter = new stdClass();
-		$filter->type 	= $this->getFilterType($type);
-		$filter->search = $mainframe->getUserStateFromRequest( 'com_easyblog.acls.search', 'search', '', 'string' );
+		$filter->search = $this->app->getUserStateFromRequest( 'com_easyblog.acls.search', 'search', '', 'string' );
 
-		//sorting
+		// Sorting
 		$sort = new stdClass();
-		$sort->order			= $mainframe->getUserStateFromRequest( 'com_easyblog.acls.filter_order', 'filter_order', 'a.`id`', 'cmd' );
-		$sort->orderDirection	= $mainframe->getUserStateFromRequest( 'com_easyblog.acls.filter_order_Dir', 'filter_order_Dir', '', 'word' );
+		$sort->order = $this->app->getUserStateFromRequest( 'com_easyblog.acls.filter_order', 'filter_order', 'a.`id`', 'cmd' );
+		$sort->orderDirection = $this->app->getUserStateFromRequest( 'com_easyblog.acls.filter_order_Dir', 'filter_order_Dir', '', 'word' );
 
-		$rulesets	= $model->getRuleSets($type);
-		$pagination = $model->getPagination($type);
+		$model = EB::model('Acls');
+		$rulesets = $model->getRuleSets();
+		$pagination = $model->getPagination();
 
-		if ( $type == 'assigned' )
-		{
-			$document->setTitle( JText::_("COM_EASYBLOG_ACL_ASSIGN_USER") );
-			JToolBarHelper::title( JText::_( 'COM_EASYBLOG_ACL_ASSIGN_USER' ), 'acl' );
-		}
-		else
-		{
-			$document->setTitle( JText::_("COM_EASYBLOG_ACL_JOOMLA_USER_GROUP") );
-			JToolBarHelper::title( JText::_( 'COM_EASYBLOG_ACL_JOOMLA_USER_GROUP' ), 'acl' );
-		}
 
-		$this->assignRef( 'config' , $config );
-		$this->assignRef( 'rulesets' , $rulesets );
-		$this->assignRef( 'filter', $filter );
-		$this->assignRef( 'sort', $sort );
-		$this->assignRef( 'type', $type );
-		$this->assignRef( 'pagination'	, $pagination );
+		$this->doc->setTitle(JText::_("COM_EASYBLOG_ACL_JOOMLA_USER_GROUP"));
+		JToolBarHelper::title(JText::_('COM_EASYBLOG_ACL_JOOMLA_USER_GROUP'), 'acl');
 
-		parent::display($tpl);
+		$this->set('rulesets', $rulesets);
+		$this->set('filter', $filter);
+		$this->set('sort', $sort);
+		$this->set('pagination', $pagination);
+
+		parent::display('acls/default');
 	}
 
-	function registerToolbar()
+	/**
+	 * Displays the ACL form
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function form()
 	{
-		$mainframe	= JFactory::getApplication();
-		$type		= $mainframe->getUserStateFromRequest( 'com_easyblog.acls.filter_type', 'filter_type', 'group', 'word' );
+		$model 	= EB::model('Acl');
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
-		JToolbarHelper::divider();
+		$id 	= JRequest::getInt('id');
+		$add 	= JRequest::getVar('add');
 
-		if($type=='assigned')
-		{
-			JToolbarHelper::addNew();
-			JToolbarHelper::deleteList();
+		if (empty($id) && empty($add)) {
+			EB::info()->set(JText::_('COM_EASYBLOG_ACL_INVALID_ID_PROVIDED'), 'error');
+
+			return $this->app->redirect('index.php?option=com_easyblog&view=acls');
 		}
+
+		// Get a list of rule sets.
+		$ruleset 	= $model->getInstalledRules($id, $add);
+		$groups		= $model->getGroups();
+
+		$this->setHeading('COM_EASYBLOG_TITLE_ACL', '', 'fa-lock');
+
+		$this->doc->setTitle(JText::_("COM_EASYBLOG_ACL_JOOMLA_USER_GROUP"));
+		JToolBarHelper::title(JText::_('COM_EASYBLOG_ACL_JOOMLA_USER_GROUP'), 'acl');
+
+
+		$filter 	= EB::table('ACLFilter');
+		$filter->load($id);
+
+		$this->set('groups', $groups);
+		$this->set('filter', $filter);
+		$this->set('ruleset', $ruleset);
+
+		$this->set('add', $add);
+
+		parent::display('acls/form');
 	}
 
-	function getFilterType( $filter_type='*', $group='COM_EASYBLOG_JOOMLA_GROUP', $assigned='COM_EASYBLOG_ASSIGNED' )
+	public function registerToolbar()
 	{
-		return $this->renderFilters(
-						array( 'group' => $group, 'assigned' => $assigned ),
-						$filter_type,
-						'filter_type');
+		$layout = $this->getLayout();
+
+		if ($layout == 'form') {
+			JToolBarHelper::apply('acl.apply');
+			JToolBarHelper::save('acl.save');
+			JToolBarHelper::divider();
+			JToolBarHelper::custom('acl.enable', 'plus', '', JText::_( 'COM_EASYBLOG_ENABLE_ALL' ), false );
+			JToolBarHelper::custom('acl.disable', 'minus', '', JText::_( 'COM_EASYBLOG_DISABLE_ALL' ), false );
+			JToolBarHelper::divider();
+			JToolBarHelper::cancel();
+
+			return;
+		}
 	}
 
 }

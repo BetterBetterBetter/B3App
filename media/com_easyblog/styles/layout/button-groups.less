@@ -1,0 +1,38 @@
+//
+// Button groups
+// --------------------------------------------------
+.btn-group-yesno {
+	width: 100px;
+	display: inline-block;
+	vertical-align: middle;
+
+	.btn {
+		background: #ddd;
+		border: 1px solid #ccc;
+		border-radius: 0;
+		.border-left-radius(3px);
+		float: left;
+		width: 50%;
+
+		+ .btn {
+			border-radius: 0;
+			.border-right-radius(3px);
+		}
+
+		&.active {
+			background: #fff;
+			color: #fff;
+			text-shadow: 0 -1px 0 rgba(0,0,0,0.25);
+		}
+
+		&.btn-yes.active {
+			background: @brand-primary;
+			border-color: darken(@brand-primary, 10%);
+		}
+
+		&.btn-no.active {
+			background: @brand-danger;
+			border-color: darken(@brand-danger, 10%);
+		}
+	}
+}

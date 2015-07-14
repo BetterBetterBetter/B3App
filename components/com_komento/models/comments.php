@@ -1219,8 +1219,8 @@ class KomentoModelComments extends KomentoModel
 	public function deleteArticleComments( $component, $cid )
 	{
 		$query  = 'DELETE FROM ' . $this->db->nameQuote( '#__komento_comments' );
-		$query .= ' WHERE ' . $this->db->nameQuote( 'component' ) . ' = ' . $component;
-		$query .= ' AND ' . $this->db->nameQuote( 'cid' ) . ' = ' . $cid;
+		$query .= ' WHERE ' . $this->db->nameQuote( 'component' ) . ' = ' . $this->db->quote( $component);
+		$query .= ' AND ' . $this->db->nameQuote( 'cid' ) . ' = ' . $this->db->quote($cid);
 
 		$this->db->setQuery( $query );
 		return $this->db->query();

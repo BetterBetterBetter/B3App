@@ -24,7 +24,7 @@ class EasyDiscussViewPost extends EasyDiscussView
 		$config		= DiscussHelper::getConfig();
 
 		// Sorting and filters.
-		$sort			= JRequest::getString('sort', DiscussHelper::getDefaultRepliesSorting() );
+		$sort = JRequest::getWord('sort', DiscussHelper::getDefaultRepliesSorting() );
 		$filteractive	= JRequest::getString('filter', 'allposts');
 		$id				= JRequest::getInt( 'id' );
 		$acl			= DiscussHelper::getHelper( 'ACL' );

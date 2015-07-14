@@ -35,10 +35,21 @@ class EasyDiscussViewMigrators extends EasyDiscussAdminView
 
 	public function communitypolls()
 	{
-
 		$this->set( 'installed' , $this->communityPollsExists() );
 
 		parent::display( 'communitypolls' );
+	}
+
+	public function discussions()
+	{
+		parent::display('discussions');
+	}
+
+	public function discussionsExists()
+	{
+		$file = JPATH_ADMINISTRATOR . '/components/com_discussions/discussions.php';
+
+		return JFile::exists($file);
 	}
 
 	public function communityPollsExists()

@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,388 +9,225 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'date.php' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewCategories extends EasyBlogView
 {
 	/**
-	 * This method is responsible the output on the all categories layout.
+	 * Displays the default categories layout
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	function display( $tmpl = null )
+	public function display($tmpl = null)
 	{
-		$app 		= JFactory::getApplication();
-		$doc 		= JFactory::getDocument();
-		$config 	= EasyBlogHelper::getConfig();
+		// Set meta tags for bloggers
+		EB::setMeta(META_ID_GATEGORIES, META_TYPE_VIEW);
 
-		// @task: Set meta tags for bloggers
-		EasyBlogHelper::setMeta( META_ID_GATEGORIES , META_TYPE_VIEW );
-
-		$limitstart	= JRequest::getVar('limitstart', 0);
-
-		if ($limitstart) {
-			$doc->setMetadata('robots', 'noindex,follow');
+		// If the active menu is this view, we should not make the breadcrumb linkable.
+		if (EasyBlogRouter::isCurrentActiveMenu('categories')) {
+			$this->setPathway(JText::_('COM_EASYBLOG_CATEGORIES_BREADCRUMB'), '');
 		}
 
-		// @task: Set the pathway
-		$pathway	= $app->getPathway();
+		// Sorting options
+		$defaultSorting = $this->config->get('layout_sorting_category', 'latest');
+		$sort = $this->input->get('sort', $defaultSorting, 'cmd');
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'categories' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_CATEGORIES_BREADCRUMB') , '' );
-		}
+		// Load up our own models
+		$model = EB::model('Category');
 
-		// @task: Get the sorting options.
-		$sortConfig = $config->get('layout_sorting_category','latest');
-		$sort		= JRequest::getCmd('sort',$sortConfig);
-
-		// @task: Retrieve models
-		$blogModel		= $this->getModel( 'Blog' );
-		$categoryModel	= $this->getModel( 'Category' );
-
-		// @task: Test if there's any explicit inclusion of categories
-		$menu 		= $app->getMenu()->getActive();
+		// Test if there's any explicit inclusion of categories
+		$menu = $this->app->getMenu()->getActive();
 		$inclusion	= '';
 
-		if( is_object( $menu ) && stristr($menu->link , 'view=categories') !== false )
-		{
-			$params 	= EasyBlogHelper::getRegistry( $menu->params );
-			$inclusion	= EasyBlogHelper::getCategoryInclusion( $params->get( 'inclusion' ) );
+		if (is_object($menu) && stristr($menu->link , 'view=categories') !== false) {
+			$inclusion	= EB::getCategoryInclusion($menu->params->get('inclusion'));
 		}
 
-		// @task: Get limit
-		$limit = $config->get( 'layout_pagination_categories_per_page' );
+		// Get the number of categories to show per page
+		$limit = $this->config->get('layout_pagination_categories_per_page');
 
-		$data				= $categoryModel->getCategories($sort, $config->get( 'main_categories_hideempty' ) , $limit , $inclusion );
+		// Get the categories
+		$categories = $model->getCategories($sort, $this->config->get('main_categories_hideempty'), $limit, $inclusion);
 
-		$pagination			= $categoryModel->getPagination();
+		// Get the pagination
+		$pagination	= $model->getPagination();
+		$pagination = $pagination->getPagesLinks();
 
-		if(!empty($data))
-		{
-			for($i = 0; $i < count($data); $i++)
-			{
-				$row		=& $data[$i];
-				$category 	= EasyBlogHelper::getTable( 'Category' );
-				$category->load($row->id);
+		// Format the categories
+		$categories = EB::formatter('categories', $categories);
 
-				$row->childs = null;
+		// Update the title of the page if navigating on different pages to avoid Google marking these title's as duplicates.
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_CATEGORIES_PAGE_TITLE'));
+		$this->setPageTitle($title, $pagination, $this->config->get('main_pagetitle_autoappend'));
 
-				EasyBlogHelper::buildNestedCategories($row->id, $row, false , true );
+		// Add canonical URLs.
+		$this->canonical('index.php?option=com_easyblog&view=categories');
 
-				// TODO: Parameterize initial subcategories to display. Ability to configure from backend.
-				$nestedLinks = '';
-				$initialLimit = ( $app->getCfg('list_limit') == 0) ? 5 : $app->getCfg('list_limit');
+		// Get the default pagination limit for authors
+		$limit = $this->app->getCfg('list_limit');
+		$limit = $limit == 0 ? 5 : $limit;
 
-				if (count($row->childs) > $initialLimit)
-				{
-					$initialNestedLinks = '';
-					$initialRow			= new stdClass();
-					$initialRow->childs = array_slice($row->childs, 0, $initialLimit);
+		$this->set('limit', $limit);
+		$this->set('categories', $categories);
+		$this->set('sort', $sort);
+		$this->set('pagination', $pagination);
 
-					EasyBlogHelper::accessNestedCategories($initialRow, $initialNestedLinks, '0', '', 'link', ', ');
+		$namespace 	= 'blogs/categories/default';
 
-					$moreNestedLinks 	= '';
-					$moreRow			= new stdClass();
-					$moreRow->childs	= array_slice($row->childs, $initialLimit);
-
-					EasyBlogHelper::accessNestedCategories($moreRow, $moreNestedLinks, '0', '', 'link', ', ');
-
-					// Hide more nested links until triggered
-					$nestedLinks .= $initialNestedLinks;
-					$nestedLinks .= '<span class="more-subcategories-toggle"> ' . JText::_('COM_EASYBLOG_AND') . ' <a href="javascript:void(0);" onclick="eblog.categories.loadMore( this );">' . JText::sprintf('COM_EASYBLOG_OTHER_SUBCATEGORIES', count($row->childs) - $initialLimit) . '</a></span>';
-					$nestedLinks .= '<span class="more-subcategories" style="display: none;">, ' . $moreNestedLinks . '</span>';
-
-				}
-				else
-				{
-					EasyBlogHelper::accessNestedCategories($row, $nestedLinks, '0', '', 'link', ', ');
-				}
-
-				$catIds     = array();
-				$catIds[]   = $row->id;
-				EasyBlogHelper::accessNestedCategoriesId( $row , $catIds );
-
-				$blogs		= $blogModel->getBlogsBy( 'category' , $catIds , 'latest' , EasyBlogHelper::getHelper( 'Pagination' )->getLimit( EBLOG_PAGINATION_CATEGORIES ) );
-
-				for($j=0; $j < count($blogs); $j++)
-				{
-					$blogItem   	= $blogs[$j];
-					$itemLinkageArr	= EasyBlogHelper::populateCategoryLinkage($blogItem->category_id);
-					$itemLinkage	= '';
-
-					foreach($itemLinkageArr as $linkItem)
-					{
-						$str    = '<a href="' . EasyBlogRouter::_('index.php?option=com_easyblog&view=categories&layout=listings&id='.$linkItem->id) . '">' . $linkItem->title . '</a>';
-						$itemLinkage   .= (empty($itemLinkage)) ? $str : '&nbsp;' . '&gt;' . '&nbsp;' . $str;
-					}
-					$blogItem->nestedLink	= $itemLinkage;
-					$author					= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-
-					$author->load( $blogItem->created_by );
-					$blogItem->author		= $author;
-				}
-
-				$row->cnt   = $categoryModel->getTotalPostCount( $catIds );
-
-				if(!empty($blogs))
-				{
-					$blogs	= EasyBlogHelper::formatBlog( $blogs , false , true , true , true );
-				}
-
-				$row->description	= $category->get( 'description' );
-				$row->blogs			= $blogs;
-				$row->rssLink   	= $category->getRSS();
-				$row->avatar    	= $category->getAvatar();
-				$row->nestedLink    = $nestedLinks;
-				$row->bloggers		= $category->getActiveBloggers();
-			}
+		if ($this->getLayout() == 'simple') {
+			$namespace 	= 'blogs/categories/default.simple';
 		}
 
-		// @task: Update the title of the page if navigating on different pages to avoid Google marking these title's as duplicates.
-		$title 		= EasyBlogHelper::getPageTitle( JText::_( 'COM_EASYBLOG_CATEGORIES_PAGE_TITLE' ) );
-
-		// @task: Set the page title
-		parent::setPageTitle( $title , $pagination , $config->get( 'main_pagetitle_autoappend' ) );
-
-		$theme	= new CodeThemes();
-		$theme->set( 'data', $data );
-		$theme->set( 'sort', $sort );
-		$theme->set( 'pagination', $pagination->getPagesLinks());
-
-		echo $theme->fetch( 'blog.categories.php' );
+		parent::display($namespace);
 	}
 
-	function simple( $tmpl = null )
-	{
-		$app 		= JFactory::getApplication();
-		$doc 		= JFactory::getDocument();
-		$config 	= EasyBlogHelper::getConfig();
-
-		// @task: Set meta tags for bloggers
-		EasyBlogHelper::setMeta( META_ID_GATEGORIES , META_TYPE_VIEW );
-
-		// @task: Set the pathway
-		$pathway	= $app->getPathway();
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'categories' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_CATEGORIES_BREADCRUMB') , '' );
-		}
-
-		// @task: Get the sorting options.
-		$sortConfig = $config->get('layout_sorting_category','latest');
-		$sort		= JRequest::getCmd('sort',$sortConfig);
-
-		// @task: Retrieve models
-		$categoriesModel	= $this->getModel( 'Categories' );
-		$categoryModel		= $this->getModel( 'Category' );
-
-		// @task: Test if there's any explicit inclusion of categories
-		$menu 		= $app->getMenu()->getActive();
-		$inclusion	= '';
-
-		if( is_object( $menu ) && stristr($menu->link , 'view=categories') !== false )
-		{
-			$params 	= EasyBlogHelper::getRegistry( $menu->params );
-			$inclusion	= EasyBlogHelper::getCategoryInclusion( $params->get( 'inclusion' ) );
-		}
-
-		$data				= $categoriesModel->getCategoryTree( $sort );
-
-		if(!empty($data))
-		{
-			for($i = 0; $i < count($data); $i++)
-			{
-				$row		=& $data[$i];
-
-// 				$row->childs = null;
-// 				EasyBlogHelper::buildNestedCategories($row->id, $row, false , true );
-
-				$catIds     = array();
-				$catIds[]   = $row->id;
-
-				$row->cnt   		= $categoryModel->getTotalPostCount( $catIds );
-				$row->description	= $row->get( 'description' );
-// 				$row->rssLink   	= $row->getRSS();
-// 				$row->avatar    	= $row->getAvatar();
-			}
-		}
-
-// 		echo '<pre>';
-// 		print_r($data);
-// 		echo '</pre>';
-// 		exit;
-
-		// @task: Set page title
-		parent::setPageTitle( JText::_('COM_EASYBLOG_CATEGORIES_PAGE_TITLE') , '0' , true );
-
-		$theme	= new CodeThemes();
-		$theme->set( 'data', $data );
-		$theme->set( 'sort', $sort );
-
-		echo $theme->fetch( 'blog.categories.simple.php' );
-	}
-
-
-	/*
-	 * Show all the blogs in this category
+	/**
+	 * Displays a list of blog posts on the site filtered by a category.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	function listings()
+	public function listings()
 	{
-		$app 		= JFactory::getApplication();
-		$doc 		= JFactory::getDocument();
-		$config 	= EasyBlogHelper::getConfig();
-		$my         = JFactory::getUser();
-		$acl 		= EasyBlogACLHelper::getRuleSet();
-		$sort		= JRequest::getCmd('sort', $config->get( 'layout_postorder' ) );
-		$catId		= JRequest::getCmd('id','0');
+		// Retrieve sorting options
+		$sort = $this->input->get('sort', $this->config->get('layout_postorder'), 'cmd');
+		$id = $this->input->get('id', 0, 'int');
 
-		$category = EasyBlogHelper::getTable( 'Category', 'Table' );
-		$category->load($catId);
+		// Try to load the category
+		$category = EB::table('Category');
+		$category->load($id);
 
-		if($category->id == 0)
-		{
-			$category->title    = JText::_('COM_EASYBLOG_UNCATEGORIZED');
+		// If the category isn't found on the site throw an error.
+		if (!$id || !$category->id) {
+			return JError::raiseError(404, JText::_('COM_EASYBLOG_CATEGORY_NOT_FOUND'));
 		}
 
 		// Set the meta description for the category
-		EasyBlogHelper::setMeta( $category->id , META_TYPE_CATEGORY );
+		EB::setMeta($category->id, META_TYPE_CATEGORY);
 
-		// Set the meta description for the category
-		// $doc->setMetadata( 'description' , strip_tags( $category->description ) );
-		$canonicalUrl   = EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=categories&layout=listings&id=' . $category->id , false , true, true );
-		$doc->addCustomTag( '<link rel="canonical" href="' . $canonicalUrl . '"/>' );
+		// Set a canonical link for the category page.
+		$this->canonical($category->getExternalPermalink());
 
-		//setting pathway
-		$pathway	= $app->getPathway();
+		// Get the privacy
+		$privacy = $category->checkPrivacy();
 
-		$privacy	= $category->checkPrivacy();
-
-		$addRSS = true;
-		if(! $privacy->allowed )
-		{
-			if( $my->id == 0 && !$config->get('main_allowguestsubscribe'))
-			{
-				$addRSS = false;
-			}
+		if ($privacy->allowed || EB::isSiteAdmin() || (!$this->my->guest && $this->config->get('main_allowguestsubscribe'))) {
+			$this->doc->addHeadLink($category->getRSS() , 'alternate' , 'rel' , array('type' => 'application/rss+xml', 'title' => 'RSS 2.0') );
+			$this->doc->addHeadLink($category->getAtom() , 'alternate' , 'rel' , array('type' => 'application/atom+xml', 'title' => 'Atom 1.0') );
 		}
 
-		if( $addRSS )
-		{
-			// Add rss feed link
-			$doc->addHeadLink( $category->getRSS() , 'alternate' , 'rel' , array('type' => 'application/rss+xml', 'title' => 'RSS 2.0') );
-			$doc->addHeadLink( $category->getAtom() , 'alternate' , 'rel' , array('type' => 'application/atom+xml', 'title' => 'Atom 1.0') );
-		}
+		// Set views breadcrumbs
+		$this->setViewBreadcrumb($this->getName());
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'categories', $category->id ) )
-		{
-			if( ! EasyBlogRouter::isCurrentActiveMenu( 'categories' ) )
-				$this->setPathway( JText::_('COM_EASYBLOG_CATEGORIES_BREADCRUMB') , EasyBlogRouter::_('index.php?option=com_easyblog&view=categories') );
-
-			//add the pathway for category
-			$this->setPathway( $category->title , '' );
+		// Set the breadcrumb for this category
+		if (!EBR::isCurrentActiveMenu('categories', $category->id)) {
+			// Always add the final pathway to the category title.
+			$this->setPathway($category->title, '');
 		}
 
 		//get the nested categories
 		$category->childs = null;
 
-		EasyBlogHelper::buildNestedCategories($category->id, $category , false , true );
+		// Build nested childsets
+		EB::buildNestedCategories($category->id, $category, false, true);
 
-		// TODO: Parameterize initial subcategories to display. Ability to configure from backend.
+		// Parameterize initial subcategories to display. Ability to configure from backend.
 		$nestedLinks = '';
-		$initialLimit = ($app->getCfg('list_limit') == 0) ? 5 : $app->getCfg('list_limit');
+		$initialLimit = ($this->app->getCfg('list_limit') == 0) ? 5 : $this->app->getCfg('list_limit');
 
-		if (count($category->childs) > $initialLimit)
-		{
+		if (count($category->childs) > $initialLimit) {
 			$initialNestedLinks = '';
-			$initialRow = new stdClass();
+			$initialRow			= new stdClass();
 			$initialRow->childs = array_slice($category->childs, 0, $initialLimit);
 
-			EasyBlogHelper::accessNestedCategories($initialRow, $initialNestedLinks, '0', '', 'link', ', ');
+			EB::accessNestedCategories($initialRow, $initialNestedLinks, '0', '', 'link', ', ');
 
 			$moreNestedLinks = '';
 			$moreRow = new stdClass();
 			$moreRow->childs = array_slice($category->childs, $initialLimit);
 
-			EasyBlogHelper::accessNestedCategories($moreRow, $moreNestedLinks, '0', '', 'link', ', ');
+			EB::accessNestedCategories($moreRow, $moreNestedLinks, '0', '', 'link', ', ');
 
 			// Hide more nested links until triggered
 			$nestedLinks .= $initialNestedLinks;
-			$nestedLinks .= '<span class="more-subcategories-toggle"> ' . JText::_('COM_EASYBLOG_AND') . ' <a href="javascript: void(0);onclick="eblog.categories.loadMore( this );">' . JText::sprintf('COM_EASYBLOG_OTHER_SUBCATEGORIES', count($category->childs) - $initialLimit) . '</a></span>';
-			$nestedLinks .= '<span class="more-subcategories" style="display: none;">, ' . $moreNestedLinks . '</span>';
+
+			$nestedLinks .= '<span class="more-subcategories-toggle" data-more-categories-link> ' . JText::_('COM_EASYBLOG_AND') . ' <a href="javascript:void(0);">' . JText::sprintf('COM_EASYBLOG_OTHER_SUBCATEGORIES', count($category->childs) - $initialLimit) . '</a></span>';
+			$nestedLinks .= '<span class="more-subcategories" style="display: none;" data-more-categories>, ' . $moreNestedLinks . '</span>';
 
 		} else {
-			EasyBlogHelper::accessNestedCategories($category, $nestedLinks, '0', '', 'link', ', ');
+			EB::accessNestedCategories($category, $nestedLinks, '0', '', 'link', ', ');
 		}
 
-		$catIds     = array();
-		$catIds[]   = $category->id;
-		EasyBlogHelper::accessNestedCategoriesId($category, $catIds);
+		$catIds = array();
+		$catIds[] = $category->id;
+
+		EB::accessNestedCategoriesId($category, $catIds);
 
 		$category->nestedLink = $nestedLinks;
 
-		$modelC			= $this->getModel( 'Category' );
-		$category->cnt	= $modelC->getTotalPostCount( $category->id );
+		// Get the category model
+		$model = EB::model('Category');
 
-		$modelPT	= $this->getModel( 'PostTag' );
-		$model		= $this->getModel( 'Blog' );
-		$modelCat	= $this->getModel( 'Category' );
+		// Get total posts in this category
+		$category->cnt = $model->getTotalPostCount($category->id);
 
-		$data		= $model->getBlogsBy('category', $catIds, $sort, null , null, null, null, array(), null, null, true, array(), array(), null, EBLOG_PAGINATION_CATEGORIES );
-		$pagination	= $model->getPagination();
+		// Get teamblog posts count
+		// $teamBlogCount = $model->getTeamBlogCount($category->id);
 
+		$limit = EB::call('Pagination', 'getLimit', array(EBLOG_PAGINATION_CATEGORIES));
 
-		$allowCat	= $modelCat->allowAclCategory( $category->id );
+		// Get the posts in the category
+		$data = $model->getPosts($catIds, $limit);
 
-		//for trigger
-		$params		= $app->getParams('com_easyblog');
-		$limitstart	= JRequest::getVar('limitstart', 0, '', 'int');
+		// Get the pagination
+		$pagination = $model->getPagination();
 
-		if ($limitstart) {
-			$doc->setMetadata('robots', 'noindex,follow');
+		// Get allowed categories
+		$allowCat = $model->allowAclCategory($category->id);
+
+		// Format the data that we need
+		$posts = array();
+
+		// Ensure that the user is really allowed to view the blogs
+		if (!empty($data)) {
+			$posts = EB::formatter('list', $data);
 		}
 
-		if(! empty($data))
-		{
-			$data	= EasyBlogHelper::formatBlog( $data , false , true , true , true);
+		// Check isCategorySubscribed
+		$isCategorySubscribed = $model->isCategorySubscribedEmail($category->id, $this->my->email);
 
-			if($config->get('layout_showcomment', false))
-			{
-				for($i = 0; $i < count($data); $i++)
-				{
-					$row   =& $data[$i];
-
-					$maxComment = $config->get('layout_showcommentcount', 3);
-					$comments	= EasyBlogHelper::getHelper( 'Comment' )->getBlogComment( $row->id, $maxComment , 'desc' );
-					$comments   = EasyBlogHelper::formatBlogCommentsLite($comments);
-					$row->comments = $comments;
-				}
-			}
+		// If this category has a different theme, we need to output it differently
+		if (!empty($category->theme)) {
+			$this->setTheme($category->theme);
 		}
-		$teamBlogCount          = $modelCat->getTeamBlogCount( $category->id );
 
-		$title					= EasyBlogHelper::getPageTitle( JText::_( $category->title ) );
+		// Set the page title
+		$title = EB::getPageTitle(JText::_($category->title));
+		$this->setPageTitle($title, $pagination, $this->config->get('main_pagetitle_autoappend'));
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , $pagination , $config->get( 'main_pagetitle_autoappend' ) );
+		// Set the return url
+		$return = base64_encode($category->getExternalPermalink());
 
-		$themes	= new CodeThemes();
+		// Get the pagination
+		$pagination = $pagination->getPagesLinks();
 
-		$themes->set('allowCat', $allowCat);
-		$themes->set('category', $category );
-		$themes->set('sort', $sort );
-		$themes->set('blogs', $data );
-		$themes->set( 'currentURL' , 'index.php?option=com_easyblog&view=categories&layout=listings&id=' . $category->id );
-		$themes->set('pagination', $pagination->getPagesLinks());
-		$themes->set('config', $config );
-		$themes->set('teamBlogCount', $teamBlogCount );
-		$themes->set('my', $my );
-		$themes->set('acl', $acl );
-		$themes->set('privacy', $privacy );
+		$this->set('allowCat', $allowCat);
+		$this->set('category', $category);
+		$this->set('sort', $sort);
+		$this->set('posts', $posts);
+		$this->set('return', $return);
+		$this->set('pagination', $pagination);
+		// $this->set('teamBlogCount', $teamBlogCount);
+		$this->set('privacy', $privacy);
+		$this->set('isCategorySubscribed', $isCategorySubscribed);
 
-		echo $themes->fetch( 'blog.category.php' );
+		parent::display('blogs/categories/item');
 	}
 }

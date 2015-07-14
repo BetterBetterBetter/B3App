@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,9 +9,9 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(dirname(__FILE__) . '/table.php');
 
 class EasyBlogTableFeedburner extends EasyBlogTable
 {
@@ -34,7 +34,7 @@ class EasyBlogTableFeedburner extends EasyBlogTable
 	{
 		$db		= $this->getDBO();
 
-		$query  = 'select `id` FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl );
+		$query  = 'select `id` FROM ' . $db->nameQuote( $this->_tbl );
 		$query  .= ' where userid = ' . $db->Quote( $id );
 
 		$db->setQuery( $query );
@@ -56,7 +56,7 @@ class EasyBlogTableFeedburner extends EasyBlogTable
 	function store($updateNulls = false)
 	{
 		$db		= $this->getDBO();
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
+		$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( $this->_tbl ) . ' '
 				. 'WHERE `userid`=' . $db->Quote( $this->userid );
 		$db->setQuery( $query );
 

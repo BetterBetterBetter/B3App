@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,84 +9,99 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport('joomla.application.component.controller');
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerSpools extends EasyBlogController
-{	
-	function __construct()
+{
+	public function __construct()
 	{
 		parent::__construct();
 	}
-	
+
+	/**
+	 * Purges all emails from the system
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function purge()
 	{
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		// Check for request forgeries
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'mail' );
+		$this->checkAccess('mail');
 
-		$db 	= EasyBlogHelper::db();
-		$query	= 'DELETE FROM ' . $db->nameQuote( '#__easyblog_mailq' );
-		
-		$db->setQuery( $query );
-		$db->Query();
-		
-		$this->setRedirect( 'index.php?option=com_easyblog&view=spools' , JText::_( 'COM_EASYBLOG_MAILS_PURGED' ) );
+		$model = EB::model('Spools');
+		$model->purge();
+
+		$this->info->set(JText::_('COM_EASYBLOG_MAILS_PURGED'), 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=spools');
 	}
 
-	public function preview()
+	/**
+	 * Purge Sent items
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function purgeSent()
 	{
 		// Check for request forgeries
-		JRequest::checkToken( 'get' ) or jexit( 'Invalid Token' );
+		EB::checkToken();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'mail' );
+		// Check for acl
+		$this->checkAccess('mail');
 
-		$mailq	= EasyBlogHelper::getTable( 'Mailqueue' );
-		$mailq->load( JRequest::getInt( 'id' ) );
+		$model = EB::model('Spools');
+		$model->purge('sent');
 
-		echo $mailq->body;exit;
+		$this->info->set('COM_EASYBLOG_SENT_MAILS_PURGED', 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=spools');
 	}
 
-	function remove()
+	/**
+	 * Deletes a mailer item
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function remove()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'mail' );
+		$this->checkAccess('mail');
 
-		$mails		= JRequest::getVar( 'cid' , '' , 'POST' );
-		
-		$message	= '';
-		$type		= 'info';
-		
-		if( empty( $mails ) )
-		{
-			$message	= JText::_('COM_EASYBLOG_NO_MAIL_ID_PROVIDED');
-			$type		= 'error';
-		}
-		else
-		{
-			$table		= EasyBlogHelper::getTable( 'MailQueue' , 'Table' );
-			
-			foreach( $mails as $id )
-			{
-				$table->load( $id );
+		$mails = $this->input->get('cid', array(), 'array');
 
-				if( !$table->delete() )
-				{
-					$message	= JText::_( 'COM_EASYBLOG_SPOOLS_DELETE_ERROR' );
-					$type		= 'error';
-					$this->setRedirect( 'index.php?option=com_easyblog&view=spools' , $message , $type );
-					return;
-				}
-			}
-			$message	= JText::_('COM_EASYBLOG_SPOOLS_DELETE_SUCCESS');
+		if (!$mails) {
+			$message = JText::_('COM_EASYBLOG_NO_MAIL_ID_PROVIDED');
+
+			$this->info->set($message, 'error');
+			return $this->app->redirect('index.php?option=com_easyblog&view=spools');
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=spools' , $message );
+		foreach ($mails as $id) {
+			$table = EB::table('MailQueue');
+			$table->load((int) $id);
+
+			$table->delete();
+		}
+
+		$this->info->set('COM_EASYBLOG_SPOOLS_DELETE_SUCCESS', 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=spools');
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,41 +9,32 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableReport extends EasyBlogTable
 {
-	var $id			= null;
-	var $obj_id		= null;
-	var $obj_type 	= null;
-	var $created_by	= null;
-	var $created	= null;
-	var $reason		= null;
-	var $ip 		= null;
-
+	public $id = null;
+	public $obj_id = null;
+	public $obj_type = null;
+	public $created_by = null;
+	public $created	= null;
+	public $reason = null;
+	public $ip = null;
 	private $author = null;
 
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(&$db)
 	{
-		parent::__construct( '#__easyblog_reports' , 'id' , $db );
+		parent::__construct('#__easyblog_reports', 'id', $db);
 	}
 
 	public function getAuthor()
 	{
-		if( !isset( $this->author ) || is_null( $this->author ) )
-		{
-			$profile 	= EasyBlogHelper::getTable('Profile' );
-			$profile->load( $this->created_by );
-			$this->author	= $profile;
+		if (!isset($this->author) || is_null($this->author)) {
+			$this->author = EB::user($this->created_by);
 		}
+
 		return $this->author;
 	}
 
@@ -56,16 +47,17 @@ class EasyBlogTableReport extends EasyBlogTable
 		if( $maxTimes > 0 )
 		{
 			$db 	= EasyBlogHelper::db();
-			$query 	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'obj_id' ) . ' = ' . $db->Quote( $this->obj_id ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'obj_type' ) . ' = ' . $db->Quote( $this->obj_type ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'ip' ) . ' = ' . $db->Quote( $this->ip );
+			$query 	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( $this->_tbl ) . ' '
+					. 'WHERE ' . $db->nameQuote( 'obj_id' ) . ' = ' . $db->Quote( $this->obj_id ) . ' '
+					. 'AND ' . $db->nameQuote( 'obj_type' ) . ' = ' . $db->Quote( $this->obj_type ) . ' '
+					. 'AND ' . $db->nameQuote( 'ip' ) . ' = ' . $db->Quote( $this->ip );
 
 			$db->setQuery( $query );
 			$total 	= (int) $db->loadResult();
 
 			if( $total >= $maxTimes )
 			{
+				EB::loadLanguages();
 				JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
 				$this->setError( JText::_( 'COM_EASYBLOG_REPORT_ALREADY_REPORTED' ) );
 				return false;
@@ -79,56 +71,60 @@ class EasyBlogTableReport extends EasyBlogTable
 		return parent::store();
 	}
 
-	public function notify( EasyBlogTableBlog $blog )
+	/**
+	 * Notifies the site owners when a new report is made on the site
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function notify(EasyBlogPost &$post)
 	{
-		$config 	= EasyBlogHelper::getConfig();
+		$config = EB::config();
 
 		// Send notification to site admins when a new blog post is reported
-		$data 	= array();
-		$data[ 'blogTitle']				= $blog->title;
-		$data[ 'blogLink' ]				= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=entry&id='. $blog->id, false, true);		
+		$data = array();
+		$data['blogTitle'] = $post->title;
+		$data['blogLink'] = $post->getExternalPermalink();
 
-		// @rule: Send email notifications out to subscribers.
-		$author 	= EasyBlogHelper::getTable( 'Profile' );
-		$author->load( $this->created_by );
+		// Get the author of this reporter
+		$author = $this->getAuthor();
 
-		$data[ 'reporterAvatar' ]		= $author->getAvatar();
-		$data[ 'reporterName' ]			= $author->getName();
-		$data[ 'reporterLink' ]			= $author->getProfileLink();
-		$data[ 'reason' ]				= $this->reason;
-		$date							= EasyBlogDateHelper::dateWithOffSet( $this->created );
-		$data[ 'reportDate' ]			= EasyBlogDateHelper::toFormat( $date , '%A, %B %e, %Y' );
+		$data['reporterAvatar'] = $author->getAvatar();
+		$data['reporterName'] = $author->getName();
+		$data['reporterLink'] = $author->getProfileLink();
+		$data['reason'] = $this->reason;
+		$data['reportDate'] = EB::date()->format(JText::_('DATE_FORMAT_LC2'));
 
 		// If blog post is being posted from the back end and SH404 is installed, we should just use the raw urls.
-		$sh404exists	= EasyBlogRouter::isSh404Enabled();
-
-		if( JFactory::getApplication()->isAdmin() && $sh404exists )
-		{
-			$data[ 'blogLink' ]			= JURI::root() . 'index.php?option=com_easyblog&view=entry&id=' . $blog->id;
+		$app = JFactory::getApplication();
+		
+		if ($app->isAdmin() && EBR::isSh404Enabled()) {
+			$data['blogLink'] = JURI::root() . 'index.php?option=com_easyblog&view=entry&id=' . $post->id;
 		}
 
-		$emailBlogTitle = JString::substr( $blog->title , 0 , $config->get( 'main_mailtitle_length' ) );
-		$emailTitle 	= JText::sprintf( 'COM_EASYBLOG_EMAIL_TITLE_NEW_REPORT' ,  $emailBlogTitle ) . ' ...';
+		// Set the title of the email
+		$subject = JString::substr($post->title, 0, $config->get('main_mailtitle_length'));
+		$subject = JText::sprintf('COM_EASYBLOG_EMAIL_TITLE_NEW_REPORT', $subject) . ' ...';
 
-		$notification	= EasyBlogHelper::getHelper( 'Notification' );
-		$emails 		= array();
 
-		// @rule: Fetch custom emails defined at the back end.
-		if( $config->get( 'notification_blogadmin' ) )
-		{
-			if( $config->get( 'custom_email_as_admin' ) )
-			{
-				$notification->getCustomEmails( $emails );
-			}
-			else
-			{
-				$notification->getAdminEmails( $emails );
+		// Get the notification library
+		$notification = EB::notification();
+		$recipients = array();
+
+		// Fetch custom emails defined at the back end.
+		if ($config->get('notification_blogadmin')) {
+
+			if ($config->get('custom_email_as_admin')) {
+				$notification->getCustomEmails($recipients);
+			} else {
+				$notification->getAdminEmails($recipients);
 			}
 		}
 
-		if( !empty( $emails ) )
-		{
-			$notification->send( $emails , $emailTitle , 'email.blog.report' , $data );
+		if (!empty($recipients)) {
+			$notification->send($recipients, $subject, 'post.reported', $data);
 		}
 	}
 }

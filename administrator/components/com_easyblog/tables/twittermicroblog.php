@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,53 +9,21 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableTwitterMicroblog extends EasyBlogTable
 {
-	var $id_str		= null;
-	var $oauth_id	= null;
-	var $post_id	= null;
-	var $created	= null;
-	var $tweet_author	= null;
+	public $id_str = null;
+	public $oauth_id = null;
+	public $post_id	= null;
+	public $created	= null;
+	public $tweet_author = null;
 
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db ){
-		parent::__construct( '#__easyblog_twitter_microblog' , 'id_str' , $db );
-	}
-
-	function load($id = null, $reset = false )
+	public function __construct(&$db)
 	{
-	    $db		= $this->getDBO();
-
-	    $query  = 'select * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl );
-	    $query  .= ' where `id_str`= ' . $db->Quote( $id );
-
-	    $db->setQuery( $query );
-
-	    $result = $db->loadAssoc();
-		return parent::bind( $result );
-	}
-
-	public function loadByPostId( $id )
-	{
-	    $db		= $this->getDBO();
-
-	    $query  = 'select * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl );
-	    $query  .= ' where `post_id`= ' . $db->Quote( $id );
-
-	    $db->setQuery( $query );
-
-	    $result = $db->loadAssoc();
-
-		return parent::bind( $result );
+		parent::__construct('#__easyblog_twitter_microblog', 'id_str', $db);
 	}
 
 	public function store( $updateNulls = false )
@@ -70,5 +38,32 @@ class EasyBlogTableTwitterMicroblog extends EasyBlogTable
 			return $db->updateObject( $this->_tbl, $this, $this->_tbl_key );
 		}
 		return $db->insertObject( $this->_tbl, $this, $this->_tbl_key );
+	}
+	
+	/**
+	 * Loads a micro posting from twitter given the post id
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function loadByPostId($id)
+	{
+		$db = EB::db();
+
+		$query = array();
+		$query[] = 'SELECT * FROM ' . $db->qn($this->_tbl);
+		$query[] = 'WHERE ' . $db->qn('post_id') . '=' . $db->Quote($id);
+
+		$query = implode(' ', $query);
+
+		$db->setQuery($query);
+
+		$result = $db->loadObject();
+
+		$state = parent::bind($result);
+
+		return $state;
 	}
 }

@@ -1354,6 +1354,9 @@ class DiscussPost extends JTable
 				$db->Query();
 			}
 		}
+
+		// Remove Easysocial Stream
+		DiscussHelper::getHelper('EasySocial')->deleteDiscussStream($this);
 	}
 
 	/**

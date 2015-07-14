@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,38 +9,45 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-class JElementTags extends JElement
+require_once(__DIR__ . '/abstract.php');
+
+class JFormFieldTags extends EasyBlogFormField
 {
-	var	$_name = 'Tags';
+	protected $type = 'Post';
 
-	function fetchElement($name, $value, &$node, $control_name)
+	/**
+	 * Displays the post selection form
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	protected function getInput()
 	{
-		$mainframe	= JFactory::getApplication();
-		$doc 		= JFactory::getDocument();
+		$title = JText::_('COM_EASYBLOG_MENU_SELECT_A_TAG');
 
-		require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'models' . DIRECTORY_SEPARATOR . 'tags.php' );
-		$model		= new EasyBlogModelTags();
-		$tags		= $model->getData( false );
+		$model = EB::model('Tags');
+		$tags = $model->getData(false);
 
-		ob_start();
-		?>
-		<select name="<?php echo $control_name;?>[<?php echo $name;?>]">
-			<option value="0"<?php echo $value == 0 ? ' selected="selected"' :'';?>><?php echo JText::_('Select a tag');?></option>
-		<?php
-		foreach($tags as $tag)
-		{
-			$selected	= $tag->id == $value ? ' selected="selected"' : '';
-		?>
-			<option value="<?php echo $tag->id;?>"<?php echo $selected;?>><?php echo $tag->title;?></option>
-		<?php
+		if ($this->value) {
+			$tag = EB::table('Tag');
+			$tag->load($this->value);
+
+			$title = $tag->title;
 		}
-		?>
-		</select>
-		<?php
-		$html	= ob_get_contents();
-		ob_end_clean();
-		return $html;
+
+		$theme = EB::template();
+		$theme->set('id', $this->id);
+		$theme->set('name', $this->name);
+		$theme->set('value', $this->value);
+		$theme->set('title', $title);
+		$theme->set('tags', $tags);
+
+		$output = $theme->output('admin/elements/tags');
+
+		return $output;
 	}
 }

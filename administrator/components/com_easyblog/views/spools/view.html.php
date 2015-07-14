@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,56 +9,83 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewSpools extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	/**
+	 * Display a list of email activities
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if( !JFactory::getUser()->authorise('easyblog.manage.mail' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
-			}
-		}
-		//initialise variables
-		$document		= JFactory::getDocument();
-		$user			= JFactory::getUser();
-		$mainframe		= JFactory::getApplication();
+		$this->checkAccess('easyblog.manage.mail');
 
-		$filter_state	= $mainframe->getUserStateFromRequest( 'com_easyblog.spools.filter_state', 		'filter_state', 	'*', 		'word' );
-		$search			= $mainframe->getUserStateFromRequest( 'com_easyblog.spools.search', 			'search', 			'', 		'string' );
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
+		}
+
+		// Set heading
+		$this->setHeading('COM_EASYBLOG_TITLE_MAIL_ACTIVITIES', '', 'fa-send-o');
+
+		$filter_state	= $this->app->getUserStateFromRequest( 'com_easyblog.spools.filter_state', 		'filter_state', 	'*', 		'word' );
+		$search			= $this->app->getUserStateFromRequest( 'com_easyblog.spools.search', 			'search', 			'', 		'string' );
 
 		$search			= trim(JString::strtolower( $search ) );
-		$order			= $mainframe->getUserStateFromRequest( 'com_easyblog.spools.filter_order', 		'filter_order', 	'created', 	'cmd' );
-		$orderDirection	= $mainframe->getUserStateFromRequest( 'com_easyblog.spools.filter_order_Dir',	'filter_order_Dir',	'asc', 		'word' );
+		$order			= $this->app->getUserStateFromRequest( 'com_easyblog.spools.filter_order', 		'filter_order', 	'created', 	'cmd' );
+		$orderDirection	= $this->app->getUserStateFromRequest( 'com_easyblog.spools.filter_order_Dir',	'filter_order_Dir',	'asc', 		'word' );
 
-		$mails			= $this->get( 'Data' );
+		$mails			= $this->get('Data');
 		$pagination		= $this->get( 'Pagination' );
 
-		$this->assign( 'mails'			, $mails );
-		$this->assign( 'pagination'		, $pagination );
-		$this->assign( 'state'			, JHTML::_('grid.state', $filter_state , JText::_( 'COM_EASYBLOG_SENT' ) , JText::_( 'COM_EASYBLOG_PENDING' ) ) );
-		$this->assign( 'search'			, $search );
-		$this->assign( 'order'			, $order );
-		$this->assign( 'orderDirection'	, $orderDirection );
+		$this->set('mails', $mails );
+		$this->set('pagination', $pagination );
+		$this->set('state', JHTML::_('grid.state', $filter_state, JText::_('COM_EASYBLOG_SENT'), JText::_('COM_EASYBLOG_PENDING')));
+		$this->set('search', $search );
+		$this->set('order', $order );
+		$this->set('orderDirection', $orderDirection );
 
-		parent::display($tpl);
+		parent::display('spools/default');
 	}
 
-	function registerToolbar()
+	/**
+	 * Previews a mail
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function preview()
 	{
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_MAIL_POOL_TITLE' ), 'spools' );
+		// Check for acl rules.
+		$this->checkAccess('mail');
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
-		JToolbarHelper::divider();
-		JToolbarHelper::deleteList();
+		// Get the mail id
+		$id = $this->input->get('id', 0, 'int');
+
+		$mailq	= EB::table('Mailqueue');
+		$mailq->load($id);
+
+		echo $mailq->getBody();
+		exit;
+	}
+
+	public function registerToolbar()
+	{
+		JToolBarHelper::title(JText::_('COM_EASYBLOG_TITLE_MAIL_ACTIVITIES'), 'spools');
+
+		JToolbarHelper::deleteList('COM_EASYBLOG_ARE_YOU_SURE_CONFIRM_DELETE', 'spools.remove');
 		JToolBarHelper::divider();
-		JToolBarHelper::custom('purge','purge','icon-32-unpublish.png', 'COM_EASYBLOG_PURGE_ALL', false);
+		JToolBarHelper::custom('spools.purgeSent','purge','icon-32-unpublish.png', 'COM_EASYBLOG_PURGE_SENT', false);
+		JToolBarHelper::custom('spools.purge','purge','icon-32-unpublish.png', 'COM_EASYBLOG_PURGE_ALL', false);
 	}
 }

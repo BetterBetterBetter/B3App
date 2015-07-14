@@ -1,26 +1,27 @@
 <?php
 /**
- * @package		EasyBlog
- * @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
- * @license		GNU/GPL, see LICENSE.php
- *
- * EasyBlog is free software. This version may have been modified pursuant
- * to the GNU General Public License, and as distributed it includes or
- * is derivative of works licensed under the GNU General Public License or
- * other free or open source software licenses.
- * See COPYRIGHT.php for copyright notices and details.
- */
-
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @license		GNU/GPL, see LICENSE.php
+* EasyBlog is free software. This version may have been modified pursuant
+* to the GNU General Public License, and as distributed it includes or
+* is derivative of works licensed under the GNU General Public License or
+* other free or open source software licenses.
+* See COPYRIGHT.php for copyright notices and details.
+*/
 defined('_JEXEC') or die('Restricted access');
 
-jimport('joomla.application.component.controller');
+require_once(JPATH_COMPONENT . '/controller.php');
 
-class EasyBlogControllerFoundry extends EasyBlogParentController
+class EasyBlogControllerFoundry extends EasyBlogController
 {
-	function getResource()
+	public function getResource()
 	{
-		$resources = JRequest::getVar( 'resource' );
+		$resources = JRequest::getVar('resource');
 
+		if (!$resources) {
+
+		}
 		foreach( $resources as &$resource )
 		{
 			$resource = (object) $resource;
@@ -34,45 +35,41 @@ class EasyBlogControllerFoundry extends EasyBlogParentController
 		}
 
 		header('Content-type: text/x-json; UTF-8');
-		$json = new Services_JSON();
-		echo $json->encode( $resources );
+		echo json_encode($resources);
 		exit;
 	}
 
-	function getView( $name = '', $type = '', $prefix = '', $config = Array() )
+	public function getView($namespace = '', $type = '', $prefix = '', $config = Array() )
 	{
 		// Load language support for front end and back end.
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' );
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
+		$lang 	= JFactory::getLanguage();
 
-		$file = $name;
+		$lang->load('com_easyblog', JPATH_ROOT . '/administrator');
+		$lang->load('com_easyblog', JPATH_ROOT);
 
-		$dashboard = explode( '/' , $file );
+		$output 	= '';
+		$parts 		= explode('/', $namespace);
 
-		if( $dashboard[0]=="dashboard" )
-		{
-			$template 	= new CodeThemes( true );
-			$out		= $template->fetch( $dashboard[1] . '.ejs' );
-		}
-		elseif ( $dashboard[0]=="media" )
-		{
-			$template 	= new CodeThemes( true );
-			$out		= $template->fetch( "media." . $dashboard[1] . '.ejs' );
-		}
-		else
-		{
-			$template 	= new CodeThemes();
-			$out		= $template->fetch( $file . '.ejs' );
+		// For admin
+		if ($parts[0] == 'admin') {
+
+			$template 	= EB::template(null, array('admin' => true));
+			$output 	= $template->output($namespace, array(), 'ejs');
+		} else if ($parts[0] == 'dashboard') {
+			$template 	= EB::template(null, array('dashboard' => true));
+			$output 	= $template->output('site/dashboard/' . $parts[1], array(), 'ejs');
+		}  else {
+			$template 	= EB::template();
+			$output		= $template->output($namespace, array(), 'ejs');
 		}
 
-		return $out;
+		return $output;
 	}
 
-	function getLanguage( $lang )
+	public function getLanguage( $lang )
 	{
 		// Load language support for front end and back end.
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' );
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
+		EB::loadLanguages();
 
 		return JText::_( strtoupper( $lang ) );
 	}

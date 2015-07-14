@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,155 +9,143 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-jimport( 'joomla.html.toolbar' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewLatest extends EasyBlogView
 {
 	/**
-	 * Responsible to display the front page of the blog listings
+	 * Displays the frontpage blog listings on the site.
 	 *
+	 * @since	5.0
 	 * @access	public
 	 */
-	function display( $tmpl = null )
+	public function display($tmpl = null)
 	{
-		// @task: Set meta tags for latest post
-		EasyBlogHelper::setMeta( META_ID_LATEST , META_TYPE_VIEW );
 
-		// @task: Set rss links into headers.
-		EasyBlogHelper::getHelper( 'Feeds' )->addHeaders( 'index.php?option=com_easyblog&view=latest' );
+		// Add the RSS headers on the page
+		EB::feeds()->addHeaders('index.php?option=com_easyblog');
 
-		$app 		= JFactory::getApplication();
-		$doc 		= JFactory::getDocument();
-		$config		= EasyBlogHelper::getConfig();
-		$my         = JFactory::getUser();
-		$acl 		= EasyBlogACLHelper::getRuleSet();
+		// Add breadcrumbs on the site menu.
+		$this->setPathway('COM_EASYBLOG_LATEST_BREADCRUMB');
 
-		// @task: Add a breadcrumb if the current menu that's being accessed is not from the latest view.
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'latest' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_LATEST_BREADCRUMB') , '' );
-		}
-
-		// @task: Get the current active menu's properties.
-		$menu 		= $app->getMenu()->getActive();
-		$menu 		= JFactory::getApplication()->getMenu()->getActive();
+		// Get the current active menu's properties.
+		$params = $this->theme->params;
 		$inclusion	= '';
 
-		if( is_object( $menu ) )
-		{
-			$params 	= EasyBlogHelper::getRegistry();
-			$params->load( $menu->params );
+		if ($params) {
 
-			$inclusion	= EasyBlogHelper::getCategoryInclusion( $params->get( 'inclusion' ) );
+			// Get a list of category inclusions
+			$inclusion	= EB::getCategoryInclusion($params->get('inclusion'));
 
-			if( $params->get('includesubcategories', 0) && !empty( $inclusion ) )
-			{
-				$tmpInclusion   = array();
+			if ($params->get('includesubcategories', 0) && !empty($inclusion)) {
 
-				foreach( $inclusion as $includeCatId )
-				{
-					//get the nested categories
-					$category   = new stdClass();
-					$category->id   	= $includeCatId;
-					$category->childs 	= null;
+				$tmpInclusion = array();
 
-					EasyBlogHelper::buildNestedCategories($category->id, $category);
+				foreach ($inclusion as $includeCatId) {
 
-					$linkage   = '';
-					EasyBlogHelper::accessNestedCategories($category, $linkage, '0', '', 'link', ', ');
+					// Retrieve nested categories
+					$category = new stdClass();
+					$category->id = $includeCatId;
+					$category->childs = null;
 
-					$catIds     = array();
-					$catIds[]   = $category->id;
-					EasyBlogHelper::accessNestedCategoriesId($category, $catIds);
+					EB::buildNestedCategories($category->id, $category);
 
-					$tmpInclusion	= array_merge( $tmpInclusion, $catIds);
+					$linkage = '';
+					EB::accessNestedCategories($category, $linkage, '0', '', 'link', ', ');
+
+					$catIds = array();
+					$catIds[] = $category->id;
+					EB::accessNestedCategoriesId($category, $catIds);
+
+					$tmpInclusion = array_merge($tmpInclusion, $catIds);
 				}
 
-				$inclusion  = $tmpInclusion;
+				$inclusion = $tmpInclusion;
 			}
-
 		}
 
-		$limitstart = JRequest::getInt('limitstart', 0);
+		// Sorting for the posts
+		$sort = $this->input->get('sort', $this->config->get('layout_postorder'), 'cmd');
+		$model = EB::model('Blog');
 
-		if ($limitstart) {
-			$doc->setMetadata('robots', 'noindex,follow');
-		}
+		$tobeCached = array();
 
-		// @task: Necessary filters
-		$sort			= JRequest::getCmd('sort', $config->get('layout_postorder'));
-		$model			= $this->getModel('Blog');
-
-		// @task: Retrieve the list of featured blog posts.
-		$featured   	= $model->getFeaturedBlog($inclusion);
-		$excludeIds		= array();
-
-		// @task: Add canonical URLs.
-		if( $config->get( 'main_canonical_entry') )
-		{
-			$canonicalUrl   = EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=latest' , false , true, true );
-			$doc->addCustomTag( '<link rel="canonical" href="' . $canonicalUrl . '"/>' );
-		}
+		// Retrieve a list of featured blog posts on the site.
+		$featured = $model->getFeaturedBlog($inclusion);
+		$excludeIds = array();
 
 		// Test if user also wants the featured items to be appearing in the blog listings on the front page.
 		// Otherwise, we'll need to exclude the featured id's from appearing on the front page.
-		if( !$config->get( 'layout_featured_frontpage' ) )
-		{
-			foreach($featured as $item)
-			{
-				$excludeIds[]	= $item->id;
+		if (!$this->theme->params->get('post_include_featured', true)) {
+			foreach ($featured as $item) {
+				$excludeIds[] = $item->id;
 			}
 		}
 
-		// @task: Admin might want to display the featured blogs on all pages.
-		if( !$config->get( 'layout_featured_allpages') && ( JRequest::getInt( 'start' , 0 ) != 0 || $limitstart != 0 ) )
-		{
-			$featured 	= array();
-		}
-		else
-		{
-			for( $i = 0; $i < count( $featured ); $i++ )
-			{
-				$row					= $featured[ $i ];
-				$row->featuredImage		= EasyBlogHelper::getFeaturedImage( $row->intro . $row->content );
-			}
+		// Admin might want to display the featured blogs on all pages.
+		$start = $this->input->get('start', 0, 'int');
+		$limitstart = $this->input->get('limitstart', 0, 'int');
 
-			$featured	= EasyBlogHelper::formatBlog( $featured , true , false , false , false , false );
+		if (!$this->theme->params->get('featured_slider_all_pages') && ($start != 0 || $limitstart != 0)) {
+			$featured = array();
 		}
 
-		// @task: Try to retrieve any categories to be excluded.
-		$excludedCategories	= $config->get( 'layout_exclude_categories' );
+		if ($featured) {
+			$tobeCached = array_merge($tobeCached, $featured);
+		}
+
+		// Try to retrieve any categories to be excluded.
+		$excludedCategories	= $this->config->get('layout_exclude_categories');
 		$excludedCategories	= ( empty( $excludedCategories ) ) ? '' : explode( ',' , $excludedCategories );
 
+		// Fetch the blog entries.
+		$data = $model->getBlogsBy('', '', $sort, 0, EBLOG_FILTER_PUBLISHED, null, true, $excludeIds, false, false, true, $excludedCategories, $inclusion, null, 'listlength', $this->theme->params->get('post_pin_featured', false));
 
-		// @task: Fetch the blog entries.
-		$data		= $model->getBlogsBy( '' , '' , $sort , 0 , EBLOG_FILTER_PUBLISHED, null, true, $excludeIds , false , false , true , $excludedCategories , $inclusion );
+		if ($data) {
+			$tobeCached = array_merge($tobeCached, $data);
+		}
+
+		// we will cache it here.
+		if ($tobeCached) {
+			EB::cache()->insert($tobeCached);
+		}
+
+		// Get the pagination
 		$pagination	= $model->getPagination();
 
-		$params 	= $app->getParams( 'com_easyblog' );
+		if ($featured) {
+			// Format the featured items without caching
+			$featured = EB::formatter('featured', $featured, false);
+		}
 
-		// @task: Perform necessary formatting here.
-		$data		= EasyBlogHelper::formatBlog( $data , true , true , true , true );
+		// Perform blog formatting without caching
+		$posts = EB::formatter('list', $data, false);
 
-		// @task: Update the title of the page if navigating on different pages to avoid Google marking these title's as duplicates.
-		$title 		= EasyBlogHelper::getPageTitle( JText::_( 'COM_EASYBLOG_LATEST_PAGE_TITLE' ) );
+		// Update the title of the page if navigating on different pages to avoid Google marking these title's as duplicates.
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_LATEST_PAGE_TITLE'));
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , $pagination , $config->get( 'main_pagetitle_autoappend' ) );
+		// Set the page title
+		$this->setPageTitle($title, $pagination, $this->config->get('main_pagetitle_autoappend'));
 
-		// @task: Get pagination output here.
-		$paginationHTML		= $pagination->getPagesLinks();
+		// Add canonical URLs.
+		$this->canonical('index.php?option=com_easyblog&view=latest');
 
-		$theme		= new CodeThemes();
-		$theme->set( 'data'			, $data );
-		$theme->set( 'featured'		, $featured );
-		$theme->set( 'currentURL'	, EasyBlogRouter::_( 'index.php?option=com_easyblog&view=latest' , false ) );
-		$theme->set( 'pagination'	, $paginationHTML );
+		// Retrieve the pagination for the latest view
+		$pagination	= $pagination->getPagesLinks();
 
-		// @task: Send back response to the browser.
-		echo $theme->fetch( 'blog.latest.php' );
+		// Meta should be set later because formatter would have cached the post already.
+		EB::setMeta(META_ID_LATEST, META_TYPE_VIEW);
+
+		// Get the current url
+		$return = EBR::_('index.php?option=com_easyblog', false);
+
+		$this->set('return', $return);
+		$this->set('posts', $posts);
+		$this->set('featured', $featured);
+		$this->set('pagination', $pagination);
+
+		parent::display('blogs/latest/default');
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,42 +9,22 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'parent.php' );
+require_once(dirname(__FILE__) . '/model.php');
 
-class EasyBlogModelFeeds extends EasyBlogModelParent
+class EasyBlogModelFeeds extends EasyBlogAdminModel
 {
-	/**
-	 * Category total
-	 *
-	 * @var integer
-	 */
-	var $_total = null;
+	public $_total = null;
+	public $_pagination = null;
+	public $_data = null;
 
-	/**
-	 * Pagination object
-	 *
-	 * @var object
-	 */
-	var $_pagination = null;
-
-	/**
-	 * Category data array
-	 *
-	 * @var array
-	 */
-	var $_data = null;
-	
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
-		
-		$mainframe	= JFactory::getApplication();
-
-		$limit		= $mainframe->getUserStateFromRequest( 'com_easyblog.feeds.limit', 'limit', $mainframe->getCfg('list_limit'), 'int');
-		$limitstart	= JRequest::getVar('limitstart', 0, '', 'int');
+		$limit = $this->app->getUserStateFromRequest('com_easyblog.feeds.limit', 'limit', $this->app->getCfg('list_limit'), 'int');
+		$limitstart = $this->input->get('limitstart', 0, 'int');
 
 		$this->setState('limit', $limit);
 		$this->setState('limitstart', $limitstart);
@@ -56,31 +36,28 @@ class EasyBlogModelFeeds extends EasyBlogModelParent
 	 * @access public
 	 * @return integer
 	 */
-	function getTotal()
+	public function getTotal()
 	{
-		// Lets load the content if it doesn't already exist
-		if (empty($this->_total))
-		{
+		if (!$this->_total) {
 			$query = $this->_buildQuery();
 			$this->_total = $this->_getListCount($query);
 		}
 
 		return $this->_total;
 	}
-	
+
 	/**
 	 * Method to get a pagination object for the categories
 	 *
 	 * @access public
 	 * @return integer
 	 */
-	function getPagination()
+	public function getPagination()
 	{
 		// Lets load the content if it doesn't already exist
-		if (empty($this->_pagination))
-		{
+		if (empty($this->_pagination)) {
 			jimport('joomla.html.pagination');
-			$this->_pagination = new JPagination( $this->getTotal(), $this->getState('limitstart'), $this->getState('limit') );
+			$this->_pagination = new JPagination($this->getTotal(), $this->getState('limitstart'), $this->getState('limit') );
 		}
 
 		return $this->_pagination;
@@ -92,54 +69,49 @@ class EasyBlogModelFeeds extends EasyBlogModelParent
 	 * @access private
 	 * @return string
 	 */
-	function _buildQuery()
+	public function _buildQuery()
 	{
 		// Get the WHERE and ORDER BY clauses for the query
-		$where		= $this->_buildQueryWhere();
-		$orderby	= $this->_buildQueryOrderBy();
-		$db			= EasyBlogHelper::db();
-		
-		$query	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_feeds' )
+		$where = $this->_buildQueryWhere();
+		$orderby = $this->_buildQueryOrderBy();
+		$db = EasyBlogHelper::db();
+
+		$query	= 'SELECT * FROM ' . $db->nameQuote('#__easyblog_feeds')
 				. $where . ' '
 				. $orderby;
 
 		return $query;
 	}
 
-	function _buildQueryWhere()
+	public function _buildQueryWhere()
 	{
-		$mainframe			= JFactory::getApplication();
-		$db					= EasyBlogHelper::db();
-		
-		$filter_state 		= $mainframe->getUserStateFromRequest( 'com_easyblog.categories.filter_state', 'filter_state', '', 'word' );
-		$search 			= $mainframe->getUserStateFromRequest( 'com_easyblog.categories.search', 'search', '', 'string' );
-		$search 			= $db->getEscaped( trim(JString::strtolower( $search ) ) );
+		$mainframe = JFactory::getApplication();
+		$db = EasyBlogHelper::db();
+
+		$filter_state = $mainframe->getUserStateFromRequest('com_easyblog.feeds.filter_state', 'filter_state', '', 'word');
+		$search = $mainframe->getUserStateFromRequest('com_easyblog.feeds.search', 'search', '', 'string');
+		$search = $db->getEscaped( trim(JString::strtolower( $search ) ) );
 
 		$where = array();
 
-		if ( $filter_state )
-		{
-			if ( $filter_state == 'P' )
-			{
-				$where[] = EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( '1' );
-			}
-			else if ($filter_state == 'U' )
-			{
-				$where[] = EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( '0' );
+		if ($filter_state) {
+			if ($filter_state == 'P') {
+				$where[] = $db->nameQuote('published') . '=' . $db->Quote('1');
+			} else if ($filter_state == 'U') {
+				$where[] = $db->nameQuote('published') . '=' . $db->Quote('0');
 			}
 		}
 
-		if ($search)
-		{
+		if ($search) {
 			$where[] = ' LOWER( title ) LIKE \'%' . $search . '%\' ';
 		}
 
-		$where 		= ( count( $where ) ? ' WHERE ' . implode( ' AND ', $where ) : '' );
+		$where = (count($where)? ' WHERE ' . implode(' AND ', $where) : '');
 
 		return $where;
 	}
 
-	function _buildQueryOrderBy()
+	public function _buildQueryOrderBy()
 	{
 		$mainframe			= JFactory::getApplication();
 
@@ -157,7 +129,7 @@ class EasyBlogModelFeeds extends EasyBlogModelParent
 	 * @access public
 	 * @return array
 	 */
-	function getData( $usePagination = true )
+	public function getData( $usePagination = true )
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_data))
@@ -172,29 +144,115 @@ class EasyBlogModelFeeds extends EasyBlogModelParent
 		return $this->_data;
 	}
 
-	function publish( &$feeds = array(), $publish = 1 )
+	/**
+	 * Determines if a feed item has already been imported
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isFeedItemImported($feedId, $uid)
+	{
+		$db = EB::db();
+
+		$query = array();
+		$query[] = 'SELECT COUNT(1) FROM ' . $db->quoteName('#__easyblog_feeds_history');
+		$query[] = 'WHERE ' . $db->quoteName('feed_id') . '=' . $db->Quote($feedId);
+		$query[] = 'AND ' . $db->quoteName('uid') . '=' . $db->Quote($uid);
+
+		$query = implode(' ', $query);
+
+		$db->setQuery($query);
+		$exists = $db->loadResult() > 0;
+
+		return $exists;
+	}
+
+	/**
+	 * Retrieves a list of feed items that needs to be imported
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	int		The total number of items to retrieve
+	 * @return
+	 */
+	public function getPendingFeeds($limit = 1, $debug = false)
+	{
+		$limit = (int) $limit;
+
+		$db = EB::db();
+		$now = EB::date();
+		$query = array();
+
+		$query[] = 'SELECT * FROM ' . $db->quoteName('#__easyblog_feeds');
+		$query[] = 'WHERE ' . $db->quoteName('cron') . '=' . $db->quote(1);
+		$query[] = 'AND ' . $db->quoteName('flag') . '=' . $db->quote(0);
+		$query[] = 'AND ' . $db->quoteName('published') . '=' . $db->quote(EASYBLOG_POST_PUBLISHED);
+
+		if (!$debug) {
+			$query[] = 'AND (';
+			$query[] = $db->quote($now->toSql()) . '>= DATE_ADD(' . $db->quoteName('last_import') . ', INTERVAL ' . $db->quoteName('interval') . ' MINUTE)';
+			$query[] = 'OR';
+			$query[] = $db->quoteName('last_import') . '=' . $db->Quote('0000-00-00 00:00:00');
+			$query[] = ')';
+		}
+
+		$query[] = 'ORDER BY ' . $db->quoteName('last_import');
+		$query[] = 'LIMIT ' . $limit;
+
+		$query = implode(' ', $query);
+
+		$db->setQuery($query);
+		$result = $db->loadObjectList();
+
+		if (!$result) {
+			return $result;
+		}
+
+		$feeds = array();
+
+		foreach ($result as $row) {
+			$feed = EB::table('Feed');
+			$feed->bind($row);
+
+			$feeds[] = $feed;
+		}
+
+		return $feeds;
+	}
+
+	/**
+	 * Publishes feeds
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function publish( &$feeds = array(), $publish = 1 )
 	{
 		if( count( $feeds ) > 0 )
 		{
 			$db		= EasyBlogHelper::db();
-			
-			$query	= 'UPDATE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_feeds' ) . ' '
-					. 'SET ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( $publish ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . ' IN (';
-					
+
+			$query	= 'UPDATE ' . $db->nameQuote( '#__easyblog_feeds' ) . ' '
+					. 'SET ' . $db->nameQuote( 'published' ) . '=' . $db->Quote( $publish ) . ' '
+					. 'WHERE ' . $db->nameQuote( 'id' ) . ' IN (';
+
 			for( $i = 0; $i < count( $feeds );$i++ )
 			{
 				$query	.= $db->Quote( $feeds[ $i ] );
-				
+
 				if( next( $feeds ) !== false )
 				{
 					$query	.= ',';
 				}
 			}
 			$query	.= ')';
-			
+
 			$db->setQuery( $query );
-			
+
 			if( !$db->query() )
 			{
 				$this->setError($this->_db->getErrorMsg());

@@ -18,14 +18,13 @@ EasyDiscuss.view_votes = <?php echo !$system->config->get( 'main_allowguestview_
 
 EasyDiscuss
 .require()
-.script( 'legacy', 'likes' , 'favourites', 'attachments' , 'replies' , 'posts' )
-.library( 'scrollTo' )
+.script('legacy', 'likes', 'favourites', 'attachments', 'replies', 'posts')
+.library('scrollTo')
 .done(function($){
 
 	// Implement reply item controller.
-	$( '.discussionReplies' ).implement(
-		EasyDiscuss.Controller.Replies,
-		{
+	$('.discussionReplies').implement(
+		EasyDiscuss.Controller.Replies, {
 			termsCondition : <?php echo $system->config->get( 'main_comment_tnc' ) ? 'true' : 'false'; ?>,
 			sort: "<?php echo $sort; ?>"
 		}

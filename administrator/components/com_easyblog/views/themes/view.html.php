@@ -1,79 +1,83 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewThemes extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	/**
+	 * Displays the theme listings
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.theme' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
-			}
+		// Check for access
+		$this->checkAccess('easyblog.manage.theme');
+
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
 		}
 
-		//initialise variables
-		$document	= JFactory::getDocument();
-		$user		= JFactory::getUser();
-		$mainframe	= JFactory::getApplication();
-		$config		= EasyBlogHelper::getConfig();
-		$themes		= $this->getThemes();
+		// Set heading text
+		$this->setHeading('COM_EASYBLOG_TITLE_THEMES', '', 'fa-flask');
 
-		$this->assign( 'default', $config->get( 'layout_theme' ) );
-		$this->assign( 'themes'	, $themes );
-		$this->assign( 'search' , '' );
+		// Get themes
+		$model = EB::model('Themes');
+		$themes = $model->getThemes();
 
-		parent::display($tpl);
+		$this->set('default', $this->config->get('theme_site'));
+		$this->set('themes', $themes);
+		$this->set('search', '');
+
+		parent::display('themes/default');
 	}
 
-	public function getThemes()
+	/**
+	 * Displays the theme installer form
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function install($tpl = null)
 	{
-		$path	= EBLOG_THEMES;
+		// Set heading text
+		$this->setHeading('COM_EASYBLOG_THEMES_INSTALL', '', 'fa-flask');
 
-		$result	= JFolder::folders( $path , '.', false , true , $exclude = array('.svn', 'CVS' , '.' , '.DS_Store' ) );
-		$themes	= array();
+		parent::display('themes/install');
+	}
 
-
-		// Cleanup output
-		foreach( $result as $item )
-		{
-			$name		= basename( $item );
-
-			if( $name != 'dashboard' )
-			{
-				$obj	= EasyBlogHelper::getThemeObject( $name );
-
-				if( $obj )
-				{
-					$themes[]	= $obj;
-				}
-			}
+	public function registerToolbar()
+	{
+		if ($this->getLayout() == 'install') {
+			JToolBarHelper::title(JText::_('COM_EASYBLOG_THEMES_INSTALL'), 'themes');
+			JToolbarHelper::divider();
+			JToolBarHelper::custom('themes.upload', 'save', '', JText::_('COM_EASYBLOG_UPLOAD_AND_INSTALL_BUTTON'), false);
+			return;
 		}
 
-		return $themes;
-	}
+		JToolBarHelper::title(JText::_('COM_EASYBLOG_THEMES_TITLE'), 'themes');
 
-	function registerToolbar()
-	{
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_THEMES_TITLE' ), 'themes' );
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
+		JToolBarHelper::custom('themes.setDefault', 'star', '', JText::_('COM_EASYBLOG_SET_DEFAULT'), false);
 		JToolbarHelper::divider();
-		JToolBarHelper::custom( 'makedefault' , 'star' , '' , JText::_( 'COM_EASYBLOG_SET_DEFAULT' ) , false );
+		JToolBarHelper::custom('themes.recompile', 'wand', '', JText::_('COM_EASYBLOG_COMPILE_LESS_FILES'), false);
 	}
 }

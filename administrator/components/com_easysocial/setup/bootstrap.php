@@ -21,7 +21,7 @@ $input->set('tmpl', 'component');
 $reinstall = $input->get('reinstall', false, 'bool') || $input->get('install', false, 'bool');
 
 // If the mode is update, we need to get the latest version
-$update = $input->get('update', false, 'bool');
+$update = $input->get('launchInstaller', false, 'bool') || $input->get('update', false, 'bool');
 
 // Determines if we are now in developer mode.
 $developer = $input->get('developer', false, 'bool');

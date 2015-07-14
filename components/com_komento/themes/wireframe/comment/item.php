@@ -118,8 +118,6 @@ $classes = implode( ' ', $classes );
 			</div>
 
 			<div class="kmt-option col-cell">
-				<!-- Permalink span.kmt-permalink-wrap -->
-				<?php // echo $this->fetch( 'comment/item/permalink.php' ); ?>
 
 				<!-- AdminTools span.kmt-admin-wrap -->
 				<?php echo $this->fetch( 'comment/item/admintools.php' ); ?>
@@ -160,6 +158,9 @@ $classes = implode( ' ', $classes );
 
 			<!-- Share div.kmt-share-wrap -->
 			<?php echo $this->fetch( 'comment/item/sharebutton.php' ); ?>
+
+			<!-- Permalink span.kmt-permalink-wrap -->
+			<?php echo $this->fetch( 'comment/item/permalink.php' ); ?>
 		</div>
 	</div>
 </div>

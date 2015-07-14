@@ -12,71 +12,66 @@
  */
 defined('_JEXEC') or die('Restricted access');
 ?>
+<div class="discuss-statistics">
+	<div class="media">
+		<div class="media-object pull-left">
+			<span class="discuss-widget-title"><?php echo JText::_( 'COM_EASYDISCUSS_BOARD_STATISTICS' );?></span>
+		</div>
+		<div class="media-body small">
+			<ul class="unstyled nav-pills">
+				<li>
+					<i class="icon-columns"></i>
+					<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_POSTS' ); ?>:</span>
+					<span><?php echo $totalPosts; ?></span>
+				</li>
+				<li>
+					<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_RESOLVED_POSTS' ); ?>:</span>
+					<span><?php echo $resolvedPosts; ?></span>
+				</li>
+				<li>
+					<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_UNRESOLVED_POSTS' ); ?>:</span>
+					<span><?php echo $unresolvedPosts; ?></span>
+				</li>
 
-<?php if( $system->config->get( 'main_frontend_statistics' ) ){ ?>
-	<?php if( $canViewStatistic ){ ?>
-	<div class="discuss-statistics">
-		<div class="media">
-			<div class="media-object pull-left">
-				<span class="discuss-widget-title"><?php echo JText::_( 'COM_EASYDISCUSS_BOARD_STATISTICS' );?></span>
-			</div>
-			<div class="media-body small">
-				<ul class="unstyled nav-pills">
-					<li>
-						<i class="icon-columns"></i>
-						<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_POSTS' ); ?>:</span>
-						<span><?php echo $totalPosts; ?></span>
-					</li>
-					<li>
-						<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_RESOLVED_POSTS' ); ?>:</span>
-						<span><?php echo $resolvedPosts; ?></span>
-					</li>
-					<li>
-						<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_UNRESOLVED_POSTS' ); ?>:</span>
-						<span><?php echo $unresolvedPosts; ?></span>
-					</li>
+			</ul>
 
-				</ul>
+			<ul class="unstyled nav-pills">
+				<li>
+					<i class="icon-user"></i>
+					<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_USERS' ); ?>:</span>
+					<span><?php echo $totalUsers; ?></span>
+				</li>
+				<li>
+					<span><?php echo JText::_( 'COM_EASYDISCUSS_LATEST_MEMBER' ); ?>:</span>
+					<span>
+						<a href="<?php echo $latestMember->getLink();?>"><?php echo $latestMember->getName(); ?></a>
+					</span>
+				</li>
+			</ul>
 
-				<ul class="unstyled nav-pills">
-					<li>
-						<i class="icon-user"></i>
-						<span><?php echo JText::_( 'COM_EASYDISCUSS_TOTAL_USERS' ); ?>:</span>
-						<span><?php echo $totalUsers; ?></span>
-					</li>
-					<li>
-						<span><?php echo JText::_( 'COM_EASYDISCUSS_LATEST_MEMBER' ); ?>:</span>
-						<span>
-							<a href="<?php echo $latestMember->getLink();?>"><?php echo $latestMember->getName(); ?></a>
-						</span>
-					</li>
-				</ul>
+			<ul class="unstyled nav-pills">
+				<li>
+					<i class="icon-bolt"></i>
+					<span><?php echo JText::_( 'COM_EASYDISCUSS_ONLINE_USERS' ); ?>:</span>
 
-				<ul class="unstyled nav-pills">
-					<li>
-						<i class="icon-bolt"></i>
-						<span><?php echo JText::_( 'COM_EASYDISCUSS_ONLINE_USERS' ); ?>:</span>
+					<?php if( $onlineUsers ){ ?>
+						<?php for( $i = 0; $i < count( $onlineUsers ); $i++ ){ ?>
+							<span><a href="<?php echo $onlineUsers[ $i ]->getLink();?>"><?php echo $onlineUsers[ $i ]->getName();?></a></span>
 
-						<?php if( $onlineUsers ){ ?>
-							<?php for( $i = 0; $i < count( $onlineUsers ); $i++ ){ ?>
-								<span><a href="<?php echo $onlineUsers[ $i ]->getLink();?>"><?php echo $onlineUsers[ $i ]->getName();?></a></span>
-
-								<?php if( next( $onlineUsers ) !== false ){ ?> , <?php } ?>
-							<?php } ?>
+							<?php if( next( $onlineUsers ) !== false ){ ?> , <?php } ?>
 						<?php } ?>
+					<?php } ?>
 
-						<?php if( $totalGuests && $onlineUsers ){ ?>
-							<?php echo JText::_( 'COM_EASYDISCUSS_AND' ); ?>
-						<?php } ?>
+					<?php if( $totalGuests && $onlineUsers ){ ?>
+						<?php echo JText::_( 'COM_EASYDISCUSS_AND' ); ?>
+					<?php } ?>
 
-						<?php if( $totalGuests ){ ?>
-						<?php echo JText::sprintf( 'COM_EASYDISCUSS_OTHER_GUESTS' , $totalGuests ); ?>
-						<?php } ?>
-					</li>
-				</ul>
+					<?php if( $totalGuests ){ ?>
+					<?php echo JText::sprintf( 'COM_EASYDISCUSS_OTHER_GUESTS' , $totalGuests ); ?>
+					<?php } ?>
+				</li>
+			</ul>
 
-			</div>
 		</div>
 	</div>
-	<?php } ?>
-<?php } ?>
+</div>

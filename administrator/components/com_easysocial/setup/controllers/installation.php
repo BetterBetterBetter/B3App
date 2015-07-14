@@ -1248,7 +1248,7 @@ class EasySocialControllerInstallation extends EasySocialSetupController
 		$element 	= str_ireplace( '.zip' , '' , $element );
 
 		// // @debug
-		// // 83883 Debug purposes. Remove this when not debugging!
+		// // 91279 Debug purposes. Remove this when not debugging!
 		// $result 			= new stdClass();
 		// $result->state		= true;
 		// $result->message	= JText::sprintf( 'COM_EASYSOCIAL_INSTALLATION_APPS_INSTALLED_APP_SUCCESS' , $element );
@@ -1679,19 +1679,21 @@ class EasySocialControllerInstallation extends EasySocialSetupController
 		}
 
 		// Try to extract the files
-		$state 		= JArchive::extract( $storage , $tmp );
+		$state = JArchive::extract( $storage , $tmp );
 
-		if( !$state )
-		{
-			$result 			= new stdClass();
-			$result->state		= false;
-			$result->message	= JText::_( 'COM_EASYSOCIAL_INSTALLATION_ERROR_EXTRACT_ERRORS' );
+		if (!$state) {
+			$result = new stdClass();
+			$result->state = false;
+			$result->message = JText::_( 'COM_EASYSOCIAL_INSTALLATION_ERROR_EXTRACT_ERRORS' );
 
-			$this->output( $result );
+			$this->output($result);
 			exit;
 		}
 
-		$result 	= new stdClass();
+		// After installation is completed, cleanup all zip files from the site
+		$this->cleanupZipFiles(dirname($storage));
+		
+		$result = new stdClass();
 
 		$result->message	= JText::_( 'COM_EASYSOCIAL_INSTALLATION_ARCHIVE_DOWNLOADED_SUCCESS' );
 		$result->state 		= $state;
@@ -1700,6 +1702,27 @@ class EasySocialControllerInstallation extends EasySocialSetupController
 		header('Content-type: text/x-json; UTF-8');
 		echo json_encode( $result );
 		exit;
+	}
+
+	/**
+	 * Allows cleanup of installation files
+	 *
+	 * @since	1.3
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	private function cleanupZipFiles($path)
+	{
+		$zipFiles = JFolder::files($path, '.zip', false, true);
+			
+		if ($zipFiles) {
+			foreach ($zipFiles as $file) {
+				@JFile::delete($file);
+			}
+		}
+
+		return true;
 	}
 
 	/**

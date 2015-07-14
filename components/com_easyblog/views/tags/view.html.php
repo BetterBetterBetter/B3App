@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,159 +9,146 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewTags extends EasyBlogView
 {
-	function display( $tmpl = null )
+	/**
+	 * Displays all tags on the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function display($tmpl = null)
 	{
-		$document	= JFactory::getDocument();
-		$config		= EasyBlogHelper::getConfig();
+		// Set meta tags for tags view
+		EB::setMeta(META_ID_TAGS, META_TYPE_VIEW);
 
-		// set meta tags for teamblog view
-		EasyBlogHelper::setMeta( META_ID_TAGS, META_TYPE_VIEW );
+		// Set breadcrumb
+		$this->setViewBreadcrumb('tags');
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'tags' ) )
-			$this->setPathway( JText::_('COM_EASYBLOG_TAGS_BREADCRUMB') );
-
-		// $document->setTitle( JText::_( 'COM_EASYBLOG_TAGS_PAGE_TITLE' ) );
-		parent::setPageTitle( JText::_('COM_EASYBLOG_TAGS_PAGE_TITLE') , '' , true );
+		// Set page title
+		$this->setPageTitle( JText::_('COM_EASYBLOG_TAGS_PAGE_TITLE') , '' , true );
 
 		// Add canonical URL to satify Googlebot. Incase they think it's duplicated content.
-		EasyblogHelper::addCanonicalURL( array('ordering', 'sorting') );
+		$this->canonical('index.php?option=com_easyblog&view=tags', array('ordering', 'sorting'));
 
-		$model		= $this->getModel( 'Tags' );
-		$ordering	= JString::strtolower( JRequest::getString( 'ordering'	, '' ) );
-		$sorting	= JString::strtolower( JRequest::getString( 'sorting' , $config->get( 'main_tags_sorting' ) ) );
-		$tags   	= $model->getTagCloud( '' , $ordering , $sorting ,true);
+		// Retrieve search values
+		$search = $this->input->get('search', '', 'string');
+
+		// Get the model
+		$model = EB::model('Tags');
+
+		// Get other sorting and filters
+		$ordering = JString::strtolower($this->input->get('ordering', '', 'string'));
+		$sorting = JString::strtolower($this->input->get('sorting', $this->config->get('main_tags_sorting'), 'string'));
+
+		// Get the tags
+		$result = $model->getTagCloud('', $ordering, $sorting, true, $search);
+
+		// Format the tags
+		$tags = array();
+
+		if ($result) {
+			foreach ($result as $row) {
+				$tag = EB::table('Tag');
+				$tag->bind($row);
+
+				$tag->post_count = $row->post_count;
+				$tags[] = $tag;
+			}
+		}
 
 		$titleURL	= 'index.php?option=com_easyblog&view=tags&ordering=title';
 		$titleURL	.= ( $sorting ) ? '&sorting=' . $sorting : '';
 		$postURL	= 'index.php?option=com_easyblog&view=tags&ordering=postcount';
 		$postURL	.= ( $sorting ) ? '&sorting=' . $sorting : '';
 
-		$ascURL		= 'index.php?option=com_easyblog&view=tags&sorting=asc';
-		$ascURL		.= ( $ordering ) ? '&ordering=' . $ordering : '';
-		$descURL	= 'index.php?option=com_easyblog&view=tags&sorting=desc';
-		$descURL	.= ( $ordering ) ? '&ordering=' . $ordering : '';
+		$this->set('titleURL', $titleURL);
+		$this->set('postURL', $postURL);
+		$this->set('tags', $tags);
+		$this->set('sorting', $sorting);
+		$this->set('ordering', $ordering);
 
-		$tpl		= new CodeThemes();
-		$tpl->set( 'ascURL'		, $ascURL );
-		$tpl->set( 'descURL'	, $descURL );
-		$tpl->set( 'titleURL'	, $titleURL );
-		$tpl->set( 'postURL'	, $postURL );
-		$tpl->set( 'tags'		, $tags );
-		$tpl->set( 'sorting'	, $sorting );
-		$tpl->set( 'ordering'	, $ordering );
-
-		echo $tpl->fetch( 'blog.tagcloud.php' );
-
+		parent::display('tags/default');
 	}
 
 	/**
-	 * Display specific tag from the site.
-	 **/
-	function tag()
+	 * Displays blog listings by specific tags on the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function tag()
 	{
-		$document	= JFactory::getDocument();
-		$config 	= EasyBlogHelper::getConfig();
-		$my         = JFactory::getUser();
-		$acl 		= EasyBlogACLHelper::getRuleSet();
-		$id			= JRequest::getVar( 'id' , '' , 'REQUEST' );
+		// Get the tag id
+		$id = $this->input->get('id', '', 'default');
 
-		JTable::addIncludePath( EBLOG_TABLES );
+		// Add noindex for tags listing by default
+		$this->doc->setMetadata('robots', 'noindex,follow');
 
-		// Add noindex for tags view by default.
-		$document->setMetadata( 'robots' , 'noindex,follow' );
+		// Load the tag object
+		$tag = EB::table('Tag');
+		$tag->load($id);
 
-		$tag		= EasyBlogHelper::getTable( 'Tag' , 'Table' );
-		$tag->load( $id );
-		$title		= EasyBlogHelper::getPageTitle( $tag->title );
+		// The tag could be a permalink
+		if (!$tag->id) {
+			$tag->load($id, true);
+		}
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
+		// Set page title
+		$this->setPageTitle($tag->getTitle(), '' , $this->config->get('main_pagetitle_autoappend'));
 
 		// set meta tags for tags view
-		EasyBlogHelper::setMeta( META_ID_TAGS, META_TYPE_VIEW, JText::_( $tag->title ) . ' - ' . EasyBlogHelper::getPageTitle($config->get('main_title')) );
+		EB::setMeta(META_ID_TAGS, META_TYPE_VIEW, $tag->getTitle() . ' - ' . EB::getPageTitle($this->config->get('main_title')) );
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'tags' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_TAGS_BREADCRUMB') , EasyBlogRouter::_( 'index.php?option=com_easyblog&view=tags' ) );
+		// Set breadcrumb
+		if (!EasyBlogRouter::isCurrentActiveMenu('tags')) {
+			$this->setPathway(JText::_('COM_EASYBLOG_TAGS_BREADCRUMB') , EBR::_( 'index.php?option=com_easyblog&view=tags' ) );
 		}
+		$this->setPathway($tag->getTitle());
 
-		$this->setPathway( JText::_( $tag->title ) );
+		// Get the blogs model
+		$blogModel = EB::model('Blog');
+		$tagModel = EB::model('Tags');
 
-		$blogModel	= $this->getModel( 'Blog' );
-		$tagModel	= $this->getModel( 'Tags' );
-		$rows		= $blogModel->getTaggedBlogs( $id );
+		// Get the blog posts now
+		$rows = $blogModel->getTaggedBlogs($tag->id, false, '');
+
+		// Get the pagination
 		$pagination	= $blogModel->getPagination();
 
-		$privateBlogCount   = 0;
-		$teamBlogCount   	= 0;
+		// Get total number of private blog posts
+		$privateCount = 0;
 
-		if($my->id == 0)
-		{
-			$privateBlogCount   = $tagModel->getTagPrivateBlogCount( $id );
+		// Get total number of team blog count
+		$teamblogCount = 0;
+
+		if ($this->my->guest) {
+			$privateCount = $tagModel->getTagPrivateBlogCount($id);
 		}
 
-		if( !$config->get( 'main_includeteamblogpost' ) )
-		{
-			$teamBlogCount          = $tagModel->getTeamBlogCount( $id );
+		// Determines if we should get the team blog count
+		if (!$this->config->get('main_includeteamblogpost')) {
+			$teamblogCount = $tagModel->getTeamBlogCount($id);
 		}
 
-		//for trigger only
-		JPluginHelper::importPlugin( 'easyblog' );
-		$dispatcher	= JDispatcher::getInstance();
-		$mainframe	= JFactory::getApplication();
-		$params		= $mainframe->getParams('com_easyblog');
-		$limitstart	= JRequest::getVar('limitstart', 0, '', 'int');
+		// Format the blog posts using the standard list formatter
+		$posts = EB::formatter('list', $rows);
 
-		// @task: Add canonical URLs.
-		if( $config->get( 'main_canonical_entry') )
-		{
-			$canonicalUrl   = EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=tags&layout=tag&id=' . $tag->id , false , true, true );
-			$document->addCustomTag( '<link rel="canonical" href="' . $canonicalUrl . '"/>' );
-		}
+		$return = base64_encode($tag->getPermalink());
+		
+		$this->set('return', $return);
+		$this->set('tag', $tag);
+		$this->set('posts', $posts);
+		$this->set('pagination', $pagination);
+		$this->set('private', $privateCount);
+		$this->set('team', $teamblogCount);
 
-		if(!empty( $rows ))
-		{
-		    $rows	= EasyBlogHelper::formatBlog( $rows , true , true , true , true );
-
-			for( $i = 0; $i < count( $rows ); $i++ )
-			{
-        		$row	=& $rows[ $i ];
-
-        		$row->category  	= $blogModel->getCategoryName($row->category_id);
-				// $row->readmore		= JText::_('COM_EASYBLOG_CONTINUE_READING');
-
-				if($config->get('layout_showcomment', false))
-				{
-					$maxComment = $config->get('layout_showcommentcount', 3);
-					$comments	= EasyBlogHelper::getHelper( 'Comment' )->getBlogComment( $row->id, $maxComment , 'desc' );
-	                $comments   = EasyBlogHelper::formatBlogCommentsLite($comments);
-		    		$row->comments = $comments;
-				}
-   			}
-		}
-
-		$theme		= new CodeThemes();
-		$theme->set( 'tag' , $tag );
-		$theme->set( 'rows' , $rows );
-		$theme->set( 'pagination'	, $pagination );
-		$theme->set( 'currentURL' , 'index.php?option=com_easyblog&view=tags&layout=tag&id=' . $tag->id );
-		$theme->set( 'privateBlogCount', $privateBlogCount );
-		$theme->set( 'teamBlogCount', $teamBlogCount );
-
-		echo $theme->fetch( 'blog.tags.php' );
-	}
-
-	function _getSorting($sorting_type = 'latestpost')
-	{
-		$filter[] = JHTML::_('select.option', 'alphabetical', JText::_('Alphabetical') );
-		$filter[] = JHTML::_('select.option', 'posts', JText::_('Tag weight') );
-
-		return JHTML::_('select.genericlist', $filter, 'sort', 'class="inputbox" size="1"', 'value', 'text', $sorting_type );
+		parent::display('tags/item');
 	}
 }

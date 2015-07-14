@@ -85,6 +85,7 @@
 		<submenu name="jomsocialgroups" title="COM_EASYDISCUSS_SIDEBAR_MIGRATORS_JOMSOCIAL_GROUPS" url="index.php?option=com_easydiscuss&amp;view=migrators&amp;layout=default_jomsocialgroups" />
 		<submenu name="communitypolls" title="COM_EASYDISCUSS_SIDEBAR_MIGRATORS_COMMUNITY_POLLS" url="index.php?option=com_easydiscuss&amp;view=migrators&amp;layout=communitypolls" />
 		<submenu name="vbulletin" title="COM_EASYDISCUSS_SIDEBAR_MIGRATORS_VBULLETIN" url="index.php?option=com_easydiscuss&amp;view=migrators&amp;layout=default_vbulletin" />
+		<submenu name="discussions" title="COM_EASYDISCUSS_SIDEBAR_MIGRATORS_DISCUSSIONS" url="index.php?option=com_easydiscuss&amp;view=migrators&amp;layout=discussions" />
 	</menu>
 
 </component>

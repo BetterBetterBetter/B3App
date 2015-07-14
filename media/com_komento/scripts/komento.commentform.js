@@ -141,7 +141,7 @@ Komento.Controller(
 			$.dialog({
 				title: $.language( 'COM_KOMENTO_FORM_TNC' ),
 				customClass: 'kmt-dialog',
-				width: 500,
+				width: 470,
 				showOverlay: false,
 				content: content
 			});

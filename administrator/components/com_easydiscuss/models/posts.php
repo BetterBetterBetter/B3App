@@ -324,4 +324,28 @@ class EasyDiscussModelPosts extends EasyDiscussAdminModel
 		}
 	}
 
+
+	/**
+	 * Removes all finder indexed items for replies
+	 *
+	 * @since	3.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function deleteRepliesInFinder($postId)
+	{
+		$db = JFactory::getDBO();
+
+		$query = array();
+		$query[] = 'DELETE FROM ' . $db->quoteName('#__finder_links');
+		$query[] = 'WHERE ' . $db->quoteName('url') . ' LIKE (' . $db->Quote('%index.php?option=com_easydiscuss&view=post&id=' . $postId . '#reply-%') . ')';
+
+		$query = implode(' ', $query);
+
+		$db->setQuery($query);
+		
+		return $db->Query();
+	}
+
 }

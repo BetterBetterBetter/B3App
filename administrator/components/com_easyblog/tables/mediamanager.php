@@ -34,9 +34,9 @@ class EasyBlogTableMediaManager extends EasyBlogTable
 	{
 		$db 	= EasyBlogHelper::db();
 
-		$query 	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl );
-		$query	.= ' WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'path' ) . '=' . $db->Quote( $path );
-		$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'type' ) . '=' . $db->Quote( $type );
+		$query 	= 'SELECT * FROM ' . $db->nameQuote( $this->_tbl );
+		$query	.= ' WHERE ' . $db->nameQuote( 'path' ) . '=' . $db->Quote( $path );
+		$query	.= ' AND ' . $db->nameQuote( 'type' ) . '=' . $db->Quote( $type );
 
 		$db->setQuery( $query );
 		$obj	= $db->loadObject();

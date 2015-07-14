@@ -24,7 +24,7 @@ defined('_JEXEC') or die('Restricted access');
 </div>
 <?php } ?>
 
-<?php if( !$post->islock || DiscussHelper::isModerator( $post->category_id ) || $access->canReply() ){ ?>
+<?php if (!$post->islock || DiscussHelper::isModerator($post->category_id)){ ?>
 <div class="discuss-user-reply" >
 		<a name="respond" id="respond"></a>
 

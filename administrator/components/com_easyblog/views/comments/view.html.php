@@ -1,96 +1,157 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewComments extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	/**
+	 * Displays a list of comments
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.comment' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
-			}
+		// Check for access
+		$this->checkAccess('easyblog.manage.comment');
+
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
 		}
+		// Set the page heading
+		$this->setHeading('COM_EASYBLOG_TITLE_COMMENTS', '', 'fa-comments');
 
-		//initialise variables
-		$document		= JFactory::getDocument();
-		$user			= JFactory::getUser();
-		$mainframe		= JFactory::getApplication();
-
-		$filter_state	= $mainframe->getUserStateFromRequest( 'com_easyblog.comments.filter_state', 	'filter_state', 	'*', 'word' );
-		$search			= $mainframe->getUserStateFromRequest( 'com_easyblog.comments.search', 			'search', 			'', 'string' );
+		$filter_state	= $this->app->getUserStateFromRequest( 'com_easyblog.comments.filter_state', 	'filter_state', 	'*', 'word' );
+		$search			= $this->app->getUserStateFromRequest( 'com_easyblog.comments.search', 			'search', 			'', 'string' );
 
 		$search			= trim(JString::strtolower( $search ) );
-		$order			= $mainframe->getUserStateFromRequest( 'com_easyblog.comments.filter_order', 		'filter_order', 	'ordering', 'cmd' );
-		$orderDirection	= $mainframe->getUserStateFromRequest( 'com_easyblog.comments.filter_order_Dir',	'filter_order_Dir',	'', 'word' );
+		$order			= $this->app->getUserStateFromRequest( 'com_easyblog.comments.filter_order', 		'filter_order', 	'ordering', 'cmd' );
+		$orderDirection	= $this->app->getUserStateFromRequest( 'com_easyblog.comments.filter_order_Dir',	'filter_order_Dir',	'', 'word' );
 
 		//Get data from the model
-		$comments		= $this->get( 'Data' );
-		$pagination		= $this->get( 'Pagination' );
+		$model  = EB::model('Comments');
+		$result = $model->getData();
+		$pagination = $model->getPagination();
+		$comments = array();
 
 		//convert the status.
-		if(count($comments) > 0)
-		{
-			for($i = 0; $i < count($comments); $i++)
-			{
-				$item   = $comments[$i];
+		if ($result) {
 
-				if($item->published == '2')
-				{
-					$item->isModerate  = true;
-					$item->published    = '0';
+			foreach ($result as $row) {
+				$comment = EB::table('Comment');
+				$comment->bind($row);
+
+				$comment->blog_name = $row->blog_name;
+				$comment->isModerate = false;
+
+				if ($comment->published == 2) {
+					$comment->isModerate = true;
+					$comment->published = 0;
 				}
-				else
-				{
-					$item->isModerate  = false;
-				}
+
+				$comments[] = $comment;
 			}
 		}
 
-		$this->assignRef( 'comments'		, $comments );
-		$this->assignRef( 'pagination'	, $pagination );
-		$this->assign( 'state'			, $this->getFilterState($filter_state));
-		$this->assign( 'search'			, $search );
-		$this->assign( 'order'			, $order );
-		$this->assign( 'orderDirection'	, $orderDirection );
+		// Get the filter state
+		$filterState = $this->getFilterState($filter_state);
 
-		parent::display($tpl);
+		$this->set('filterState', $filterState);
+		$this->set('search', $search);
+		$this->set('comments', $comments);
+		$this->set('pagination', $pagination);
+		$this->set('order', $order);
+		$this->set('orderDirection', $orderDirection);
+
+		parent::display('comments/default');
 	}
 
-	function registerToolbar()
+	/**
+	 * Allows site admin to edit a comment from the back end
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function form($tpl = null)
 	{
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_COMMENTS_TITLE' ), 'comments' );
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
-		JToolbarHelper::divider();
-		JToolbarHelper::publishList();
-		JToolbarHelper::unpublishList();
-		JToolBarHelper::divider();
-		JToolbarHelper::deleteList();
+		$this->setHeading('COM_EASYBLOG_COMMENTS_FORM_TITLE', '', 'fa-comments');
+
+		// Get the comment item
+		$id = $this->input->get('id', '', 'int');
+
+		$comment = EB::table('Comment');
+		$comment->load($id);
+
+		// Set default values for new entries.
+		if (!$comment->id) {
+			$comment->created	= EB::date()->format();
+			$comment->published	= true;
+		}
+
+		// If this comment was posted by a user on the site, pre-fill in the values
+		if ($comment->created_by) {
+			$author = $comment->getAuthor();
+			$comment->name  = $author->getName();
+			$comment->email = $author->user->email;
+			$comment->website = $author->getWebsite();
+		}
+
+		$this->set('comment', $comment);
+
+		parent::display('comments/form');
 	}
 
-	function getFilterState ($filter_state='*')
+	public function registerToolbar()
+	{
+		$layout = $this->getLayout();
+
+		if ($layout == 'default') {
+			JToolBarHelper::title(JText::_('COM_EASYBLOG_COMMENTS_TITLE'), 'comments');
+
+			JToolbarHelper::publishList('comment.publish');
+			JToolbarHelper::unpublishList('comment.unpublish');
+			JToolBarHelper::divider();
+			JToolbarHelper::deleteList(JText::_('COM_EASYBLOG_COMMENTS_CONFIRM_DELETE', true), 'comment.delete');
+
+			return;
+		}
+
+		if ($layout == 'form') {
+			JToolbarHelper::title(JText::_('COM_EASYBLOG_COMMENTS_FORM_TITLE'), 'comments');
+
+			JToolbarHelper::apply('comment.apply');
+			JToolBarHelper::save('comment.save');
+			JToolBarHelper::cancel('comment.cancel');
+
+			return;
+		}
+	}
+
+	public function getFilterState($filter_state='*')
 	{
 		$state[] = JHTML::_('select.option',  '', '- '. JText::_( 'COM_EASYBLOG_SELECT_STATE' ) .' -' );
 		$state[] = JHTML::_('select.option',  'P', JText::_( 'COM_EASYBLOG_PUBLISHED' ) );
 		$state[] = JHTML::_('select.option',  'U', JText::_( 'COM_EASYBLOG_UNPUBLISHED' ) );
 		$state[] = JHTML::_('select.option',  'M', JText::sprintf( 'COM_EASYBLOG_AWAITING_MODERATION' , $this->get( 'TotalPending' ) ) );
 
-		return JHTML::_('select.genericlist',   $state, 'filter_state', 'class="inputbox" size="1" onchange="submitform( );"', 'value', 'text', $filter_state );
+		return JHTML::_('select.genericlist',   $state, 'filter_state', 'class="inputbox" onchange="submitform( );"', 'value', 'text', $filter_state );
 	}
 }

@@ -1,80 +1,102 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
+
 
 class EasyBlogViewSubscriptions extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.subscription' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
-			}
+		// Check for access
+		$this->checkAccess('easyblog.manage.subscription');
+
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
 		}
 
-		//initialise variables
-		$document		= JFactory::getDocument();
-		$user			= JFactory::getUser();
-		$mainframe		= JFactory::getApplication();
+		// Set the page heading
+		$this->setHeading('COM_EASYBLOG_TITLE_SUBSCRIPTIONS', '', 'fa-bell');
 
-		$filter			= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.filter', 	'filter', 	'site', 		'word' );
-		$search			= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.search', 	'search', 	'', 			'string' );
+		$filter = $this->app->getUserStateFromRequest( 'com_easyblog.subscriptions.filter', 	'filter', 	'site', 		'word' );
+		$search = $this->app->getUserStateFromRequest( 'com_easyblog.subscriptions.search', 	'search', 	'', 			'string' );
 
-		$search			= trim(JString::strtolower( $search ) );
-		$order			= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.filter_order', 		'filter_order', 	'bname', 	'cmd' );
-		$orderDirection	= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.filter_order_Dir',	'filter_order_Dir',	'', 		'word' );
+		$search = trim(JString::strtolower( $search ) );
+		$order = $this->app->getUserStateFromRequest( 'com_easyblog.subscriptions.filter_order', 		'filter_order', 	'bname', 	'cmd' );
+		$orderDirection	= $this->app->getUserStateFromRequest( 'com_easyblog.subscriptions.filter_order_Dir',	'filter_order_Dir',	'', 		'word' );
 
 		//Get data from the model
-		$subscriptions	= $this->get( 'Subscriptions' );
-		$pagination		= $this->get( 'Pagination' );
+		$model 	= EB::model('Subscriptions');
 
-		$this->assignRef( 'subscriptions'	, $subscriptions );
-		$this->assignRef( 'pagination'		, $pagination );
-		$this->assign( 'filter'				, $filter );
-		$this->assign( 'filterList'			, $this->_getFilter($filter) );
-		$this->assign( 'search'				, $search );
-		$this->assign( 'order'				, $order );
-		$this->assign( 'orderDirection'		, $orderDirection );
+		$subscriptions = $model->getSubscriptions();
+		$pagination = $model->getPagination();
 
-		parent::display($tpl);
+		$this->set('subscriptions', $subscriptions);
+		$this->set('pagination', $pagination);
+		$this->set('filter', $filter);
+		$this->set('filterList', $this->getFilter($filter));
+		$this->set('search', $search );
+		$this->set('order', $order);
+		$this->set('orderDirection', $orderDirection);
+
+		parent::display('subscriptions/default');
 	}
 
-	function _getFilter( $filter )
+	public function import()
+	{
+		$this->setHeading('COM_EASYBLOG_SUBSCRIPTION_IMPORT', '', 'fa-envelope-o');
+
+		parent::display('subscriptions/import');
+	}
+
+	private function getFilter( $filter )
 	{
 		$filterType = array();
-		$attribs	= 'size="1" class="inputbox" onchange="submitform();"';
+		$attribs	= ' class="form-control" onchange="submitform();"';
 
-		$filterType[] = JHTML::_('select.option', 'blogger', JText::_( 'COM_EASYBLOG_BLOGGER_OPTION' ) );
-		$filterType[] = JHTML::_('select.option', 'blog', JText::_( 'COM_EASYBLOG_BLOG_POST_OPTION' ) );
-		$filterType[] = JHTML::_('select.option', 'category', JText::_( 'COM_EASYBLOG_CATEGORY_OPTION' ) );
-		$filterType[] = JHTML::_('select.option', 'site', JText::_( 'COM_EASYBLOG_SITE_OPTION' ) );
-		$filterType[] = JHTML::_('select.option', 'team', JText::_( 'COM_EASYBLOG_TEAM_OPTION' ) );
+		$filterType[] = JHTML::_('select.option', EBLOG_SUBSCRIPTION_BLOGGER, JText::_( 'COM_EASYBLOG_BLOGGER_OPTION' ) );
+		$filterType[] = JHTML::_('select.option', EBLOG_SUBSCRIPTION_ENTRY, JText::_( 'COM_EASYBLOG_BLOG_POST_OPTION' ) );
+		$filterType[] = JHTML::_('select.option', EBLOG_SUBSCRIPTION_CATEGORY, JText::_( 'COM_EASYBLOG_CATEGORY_OPTION' ) );
+		$filterType[] = JHTML::_('select.option', EBLOG_SUBSCRIPTION_SITE, JText::_( 'COM_EASYBLOG_SITE_OPTION' ) );
+		$filterType[] = JHTML::_('select.option', EBLOG_SUBSCRIPTION_TEAMBLOG, JText::_( 'COM_EASYBLOG_TEAM_OPTION' ) );
 
 
 		return JHTML::_('select.genericlist',   $filterType, 'filter', $attribs, 'value', 'text', $filter );
 	}
 
-	function registerToolbar()
+	/**
+	 * Registers the toolbar.
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function registerToolbar()
 	{
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_SUBSCRIPTION' ), 'subscriptions' );
+		$layout = $this->input->get('layout', '', 'cmd');
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
-		JToolbarHelper::divider();
-		JToolbarHelper::deleteList();
+		if ($layout == 'import') {
+			JToolBarHelper::title(JText::_('COM_EASYBLOG_SUBSCRIPTION_IMPORT_SUBSCRIBERS'), 'subscriptions' );
+
+			return;
+		}
+
+		JToolBarHelper::title(JText::_('COM_EASYBLOG_SUBSCRIPTION'), 'subscriptions');
+
+		JToolbarHelper::addNew('subscriptions.form');
+		JToolbarHelper::deleteList('COM_EASYBLOG_CONFIRM_REMOVE_SUBSCRIBER', 'subscriptions.remove');
 	}
 }

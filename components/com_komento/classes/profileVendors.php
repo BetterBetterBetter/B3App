@@ -313,7 +313,7 @@ class KomentoProfileEasyblog extends KomentoProfileVendor
 		
 		$this->profileEB->load($this->profile->id);
 
-		return $this->profileEB->getLink();
+		return $this->profileEB->getPermalink();
 	}
 }
 

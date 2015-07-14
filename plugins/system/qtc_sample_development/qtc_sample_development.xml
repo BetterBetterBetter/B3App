@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension version="3.0" type="plugin" group="system" method="upgrade">
+
+	<name>Quick2Cart - System - Sample Development</name>
+
+	<author>TechJoomla</author>
+	<authorEmail>extensions@techjoomla.com</authorEmail>
+	<authorUrl>www.techjoomla.com</authorUrl>
+	<copyright>Copyright(C)2012-13 TechJoomla</copyright>
+	<license>http://www.gnu.org/licenses/gpl-2.0.html GNU/GPL</license>
+
+	<creationDate>02 Jul 2015</creationDate>
+	<version>2.3.1</version>
+
+	<description>This system plugin is used for extending Quick2cart functionalty via plugin triggers.</description>
+
+	<files>
+		<filename plugin="qtc_sample_development">qtc_sample_development.php</filename>
+		<filename>index.html</filename>
+	</files>
+	<languages>
+		<language tag="en-GB">en-GB/en-GB.plg_system_qtc_sample_development.ini</language>
+ 	</languages>
+
+	<!-- Fields for Joomla 1.6.x and onwards -->
+	<config name="params">
+		<fields name="params">
+			<fieldset name="basic">
+				<field name="affiliate_status" type="radio" default="0" label="Affiliate Prog Status ?" description="Select Affiliate Prog Status">
+					<option value="1">Enable</option>
+					<option value="0">Disable</option>
+				</field>
+				<field name="affiliate" type="radio" default="iDevAffi" label="COM_SAMPLE_DEV_AFFILIATE_PROG" description="COM_SAMPLE_DEV_AFFILIATE_PROG_DESC">
+					<option value="iDevAffi">iDevAffiliate</option>
+					<option value="PostAffiPro">Post Affiliate Pro</option>
+				</field>
+				<field name="baseurl" type="text" default="" label="Base Url for Affiliate Prog" description="Base Url for Affiliate Prog"/>
+
+				<field name="usd_exchange_status" type="radio" default="0" label="USD Exchange Rate Status ?" description="Select USD Exchange Rate Status">
+					<option value="1">Enable</option>
+					<option value="0">Disable</option>
+				</field>
+				<field name="usd_exchange" type="text" default="50" label="USD Exchange Rate" description="Exchange Rate of 1 USD for INR"/>
+
+				<field name="jlike" type="radio" default="1" label="jLike integration" description="Display Like options on product page">
+					<option value="1">Enable</option>
+					<option value="0">Disable</option>
+				</field>
+			</fieldset>
+		</fields>
+	</config>
+
+</extension>

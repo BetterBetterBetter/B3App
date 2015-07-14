@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+	<layout title="Quick2Cart All Products View" option="View" >
+		 <message><![CDATA[Quick2Cart All Products View]]></message>
+	</layout>
+
+	<!-- Add fields to the parameters object for the layout. -->
+	<fields name="params">
+		<fieldset name="advanced" label="COM_MENUS_LAYOUT_FEATURED_OPTIONS">
+			<field name="defaultCatId" type="category"
+				label="COM_QUICK2CART_MENU_PRODUCTS_FIELD_SELECT_CAT"
+				description="COM_QUICK2CART_MENU_PRODUCTS_FIELD_SELECT_CAT_DESC"
+				extension="com_quick2cart"
+				>
+					<option value=''>COM_QUICK2CART_MENU_PRODUCTS_FIELD_OPTION_SELECT_CAT</option>
+			</field>
+			<field name="show_subcat_products" type="list"
+				label="COM_QUICK2CART_MENU_PRODUCTS_FIELD_SHOW_SUBCATS"
+				description="COM_QUICK2CART_MENU_PRODUCTS_FIELD_SHOW_SUBCATS_DESC"
+				default="0"
+				>
+					<option value='1'>COM_QUICK2CART_YES</option>
+					<option value='0'>COM_QUICK2CART_NO</option>
+			</field>
+			<field name="cat_all_prod_pagination_limit" type="text" default="20" label="QTC_MENU_ALL_PROD_PAGINATION_LIMIT" description="QTC_MENU_ALL_PROD_PAGINATION_LIMIT_DESC" />
+		</fieldset>
+	</fields>
+
+	<state>
+		<name>All Products (pin view)</name>
+		<description>All Products (pin view)</description>
+	</state>
+</metadata>

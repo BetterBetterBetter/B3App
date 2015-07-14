@@ -35,7 +35,7 @@ class EasyDiscussViewTag extends EasyDiscussAdminView
 
 		// Generate All tags for merging selections
 		$tagsModel	= $this->getModel( 'Tags' );
-		$tags		= $tagsModel->getData();
+		$tags		= $tagsModel->getData(false);
 		$tagList	= array();
 		array_push($tagList, JHTML::_('select.option', 0, 'Select tag', 'value', 'text', false));
 

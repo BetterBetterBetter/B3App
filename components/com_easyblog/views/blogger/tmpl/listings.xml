@@ -6,69 +6,53 @@
 		</message>
 		<view>blogger</view>
 	</layout>
-	<state>
-		<name><![CDATA[COM_EASYBLOG_MENU_BLOGGER_LAYOUT]]></name>
-		<description><![CDATA[COM_EASYBLOG_MENU_BLOGGER_LAYOUT_DESC]]></description>
-		<url addpath="/administrator/components/com_easyblog/elements">
-			<param name="id" type="bloggers" label="Blogger Id" default="0" description="Choose a blogger..." />
-		</url>
-		<params>
-		    <param name="limit" type="list" default="-2" label="Pagination" description="Set how many items to be displayed per page">
-				<option value="-1">Use Global</option>
-				<option value="5">5</option>
-				<option value="10">10</option>
-				<option value="15">15</option>
-				<option value="20">20</option>
-				<option value="25">25</option>
-				<option value="30">30</option>
-				<option value="50">50</option>
-				<option value="100">100</option>
-				<option value="-2">Use EasyBlog List Length</option>
-			</param>
-		</params>
-		<advanced>
-			<param name="standalone_blog" type="list" default="0" label="Standalone blogger mode" description="If enabled, your site users will view only the blog posts from the blogger you've specified in above.">
-				<option value="0">No</option>
-				<option value="1">Yes</option>
-			</param>
-		</advanced>
-	</state>
-	
-	<!-- Add fields to the request variables for the layout. -->
-	<fields name="request">
-		<fieldset name="request"
-			addfieldpath="/administrator/components/com_easyblog/elements/fields">
 
-			<field name="id" type="modal_bloggers"
-				label="Blogger Id"
-				required="true"
-				description="Choose a blogger..."
-			/>
+	<fields name="request">
+		<fieldset name="request" addfieldpath="/administrator/components/com_easyblog/elements">
+			<field name="id" type="authors" label="COM_EASYBLOG_MENU_AUTHOR" description="COM_EASYBLOG_MENU_AUTHOR_DESC" required="true" />
 		</fieldset>
 	</fields>
+
     <fields name="params">
-		<fieldset name="advanced">
-			<field
-				name="standalone_blog"
-				type="list"
-				default="0"
-				label="Standalone blogger mode"
-				description="If enabled, your site users will view only the blog posts from the blogger you've specified in above." >
+    	<fieldset name="author" label="COM_EASYBLOG_MENU_AUTHOR_OPTIONS">
+			<field name="author_header" type="radio" default="1" class="btn-group" label="COM_EASYBLOG_SHOW_AUTHOR_HEADER" description="COM_EASYBLOG_SHOW_AUTHOR_HEADER_DESC">
+				<option value="0">JHIDE</option>
+				<option value="1">JSHOW</option>
+			</field>
+
+			<field name="author_avatar" type="radio" default="1" class="btn-group" label="COM_EASYBLOG_SHOW_AUTHOR_AVATAR" description="COM_EASYBLOG_SHOW_AUTHOR_AVATAR_DESC">
+				<option value="0">JHIDE</option>
+				<option value="1">JSHOW</option>
+			</field>
+
+			<field name="author_name" type="radio" default="1" class="btn-group" label="COM_EASYBLOG_SHOW_AUTHOR_NAME" description="COM_EASYBLOG_SHOW_AUTHOR_NAME_DESC">
+				<option value="0">JHIDE</option>
+				<option value="1">JSHOW</option>
+			</field>
+
+			<field name="author_bio" type="radio" default="1" class="btn-group" label="COM_EASYBLOG_SHOW_AUTHOR_BIO" description="COM_EASYBLOG_SHOW_AUTHOR_BIO_DESC">
+				<option value="0">JHIDE</option>
+				<option value="1">JSHOW</option>
+			</field>
+
+			<field name="author_twitter" type="radio" default="1" class="btn-group" label="COM_EASYBLOG_SHOW_AUTHOR_TWITTER" description="COM_EASYBLOG_SHOW_AUTHOR_TWITTER_DESC">
+				<option value="0">JHIDE</option>
+				<option value="1">JSHOW</option>
+			</field>
+
+			<field name="author_website" type="radio" default="1" class="btn-group" label="COM_EASYBLOG_SHOW_AUTHOR_WEBSITE" description="COM_EASYBLOG_SHOW_AUTHOR_WEBSITE_DESC">
+				<option value="0">JHIDE</option>
+				<option value="1">JSHOW</option>
+			</field>
+    	</fieldset>
+
+		<fieldset name="request" addfieldpath="/administrator/components/com_easyblog/elements">
+			<field name="standalone_blog" type="radio" default="0" class="btn-group" label="COM_EASYBLOG_MENU_STANDALONE_AUTHOR_MODE" description="COM_EASYBLOG_MENU_STANDALONE_AUTHOR_MODE_DESC" >
 				<option value="0">No</option>
 				<option value="1">Yes</option>
 			</field>
-		    <field name="limit" type="list" default="-2" label="Pagination" description="Set how many items to be displayed per page">
-				<option value="-1">Use Global</option>
-				<option value="5">5</option>
-				<option value="10">10</option>
-				<option value="15">15</option>
-				<option value="20">20</option>
-				<option value="25">25</option>
-				<option value="30">30</option>
-				<option value="50">50</option>
-				<option value="100">100</option>
-				<option value="-2">Use EasyBlog List Length</option>
-			</field>
+			<field type="pagination" name="limit" default="-2" label="COM_EASYBLOG_ITEMS_PER_PAGE" description="COM_EASYBLOG_ITEMS_PER_PAGE_DESC" />
+			<field name="exclusion" type="multicategoriesparent" label="COM_EASYBLOG_MENU_EXCLUDE_SELECT_CATEGORIES" description="COM_EASYBLOG_MENU_EXCLUDE_SELECT_CATEGORIES_DESC" />
 		</fieldset>
     </fields>
 </metadata>

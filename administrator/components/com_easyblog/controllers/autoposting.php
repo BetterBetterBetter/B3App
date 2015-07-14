@@ -56,7 +56,7 @@ class EasyBlogControllerAutoposting extends EasyBlogController
 			$post[ 'integrations_linkedin_company' ] 	= implode( ',' , $post[ 'integrations_linkedin_company' ] );
 		}
 
-		$model	= $this->getModel( 'Settings' );
+		$model	= EB::model( 'Settings' );
 		$model->save( $post );
 
 		$redirect 	= 'index.php?option=com_easyblog&view=autoposting&layout=form&type=' . $type;
@@ -109,7 +109,7 @@ class EasyBlogControllerAutoposting extends EasyBlogController
 		$layout	= JRequest::getWord( 'layout' );
 
 		// Retrieve the settings model.
-		$model	= $this->getModel( 'Settings' );
+		$model	= EB::model( 'Settings' );
 
 		$message	= '';
 		$status 	= '';
@@ -254,14 +254,14 @@ class EasyBlogControllerAutoposting extends EasyBlogController
 			return;
 		}
 
-		$oauth				= EasyBlogHelper::getTable( 'Oauth' );
+		$oauth				= EB::table('Oauth');
 
 		// We do not need to set the user_id because system autopostings doesn't need to be associated with any users
 		$oauth->type		= $type;
-		$oauth->created		= EasyBlogHelper::getDate()->toMySQL();
+		$oauth->created		= EB::date()->toMySQL();
 
 		// Bind the request tokens
-		$param 				= EasyBlogHelper::getRegistry();
+		$param	= EB::registry();
 		$param->set( 'token' 	, $request->token );
 		$param->set( 'secret'	, $request->secret );
 
@@ -283,7 +283,7 @@ class EasyBlogControllerAutoposting extends EasyBlogController
 		$config		= EasyBlogHelper::getConfig();
 		$from		= JRequest::getWord( 'return' );
 
-		$oauth		= EasyBlogHelper::getTable( 'Oauth' );
+		$oauth		= EB::table('Oauth');
 		$oauth->loadSystemByType( $type );
 
 		// Revoke the access through the respective client first.
@@ -327,7 +327,7 @@ class EasyBlogControllerAutoposting extends EasyBlogController
 
 		$my			= JFactory::getUser();
 		$from		= JRequest::getWord( 'return' );
-		$oauth		= EasyBlogHelper::getTable( 'Oauth' );
+		$oauth		= EB::table('Oauth');
 		$loaded		= $oauth->loadSystemByType( $type );
 		$denied		= JRequest::getVar( 'denied' , '' );
 		$redirect	= JRoute::_( 'index.php?option=com_easyblog&view=autoposting&layout=' . $type . '&step=2' , false );
@@ -355,7 +355,7 @@ class EasyBlogControllerAutoposting extends EasyBlogController
 			JError::raiseError( 500 , JText::_( 'COM_EASYBLOG_AUTOPOST_ERRORS_REQUEST_TOKENS_NOT_LOADED' ) );
 		}
 
-		$request	= EasyBlogHelper::getRegistry( $oauth->request_token );
+		$request 	= EB::registry($oauth->request_token);
 
 		$return 	= JRequest::getWord( 'return' );
 		$return  	= !empty( $return ) ? '&return=' . $return : '';
@@ -385,7 +385,7 @@ class EasyBlogControllerAutoposting extends EasyBlogController
 		}
 
 
-		$param		= EasyBlogHelper::getRegistry('');
+		$param 	= EB::registry();
 		$param->set( 'token' 	, $access->token );
 		$param->set( 'secret'	, $access->secret );
 

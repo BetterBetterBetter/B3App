@@ -64,19 +64,19 @@ class sef_easyblog {
 				switch($view)
 				{
 					case 'entry':
-						$idname = EasyBlogRouter::getBlogSefPermalink($id);
+						$idname = $id;
 						break;
 					case 'blogger':
 						$idname = EasyBlogRouter::getBloggerPermalink($id);
 						break;
 					case 'categories':
-						$idname = EasyBlogRouter::getCategoryPermalink($id);
+						$idname = $id;
 						break;
 					case 'tags':
-						$idname = EasyBlogRouter::getTagPermalink($id);
+						$idname = $id;
 						break;
 					case 'teamblog':
-						$idname = EasyBlogRouter::getTeamBlogPermalink($id);
+						$idname = $id;
 						break;
 					default:
 						$idname = '';
@@ -175,13 +175,13 @@ class sef_easyblog {
 				if((preg_match('/&amp;catid=/i',$string)))
 				{
 					$catid 		= sef_easyblog::getVarValue('catid', $string);
-					$sefstring	.= EasyBlogRouter::getCategoryPermalink($catid).'/';
+					$sefstring	.= $catid.'/';
 				}
 
 				if((preg_match('/&amp;tagid=/i',$string)))
 				{
 					$tagid 		= sef_easyblog::getVarValue('tagid', $string);
-					$sefstring	.= EasyBlogRouter::getTagPermalink($tagid).'/';
+					$sefstring	.= $tagid.'/';
 				}
 			}
 			else

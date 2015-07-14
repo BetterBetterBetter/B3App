@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,46 +9,51 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableMeta extends EasyBlogTable
 {
-	public $id 			= null;
-	public $keywords	= null;
+	public $id = null;
+	public $keywords = null;
 	public $description	= null;
-	public $content_id	= null;
-	public $type 		= null;
-	public $indexing	= null;
+	public $content_id = null;
+	public $type = null;
+	public $indexing = null;
 
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(& $db )
 	{
 		parent::__construct( '#__easyblog_meta' , 'id' , $db );
 	}
 
-	function loadByType( $type , $id )
+	/**
+	 * Loads a meta data by a specific type
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function loadByType($type, $id)
 	{
-		$db		= $this->getDBO();
-		$query	= 'SELECT * FROM ' . $this->_tbl . ' '
-				. 'WHERE `type`=' . $db->Quote( $type ) . ' '
-				. 'AND `content_id`=' . $db->Quote( $id );
-		$db->setQuery( $query );
+		$db = EB::db();
+		$query = array();
 
-		$data	= $db->loadObject();
+		$query[] = 'SELECT * FROM ' . $db->quoteName($this->_tbl);
+		$query[] = 'WHERE ' . $db->quoteName('type') . '=' . $db->Quote($type);
+		$query[] = 'AND ' . $db->quoteName('content_id') . '=' . $db->Quote($id);
 
-		if (is_null($data))
-		{
-			$data	= array();
+		$query = implode(' ', $query);
+		$db->setQuery($query);
+
+		$data = $db->loadObject();
+
+		if (!$data) {
+			return false;
 		}
 
-		return parent::bind( $data );
+		return parent::bind($data);
 	}
 
 	/**
@@ -57,12 +62,12 @@ class EasyBlogTableMeta extends EasyBlogTable
 	 * @return boolean
 	 * @param object $db
 	 */
-	function delete($pk = null)
+	public function delete($pk = null)
 	{
 		$db		= $this->getDBO();
 
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'category_id' ) . '=' . $db->Quote( $this->id );
+		$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__easyblog_post' ) . ' '
+				. 'WHERE ' . $db->nameQuote( 'category_id' ) . '=' . $db->Quote( $this->id );
 		$db->setQuery( $query );
 
 		$count	= $db->loadResult();
@@ -75,14 +80,94 @@ class EasyBlogTableMeta extends EasyBlogTable
 		return parent::delete($pk);
 	}
 
-
-	/**
-	 * Overrides parent's bind method to add our own logic.
-	 *
-	 * @param Array $data
-	 **/
-	function bind( $data, $ignore = array() )
+	public function getTitle()
 	{
-		parent::bind( $data, $ignore );
+		$title = '';
+
+		switch ($this->id)
+		{
+			case 1:
+				$title = JText::_('COM_EASYBLOG_LATEST_POSTS_PAGE');
+				break;
+
+			case 2:
+				$title = JText::_('COM_EASYBLOG_CATEGORIES_PAGE');
+				break;
+
+			case 3:
+				$title = JText::_('COM_EASYBLOG_TAGS_PAGE');
+				break;
+
+			case 4:
+				$title = JText::_('COM_EASYBLOG_BLOGGERS_PAGE');
+				break;
+
+			case 5:
+				$title = JText::_('COM_EASYBLOG_TEAM_BLOGS_PAGE');
+				break;
+
+			case 6:
+				$title = JText::_('COM_EASYBLOG_FEATURED_POSTS_PAGE');
+				break;
+
+			case 7:
+				$title = JText::_('COM_EASYBLOG_ARCHIVE_PAGE');
+				break;
+
+			case 8:
+				$title = JText::_('COM_EASYBLOG_SEARCH_PAGE');
+				break;
+
+			default:
+				$title = $this->_getTitle( $this->id );
+
+		}
+
+		return $title;
+	}
+
+	public function _getTitle( $id )
+	{
+		$db = EB::db();
+
+		$query = 'SELECT `type`, `content_id` FROM ' . $db->quoteName('#__easyblog_meta') . ' WHERE id = ' . $db->Quote($id);
+		$db->setQuery($query);
+
+		$result = $db->loadObject();
+
+		if (!$result)
+		{
+			$result	= new stdClass;
+			$result->type	= '';
+		}
+
+		$query = '';
+
+		switch ( $result->type )
+		{
+			case 'post':
+				$query = 'SELECT `title` FROM ' . $db->quoteName('#__easyblog_post') . ' WHERE id = ' . $db->Quote( $result->content_id );
+				break;
+
+			case 'blogger':
+				$query = 'SELECT `name` AS title  FROM ' . $db->quoteName('#__users') . ' WHERE id = ' . $db->Quote( $result->content_id );
+				break;
+
+			case 'team':
+				$query = 'SELECT `title`  FROM ' . $db->quoteName('#__easyblog_team') . ' WHERE id = ' . $db->Quote( $result->content_id );
+				break;
+
+			case 'category':
+				$query = 'SELECT `title`  FROM ' . $db->quoteName('#__easyblog_category') . ' WHERE id = ' . $db->Quote( $result->content_id );
+				break;
+			default:
+				return 'unknown';
+				break;
+		}
+
+		$db->setQuery($query);
+		$result = $db->loadResult();
+
+		return $result;
 	}
 }

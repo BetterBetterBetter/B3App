@@ -2458,7 +2458,7 @@ class DiscussHelper
 						$str   		.= (empty($html)) ? $child->title : $ld . '&nbsp;' . $child->title;
 						$str        .= '</a></li>';
 						$html   	.= $str;
-						break;					
+						break;
 					default:
 						$str    	 = '<a href="' . DiscussRouter::getCategoryRoute( $child->id ) . '">';
 						//str   		.= (empty($html)) ? $child->title : $ld . '&nbsp;' . $child->title;
@@ -3582,31 +3582,30 @@ class DiscussHelper
 		$tagResults = $db->loadResultArray();
 
 		// now try to get the main topic
-		$query = 'select a.`id`,  a.`title`, MATCH(a.`title`,a.`content`) AGAINST (' . $db->Quote( $text ) . ' WITH QUERY EXPANSION) AS score';
+		$query = 'select a.`id`,  a.`title`';
 		$query .= ' FROM `#__discuss_posts` as a';
 		$query .= ' WHERE MATCH(a.`title`,a.`content`) AGAINST (' . $db->Quote( $text ) . ' WITH QUERY EXPANSION)';
 		$query .= ' AND a.`published` = ' . $db->Quote('1');
 		$query .= ' AND a.`parent_id` = ' . $db->Quote('0');
 		$query .= $queryExclude;
+		$query .= ' LIMIT ' . $itemLimit;
 
 		$tagQuery   = '';
 		if( count( $tagResults ) > 0 )
 		{
-			$tagQuery = 'select a.`id`,  a.`title`, MATCH(a.`title`,a.`content`) AGAINST (' . $db->Quote( $text ) . ' WITH QUERY EXPANSION) AS score';
+			$tagQuery = 'select a.`id`,  a.`title`';
 			$tagQuery .= ' FROM `#__discuss_posts` as a';
 			$tagQuery .= ' 	INNER JOIN `#__discuss_posts_tags` as b ON a.id = b.post_id';
-			$tagQuery .= ' WHERE MATCH(a.`title`,a.`content`) AGAINST (' . $db->Quote( $text ) . ' WITH QUERY EXPANSION)';
+			$tagQuery .= ' WHERE b.`tag_id` IN (' . implode( ',', $tagResults) . ')';
 			$tagQuery .= ' AND a.`published` = ' . $db->Quote('1');
 			$tagQuery .= ' AND a.`parent_id` = ' . $db->Quote('0');
-			$tagQuery .= ' AND b.`tag_id` IN (' . implode( ',', $tagResults) . ')';
 			$tagQuery .= $queryExclude;
+			$tagQuery .= ' LIMIT ' . $itemLimit;
 
 			$query  = 'SELECT * FROM (' . $query . ' UNION ' . $tagQuery . ') AS x LIMIT ' . $itemLimit;
 		}
-		else
-		{
-			$query  .= ' LIMIT ' . $itemLimit;
-		}
+
+
 
 		$db->setQuery( $query );
 		$result = $db->loadObjectList();
@@ -3622,54 +3621,61 @@ class DiscussHelper
 	 */
 	public static function getBoardStatistics()
 	{
-		$theme	= new DiscussThemes();
-
-		$postModel 	= self::getModel( 'Posts' );
-		$totalPosts	= $postModel->getTotal();
-
-		$resolvedPosts		= $postModel->getTotalResolved();
-		$unresolvedPosts	= $postModel->getUnresolvedCount();
-
-		$userModel 	= self::getModel( 'Users' );
-		$totalUsers	= $userModel->getTotalUsers();
-
-
-		$latestMember = self::getTable( 'Profile' );
-		$latestMember->load( $userModel->getLatestUser() );
-
-		// Total guests
-		$totalGuests 	= $userModel->getTotalGuests();
-
-		// Online users
-		$onlineUsers 	= $userModel->getOnlineUsers();
-
 		$config = DiscussHelper::getConfig();
-		$gids = $config->get( 'main_exclude_frontend_statistics' );
+		$allowed = true;
+		$disallowedGroups = $config->get('main_exclude_frontend_statistics');
 
-		$canViewStatistic = true;
-		if( !empty($gids) )
-		{
-			//Remove whitespace
-			$gids = str_replace(' ', '', $gids);
-			$excludeGroup = explode(',', $gids);
-
-			$my = JFactory::getUser();
-			$myGroup = DiscussHelper::getUserGroupId( $my );
-
-			$result = array_intersect($myGroup, $excludeGroup);
-			$canViewStatistic = empty($result) ? true : false;
+		if (!$config->get('main_frontend_statistics')) {
+			return;
 		}
 
-		$theme->set( 'latestMember'		, $latestMember );
-		$theme->set( 'unresolvedPosts', $unresolvedPosts );
-		$theme->set( 'resolvedPosts', $resolvedPosts );
-		$theme->set( 'totalUsers'	, $totalUsers );
-		$theme->set( 'totalPosts'	, $totalPosts );
-		$theme->set( 'onlineUsers'	, $onlineUsers );
-		$theme->set( 'totalGuests'	, $totalGuests );
-		$theme->set( 'canViewStatistic'	, $canViewStatistic );
+		if (!empty($disallowedGroups)) {
 
-		return $theme->fetch( 'frontpage.statistics.php' );
+			//Remove whitespace
+			$disallowedGroups = trim($disallowedGroups);
+			$disallowedGroups = explode(',', $disallowedGroups);
+
+			$my = JFactory::getUser();
+			$groups = $my->groups;
+
+			$result = array_intersect($groups, $disallowedGroups);
+
+			$allowed = !$result ? true : false;
+		}
+
+		if (!$allowed) {
+			return;
+		}
+
+		$theme = new DiscussThemes();
+
+		$postModel = DiscussHelper::getModel('Posts');
+		$totalPosts	= $postModel->getTotal();
+
+		$resolvedPosts = $postModel->getTotalResolved();
+		$unresolvedPosts = $postModel->getUnresolvedCount();
+
+		$userModel = DiscussHelper::getModel('Users');
+		$totalUsers	= $userModel->getTotalUsers();
+
+		$latestMember = DiscussHelper::getTable('Profile');
+		$latestMember->load($userModel->getLatestUser());
+
+		// Total guests
+		$totalGuests = $userModel->getTotalGuests();
+
+		// Online users
+		$onlineUsers = $userModel->getOnlineUsers();
+
+		$theme->set('latestMember', $latestMember);
+		$theme->set('unresolvedPosts', $unresolvedPosts);
+		$theme->set('resolvedPosts', $resolvedPosts);
+		$theme->set('totalUsers', $totalUsers);
+		$theme->set('totalPosts', $totalPosts);
+		$theme->set('onlineUsers', $onlineUsers);
+		$theme->set('totalGuests', $totalGuests);
+
+		return $theme->fetch('frontpage.statistics.php');
 	}
 
 	/**
@@ -3764,7 +3770,7 @@ class DiscussHelper
 			case 'joomla':
 				$link	= $default;
 				break;
-				
+
 			case 'cb':
 				$link	= JRoute::_( 'index.php?option=com_comprofiler&task=registers' );
 				break;
@@ -4163,27 +4169,30 @@ class DiscussHelper
 	 * @param	string
 	 * @return
 	 */
-	public static function formatContent( $post )
+	public static function formatContent($post)
 	{
 		$config = DiscussHelper::getConfig();
 
 		// Determine the current editor
-		$editor 	= !$post->parent_id == 'questions' ? $config->get( 'layout_editor' ) : $config->get( 'layout_reply_editor' );
+		$editor = !$post->parent_id == 'questions' ? $config->get('layout_editor') : $config->get('layout_reply_editor');
 
 		// If the post is bbcode source and the current editor is bbcode
 		if (($post->content_type == 'bbcode' || is_null($post->content_type)) && $editor == 'bbcode') {
 
 			$content = $post->content_raw;
 
-			//strip this kind of tag -> &nbsp; &amp; 
-			$content = strip_tags(html_entity_decode($content));
+			// strip this kind of tag -> &nbsp; &amp; 
+			// $content = strip_tags(html_entity_decode($content));
 
-			$content = EasyDiscussParser::bbcode( $content , true );
+			// Allow syntax highlighter even on html codes.
+			$content = EasyDiscussParser::replaceCodes($content);
+
+			$content = EasyDiscussParser::bbcode($content , true);
 
 			// Since this is a bbcode content and source, we want to replace \n with <br /> tags.
 			$content = nl2br($content);
 
-			// $content 	= EasyDiscussParser::removeBrTag( $content );
+			// $content = EasyDiscussParser::removeBrTag( $content );
 		}
 
 		// If the admin decides to switch from bbcode to wysiwyg editor, we need to format it back
@@ -4191,9 +4200,9 @@ class DiscussHelper
 		{
 			$content 	= $post->content_raw;
 
-			//strip this kind of tag -> &nbsp; &amp; 
+			//strip this kind of tag -> &nbsp; &amp;
 			$content = strip_tags(html_entity_decode($content));
-			
+
 			// Since the original content is bbcode, we don't really need to do any replacements.
 			// Just feed it in through bbcode formatter.
 			$content	= EasyDiscussParser::bbcode( $content );

@@ -196,7 +196,7 @@ class EasyBlogControllerUser extends EasyBlogController
 		{
 			// Update session data if the current user was updated
 			if ($user->get('id') == $my->get('id'))
-			{		
+			{
 				$session = JFactory::getSession();
 				$session->set('user', $user); // Force load from database
 			}
@@ -218,10 +218,8 @@ class EasyBlogControllerUser extends EasyBlogController
 			$post['biography'] 		= JRequest::getVar( 'biography' , '' , 'POST' , '' , JREQUEST_ALLOWRAW );
 		}
 
-		$blogger	= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$blogger->load( $user->id );
+		$blogger = EB::user($user->id);
 		$blogger->bind($post);
-
 
 		$file 				= JRequest::getVar( 'Filedata', '', 'Files', 'array' );
 		if(! empty($file['name']))
@@ -231,7 +229,7 @@ class EasyBlogControllerUser extends EasyBlogController
 		}
 
 		//save params
-		$userparams	= EasyBlogHelper::getRegistry('');
+		$userparams 	= EB::registry();
 
 		// @rule: Save google profile url
 		if( isset( $post[ 'google_profile_url' ] ) )
@@ -251,7 +249,7 @@ class EasyBlogControllerUser extends EasyBlogController
 		JTable::addIncludePath( EBLOG_TABLES );
 
 		//save twitter info.
-		$twitter	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
+		$twitter	= EB::table('Oauth');
 		$twitter->loadByUser( $user->id , EBLOG_OAUTH_TWITTER );
 		$twitter->auto		= JRequest::getVar( 'integrations_twitter_auto' );
 		$twitter->message	= JRequest::getVar( 'integrations_twitter_message' );
@@ -261,7 +259,7 @@ class EasyBlogControllerUser extends EasyBlogController
 		}
 
 		// Map linkedin items
-		$linkedin	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
+		$linkedin	= EB::table('Oauth');
 		$linkedin->loadByUser( $user->id , EBLOG_OAUTH_LINKEDIN );
 		$linkedin->auto		= JRequest::getVar( 'integrations_linkedin_auto' );
 		$linkedin->message	= JRequest::getVar( 'integrations_linkedin_message' );
@@ -272,7 +270,7 @@ class EasyBlogControllerUser extends EasyBlogController
 		}
 
 		// store faebook info
-		$facebook	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
+		$facebook	= EB::table('Oauth');
 		$facebook->loadByUser( $user->id , EBLOG_OAUTH_FACEBOOK );
 		$facebook->auto		= JRequest::getVar( 'integrations_facebook_auto' );
 		$facebook->message	= '';
@@ -284,7 +282,7 @@ class EasyBlogControllerUser extends EasyBlogController
 		if( $config->get( 'integration_google_adsense_enable' ) )
 		{
 			// Store adsense data
-			$adsense = EasyBlogHelper::getTable( 'Adsense', 'Table' );
+			$adsense = EB::table('Adsense');
 	    	$adsense->load( $user->id );
 
 			$adsense->code 		= $post['adsense_code'];
@@ -294,7 +292,7 @@ class EasyBlogControllerUser extends EasyBlogController
 		}
 
 		// Store feedburner data
-		$feedburner	= EasyBlogHelper::getTable( 'Feedburner' , 'Table' );
+		$feedburner	= EB::table('Feedburner');
 		$feedburner->load( $user->id );
 
 		$feedburner->url	= $post['feedburner_url'];

@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,778 +9,113 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableBlog extends EasyBlogTable
 {
+	public $id = null;
+	public $created_by = null;
+	public $modified = null;
+	public $created = null;
+	public $publish_up = null;
+	public $publish_down = null;
+	public $title = null;
+	public $permalink = null;
+	public $intro = null;
+	public $content = null;
+	public $document = null;
+	public $category_id = null;
+	public $published = null;
+	public $state = null;
+	public $ordering = null;
+	public $vote = null;
+	public $hits = null;
+	public $access = null;
+	public $allowcomment = null;
+	public $subscription = null;
+	public $frontpage = null;
+	public $isnew = null;
+	public $blogpassword = null;
+	public $latitude = null;
+	public $longitude = null;
+	public $address = null;
+	public $posttype = null;
+	public $robots = null;
+	public $copyrights = null;
+	public $image = null;
+	public $language = null;
+	public $send_notification_emails = null;
+	public $locked = false;
+	public $ip = null;
+	public $doctype = null;
+	public $_checkLength = true;
+	public $revision_id = null;
 
-	var $id 				= null;
-	var $created_by			= null;
-	var $modified			= null;
-	var $created			= null;
-	var $publish_up			= null;
-	var $publish_down		= null;
-	var $title				= null;
-	var $permalink			= null;
-	var $content			= null;
-	var $intro				= null;
-	var $category_id		= null;
-	var $published			= null;
-	var $ordering			= null;
-	var $vote				= null;
-	var $hits				= null;
-	var $private			= null;
-	var $allowcomment		= null;
-	var $subscription		= null;
-	var $frontpage			= null;
-	var $isnew				= null;
-	var $ispending			= null;
-	var $issitewide			= null;
-	var $blogpassword		= null;
-	var $latitude			= null;
-	var $longitude			= null;
-	var $address			= null;
-	var $source				= null;
-	var $robots				= null;
-	var $copyrights			= null;
-	var $autoposting = null;
-
-	var $image 				= null;
-	var $language 			= null;
-
-	var $send_notification_emails = null;
-
-	var $_checkLength		= true;
-
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(&$db)
 	{
-		parent::__construct( '#__easyblog_post' , 'id' , $db );
+		parent::__construct('#__easyblog_post', 'id', $db);
 	}
 
-	function load( $key = null , $permalink = false )
+	/**
+	 * Loads a blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function load($id=null, $reset=true)
 	{
-		if( !$permalink )
-		{
-			return parent::load( $key );
+		// Remove this once we've identified who is calling this.
+		if (func_num_args() > 1) {
+			var_dump("Deprecated: Use loadByPermalink() instead.");
+			dump(debug_backtrace());
+			exit;
 		}
 
-		$db		= EasyBlogHelper::db();
+		// Load post from post table
+		$state = parent::load($id);
 
-		$query	= 'SELECT a.`id` FROM ' . $this->_tbl . ' as a '
-				. 'WHERE a.`permalink` = ' . $db->Quote( $key );
-		$db->setQuery( $query );
+		// Posts without doctypes are legacy posts.
+		if (is_null($this->doctype)) {
+			$this->doctype = 'legacy';
+		}
 
+		return $state;
+	}
 
-		$id		= $db->loadResult();
+	/**
+	 * Given a permalink, find the post id and load the post.
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function loadByPermalink($permalink)
+	{
+		$db = EB::db();
+
+		// Try to look for the permalink
+		$query = 'SELECT a.`id` FROM ' . $this->_tbl . ' as a '
+		       . 'WHERE a.`permalink` = ' . $db->Quote($permalink);
+		$db->setQuery($query);
+		$id = $db->loadResult();
 
 		// Try replacing ':' to '-' since Joomla replaces it
-		if( !$id )
-		{
-			$query	= 'SELECT a.`id` FROM ' . $this->_tbl . ' as a '
-					. 'WHERE a.`permalink` = ' . $db->Quote( JString::str_ireplace( ':' , '-' , $key ) );
-			$db->setQuery( $query );
-
-			$id		= $db->loadResult();
-		}
-		return parent::load( $id );
-	}
-
-	/**
-	 * This method returns registered users that are subscribed to the following channels
-	 *
-	 * - Site wide
-	 * - Category
-	 *
-	 * @param	boolean		$userOnly	If true, only fetches user's that are registered in the system.
-	 * @return	Array
-	 */
-	public function getRegisteredSubscribers( $type = 'new' , $excludedUsers = array() )
-	{
-
-		// @task: Get subscribers who subcribed to the site wide blog.
-		if( $type == 'new' )
-		{
-			$model 		= EasyBlogHelper::getModel( 'Subscription' );
-			$subscribers	= $model->getSiteSubscribers();
-		}
-
-		if( $type == 'new' )
-		{
-			// @task: Get subscribers who subscribed to
-			$model 		= EasyBlogHelper::getModel( 'Category' );
-			$subscribers	= array_merge( $subscribers , $model->getCategorySubscribers( $this->category_id ) );
-		}
-
-		$result 		= array();
-
-		if( !$subscribers )
-		{
-			return false;
-		}
-
-		foreach( $subscribers as $subscriber )
-		{
-			if( $subscriber->user_id && !in_array( $subscriber->user_id , $excludedUsers ) )
-			{
-				$result[]	= $subscriber->user_id;
-			}
-
-		}
-
-		// @rule: Ensure that there's no duplicates
-		$result 	= array_unique( $result );
-
-		return $result;
-	}
-
-	function getSubscribers( $excludeEmails = array() )
-	{
-		$db = $this->_db;
-
-		$excludeEmailsList  = '';
-
-		if( !empty( $excludeEmails ) )
-		{
-			for( $i = 0; $i < count($excludeEmails); $i++ )
-			{
-				$excludeEmailsList  = ( empty( $excludeEmailsList ) ) ? $db->Quote( $excludeEmails[$i] ) : ', ' . $db->Quote( $excludeEmails[$i] );
-			}
-		}
-
-		$query  = 'SELECT * FROM `#__easyblog_post_subscription` WHERE `post_id` = ' . $db->Quote($this->id);
-
-		if( !empty( $excludeEmailsList ) )
-		{
-			$query  .= ' and `email` NOT IN (' . $excludeEmailsList . ')';
-		}
-
-		$db->setQuery($query);
-
-		$result = $db->loadObjectList();
-		return $result;
-	}
-
-	function getCategoryName()
-	{
-		if($this->category_id == 0)
-		{
-			return JText::_('UNCATEGORIZED');
-		}
-
-		static $loaded	= array();
-
-		if( !isset( $loaded[ $this->category_id ] ) )
-		{
-			$db		= EasyBlogHelper::db();
-
-			$query  = 'SELECT `title` FROM `#__easyblog_category` WHERE `id` = ' . $db->Quote($this->category_id);
+		if (!$id) {
+			$permalink = JString::str_ireplace(':', '-', $permalink);
+			$query = 'SELECT a.`id` FROM ' . $this->_tbl . ' as a '
+				   . 'WHERE a.`permalink` = ' . $db->Quote($permalink);
 			$db->setQuery($query);
-
-			$loaded[ $this->category_id ]	= JText::_( $db->loadResult() );
+			$id = $db->loadResult();
 		}
-		return $loaded[ $this->category_id ];
+
+		return parent::load($id);
 	}
 
-	/**
-	 * Override functionality of JTable's hit method as we want to limit the hits based on the session.
-	 *
-	 **/
-	public function hit($pk = null)
-	{
-		$config 	= EasyBlogHelper::getConfig();
-
-		if( $config->get( 'main_hits_session') )
-		{
-			$ip			= JRequest::getVar( 'REMOTE_ADDR' , '' , 'SERVER' );
-
-			if( !empty( $ip ) && !empty($this->id) )
-			{
-				$token		= md5( $ip . $this->id );
-
-				$session	= JFactory::getSession();
-				$exists		= $session->get( $token , false );
-
-				if( $exists )
-				{
-					return true;
-				}
-
-				$session->set( $token , 1 );
-			}
-		}
-		else
-		{
-			$pages 		= JRequest::getVar( 'pagestart', '' );
-			$allpages 	= JRequest::getVar( 'showall', '' );
-			if( $pages || $allpages )
-			{
-				// we know this is coming from pagebreak plugin. so do not count the hit.
-				return true;
-			}
-		}
-
-		$my = JFactory::getUser();
-
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-
-		// Add points for reader
-		if($my->id > 0 && EasyBlogHelper::isAUPEnabled() )
-		{
-			$aupid = AlphaUserPointsHelper::getAnyUserReferreID( $my->id );
-			AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_read_blog', $aupid, '', JText::sprintf('COM_EASYBLOG_AUP_READ_BLOG', $this->title) );
-		}
-
-		// Add points for author
-		if( EasyBlogHelper::isAUPEnabled() )
-		{
-			$aupid = AlphaUserPointsHelper::getAnyUserReferreID( $this->created_by );
-			AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_read_blog_author', $aupid, '', JText::sprintf('COM_EASYBLOG_AUP_READ_BLOG_AUTHOR', $this->title) );
-		}
-
-		// Deduct points from respective systems
-		// @rule: Integrations with EasyDiscuss
-		EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.view.blog' , $my->id , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_VIEW_BLOG' , $this->title ) );
-		EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.view.blog' , $my->id );
-		EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.view.blog' , $my->id );
-
-		// Only give points if the viewer is viewing another person's blog post.
-		if( $my->id != $this->created_by )
-		{
-			EasyBlogHelper::getHelper( 'EasySocial' )->assignBadge('blog.read' , JText::_( 'COM_EASYBLOG_EASYSOCIAL_BADGE_READ_BLOG' ) );
-
-			EasyBlogHelper::getHelper( 'EasySocial' )->assignPoints('blog.read.author', $this->created_by);
-
-			EasyBlogHelper::getHelper('EasySocial')->assignPoints('blog.read', $my->id);
-		}
-
-
-		return parent::hit($pk);
-	}
-
-	/**
-	 * Must only be bind when using POST data
-	 **/
-	function bind( $data , $post = false )
-	{
-		parent::bind( $data );
-
-		if( $post )
-		{
-			$acl		= EasyBlogACLHelper::getRuleSet();
-			$my			= JFactory::getUser();
-
-			// Some properties needs to be overriden.
-			$content	= JRequest::getVar('write_content_hidden', '', 'post', 'string', JREQUEST_ALLOWRAW );
-
-			if($this->id == 0)
-			{
-				// this is to check if superadmin assign blog author during blog creation.
-				if(empty($this->created_by))
-				{
-					$this->created_by	= $my->id;
-				}
-			}
-
-			//remove unclean editor code.
-			$pattern    = array('/<p><br _mce_bogus="1"><\/p>/i',
-								'/<p><br mce_bogus="1"><\/p>/i',
-								'/<br _mce_bogus="1">/i',
-								'/<br mce_bogus="1">/i',
-								'/<p><br><\/p>/i');
-			$replace    = array('','','','','');
-			$content    = preg_replace($pattern, $replace, $content);
-
-			// Search for readmore tags using Joomla's mechanism
-			$pattern = '#<hr\s+id=("|\')system-readmore("|\')\s*\/*>#i';
-			$pos	= preg_match( $pattern, $content );
-
-			if( $pos == 0 )
-			{
-				$this->intro	= $content;
-
-				// @rule: Since someone might update this post, we need to clear out the content
-				// if it doesn't contain anything.
-				$this->content	= '';
-			}
-			else
-			{
-				list( $intro , $main ) = preg_split( $pattern , $content, 2 );
-
-				$this->intro	= $intro;
-				$this->content	= $main;
-			}
-
-			$publish_up		= '';
-			$publish_down 	= '';
-			$created_date   = '';
-
-			$tzoffset       = EasyBlogDateHelper::getOffSet();
-			if(!empty( $this->created ))
-			{
-				$date = EasyBlogHelper::getDate( $this->created,  $tzoffset);
-				$created_date   = $date->toMySQL();
-			}
-
-			if($this->publish_down == '0000-00-00 00:00:00')
-			{
-				$publish_down   = $this->publish_down;
-			}
-			else if(!empty( $this->publish_down ))
-			{
-				$date = EasyBlogHelper::getDate( $this->publish_down, $tzoffset );
-				$publish_down   = $date->toMySQL();
-			}
-
-
-			if(!empty( $this->publish_up ))
-			{
-				$date = EasyBlogHelper::getDate($this->publish_up, $tzoffset);
-				$publish_up   = $date->toMySQL();
-			}
-
-			//default joomla date obj
-			$date		= EasyBlogHelper::getDate();
-
-			$this->created 		= !empty( $created_date ) ? $created_date : $date->toMySQL();
-			$this->modified		= $date->toMySQL();
-			$this->publish_up 	= (!empty( $publish_up)) ? $publish_up : $date->toMySQL();
-			$this->publish_down	= (empty( $publish_down ) ) ? '0000-00-00 00:00:00' : $publish_down;
-			$this->ispending 	= (empty($acl->rules->publish_entry)) ? 1 : 0;
-			$this->title		= trim($this->title);
-
-			$i	= 1;
-			while( $this->aliasExists() || empty($this->permalink) )
-			{
-				$this->permalink	= empty($this->permalink) ? $this->title : $this->permalink . '-' . $i;
-				$i++;
-			}
-
-			$this->permalink 	= EasyBlogRouter::generatePermalink( $this->permalink );
-
-		}
-
-		return true;
-	}
-
-	function aliasExists()
-	{
-		$db		= $this->getDBO();
-
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'permalink' ) . '=' . $db->Quote( $this->permalink );
-
-		if( $this->id != 0 )
-		{
-			$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
-		}
-		$db->setQuery( $query );
-
-		return $db->loadResult() > 0 ? true : false;
-	}
-
-	/**
-	 * Trashing a blog simply updates the state of the blog post.
-	 */
-	public function trash()
-	{
-		$this->published	= POST_ID_TRASHED;
-
-		// we need to set this date to empty so that the unpublish task will not pick up this entry.
-		$this->publish_down	= '0000-00-00 00:00:00';
-
-		return parent::store();
-	}
-
-	/**
-	 * Override delete routine from the parent as we need to run
-	 * some custom routines in our deletion
-	 */
-	public function delete($pk = null)
-	{
-		// @rule: Delete reports that are associated to this group since the blog post is deleted, it shouldn't be tied to any reports.
-		$this->deleteReports();
-
-		// @rule: Delete relationships from jomsocial stream
-		$this->removeStream();
-
-		$status		= parent::delete($pk);
-		$config 	= EasyBlogHelper::getConfig();
-
-		JPluginHelper::importPlugin( 'easyblog' );
-		$dispatcher = JDispatcher::getInstance();
-
-		// Run some cleanup for our own plugins
-		$dispatcher->trigger('onAfterEasyBlogDelete', array(&$this ));
-
-		// Delete all relations
-		$this->deleteBlogTags();
-		$this->deleteMetas();
-		$this->deleteComments();
-		$this->deleteTeamContribution();
-		$this->deleteFeedHistory();
-
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-
-		// Deduct points from respective systems
-		// @rule: Integrations with EasyDiscuss
-		EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.delete.blog' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_DELETE_BLOG' , $this->title ) );
-		EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.delete.blog' , $this->created_by );
-		EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.delete.blog' , $this->created_by );
-
-		// Assign EasySocial points
-		$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-		$easysocial->assignPoints( 'blog.remove' , $this->created_by );
-
-		// @task: Integrations with Jomsocial. Remove points necessarily.
-		if( $config->get( 'main_jomsocial_userpoint' ) )
-		{
-			$path	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'userpoints.php';
-			if( JFile::exists( $path ) )
-			{
-				require_once( $path );
-				CUserPoints::assignPoint( 'com_easyblog.blog.remove' , $this->created_by );
-			}
-		}
-
-		if( $easysocial->exists()
-			&& ( $config->get( 'integrations_easysocial_stream_newpost' ) || $config->get( 'integrations_easysocial_stream_featurepost' ) || $config->get( 'integrations_easysocial_stream_updatepost' ) ) )
-		{
-			$easysocial->deleteBlogStream( $this );
-		}
-
-		// @rule: Mighty Touch karma points
-		EasyBlogHelper::getHelper( 'MightyTouch' )->setKarma( $this->created_by , 'remove_blog' );
-
-		// @since 1.2
-		// AlphaUserPoints integrations. Remove points necessarily
-		if ( EasyBlogHelper::isAUPEnabled() )
-		{
-			AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_delete_blog', AlphaUserPointsHelper::getAnyUserReferreID( $this->created_by ) , '', JText::sprintf('COM_EASYBLOG_AUP_BLOG_DELETED', $this->title) );
-		}
-
-		// Delete group relations
-		EasyBlogHelper::getHelper( 'Groups' )->deleteContribution( $this->id );
-
-
-		if( $status )
-		{
-			//activity logging.
-			$activity   = new stdClass();
-			$activity->actor_id		= $this->created_by;
-			$activity->target_id	= '0';
-			$activity->context_type	= 'post';
-			$activity->context_id	= $this->id;
-			$activity->verb         = 'delete';
-			$activity->uuid         = $this->title;
-			EasyBlogHelper::activityLog( $activity );
-		}
-
-		return $status;
-	}
-
-	/**
-	 * When a post is deleted, remove it from the feed history as well
-	 *
-	 * @since	3.9
-	 * @access	public
-	 */
-	public function deleteFeedHistory()
-	{
-		$db = EasyBlogHelper::db();
-		$sql = EasyBlogHelper::getHelper('SQL');
-		$query = 'DELETE FROM ' . $sql->nameQuote('#__easyblog_feeds_history') . ' WHERE ' . $sql->nameQuote('post_id') . '=' . $db->Quote($this->id);
-
-		$db->setQuery($query);
-
-		$db->Query();
-	}
-
-	public function deleteReports()
-	{
-		$db		= EasyBlogHelper::db();
-		$query	= 'DELETE FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_reports' );
-		$query	.= ' WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'obj_id' ) . '=' . $db->Quote( $this->id );
-		$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'obj_type' ) . '=' . $db->Quote( EBLOG_REPORTING_POST );
-
-		$db->setQuery( $query );
-		$db->Query();
-	}
-
-	/**
-	 * When executed, remove any 3rd party integration records.
-	 */
-	public function removeStream()
-	{
-		jimport( 'joomla.filesystem.file' );
-
-		$config 	= EasyBlogHelper::getConfig();
-
-		// @rule: Detect if jomsocial exists.
-		$file 		= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'core.php';
-
-		if( JFile::exists( $file ) && $config->get( 'integrations_jomsocial_blog_new_activity' ) )
-		{
-			// @rule: Test if record exists first.
-			$db 	= EasyBlogHelper::db();
-			$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__community_activities' ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'app' ) . '=' . $db->Quote( 'com_easyblog' ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'cid' ) . '=' . $db->Quote( $this->id );
-
-			$db->setQuery( $query );
-			$exists	= $db->loadResult();
-
-			if( $exists )
-			{
-				$query	= 'DELETE FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__community_activities' ) . ' '
-						. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'app' ) . '=' . $db->Quote( 'com_easyblog' ) . ' '
-						. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'cid' ) . '=' . $db->Quote( $this->id );
-
-				$db->setQuery( $query );
-				$db->Query();
-			}
-		}
-	}
-
-	public function deleteTeamContribution()
-	{
-		$db 	= EasyBlogHelper::db();
-
-		$query	= 'DELETE FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_team_post' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=' . $db->Quote( $this->id );
-
-		$db->setQuery( $query );
-		$db->Query();
-		return true;
-	}
-
-	function deleteBlogTags()
-	{
-		$db = $this->_db;
-
-		if($this->id == 0)
-			return false;
-
-		$query  = 'DELETE FROM `#__easyblog_post_tag` WHERE `post_id` = ' . $db->Quote($this->id);
-		$db->setQuery($query);
-		$db->query();
-
-		return true;
-	}
-
-	function deleteMetas()
-	{
-		$db = $this->_db;
-
-		if($this->id == 0)
-			return false;
-
-		$query  = 'DELETE FROM `#__easyblog_meta` WHERE `content_id` = ' . $db->Quote($this->id);
-		$query  .= ' AND `type` = ' . $db->Quote('post');
-
-		$db->setQuery($query);
-		$db->query();
-
-		return true;
-	}
-
-	function deleteComments()
-	{
-		$db = $this->_db;
-
-		if($this->id == 0)
-			return false;
-
-		$query  = 'DELETE FROM `#__easyblog_comment` WHERE `post_id` = ' . $db->Quote($this->id);
-
-		$db->setQuery($query);
-		$db->query();
-
-		return true;
-	}
-
-	public function getBlogContribution()
-	{
-		$db		= EasyBlogHelper::db();
-
-		// @task: Test for external entries
-		$query	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_external' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=' . $db->Quote( $this->id );
-		$db->setQuery( $query );
-
-		$result	= $db->loadObject();
-
-		if( $result )
-		{
-			$table	= EasyBlogHelper::getTable( 'External' );
-			$table->bind( $result );
-
-			return $table;
-		}
-
-		// @task: Legacy support for prior to 3.5 since old tables uses #__easyblog_external_groups
-		$query	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_external_groups' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=' . $db->Quote( $this->id );
-		$db->setQuery( $query );
-
-		$result	= $db->loadObject();
-
-		if( !$result )
-		{
-			return false;
-		}
-
-		$table	= EasyBlogHelper::getTable( 'ExternalGroup' );
-		$table->bind( $result );
-
-		return $table;
-	}
-
-	/**
-	 * Updates a blog contribution
-	 */
-	function updateBlogContribution( $blogContribution , $contributionSource = 'easyblog' )
-	{
-		// If there's no data passed in here, we shouldn't process anything
-		if( empty( $blogContribution ) )
-		{
-			if($contributionSource == 'easyblog')
-			{
-				// Delete any existing contribution
-				$this->deleteTeamContribution();
-
-				// Delete any contributions from jomsocial event or group
-				if( EasyBlogHelper::getHelper( 'Event')->isEnabled() )
-				{
-					EasyBlogHelper::getHelper( 'Event' )->deleteContribution( $this->id );
-				}
-
-				if( EasyBlogHelper::getHelper( 'Groups')->useGroups() )
-				{
-					EasyBlogHelper::getHelper( 'Groups' )->deleteContribution( $this->id );
-				}
-			}
-			return false;
-		}
-
-		if( $contributionSource == 'easyblog' )
-		{
-			// Delete any existing contribution
-			$this->deleteTeamContribution();
-
-			if( !is_array( $blogContribution ) )
-			{
-				$blogContribution	= array( $blogContribution );
-			}
-
-			foreach($blogContribution as $bc)
-			{
-				$post   = array();
-				$post['team_id'] = $bc;
-				$post['post_id'] = $this->id;
-
-				$teamBlogPost		= EasyBlogHelper::getTable( 'TeamBlogPost', 'Table' );
-				$teamBlogPost->bind($post);
-
-				// we supress the error here. its okay, it safe to suppress it here.
-				@$teamBlogPost->store();
-			}
-
-			// Delete any contributions from jomsocial event or group
-			if( EasyBlogHelper::getHelper( 'Event')->isEnabled() )
-			{
-				EasyBlogHelper::getHelper( 'Event' )->deleteContribution( $this->id );
-			}
-
-			if( EasyBlogHelper::getHelper( 'Groups')->useGroups() )
-			{
-				EasyBlogHelper::getHelper( 'Groups' )->deleteContribution( $this->id );
-			}
-		}
-		else
-		{
-			if( $contributionSource == 'jomsocial.event' )
-			{
-				EasyBlogHelper::getHelper( 'Event' )->updateContribution( $this->id , $blogContribution , $contributionSource );
-			}
-			else
-			{
-				// Other than team, there's other 3rd party integrations. We leave it to the helper to process this.
-				EasyBlogHelper::getHelper( 'Groups' )->updateContribution( $this->id , $blogContribution , $contributionSource );
-			}
-		}
-		return true;
-	}
-
-	function getTeamContributed()
-	{
-		$db = $this->_db;
-
-		$query  = 'SELECT a.`team_id` FROM `#__easyblog_team_post` AS a';
-		$query  .= ' INNER JOIN `#__easyblog_team` AS b';
-		$query  .= '   ON a.team_id = b.id';
-		$query  .= ' WHERE a.`post_id` = ' . $db->Quote($this->id);
-
-		$db->setQuery($query);
-		$result = $db->loadResult();
-
-		return $result;
-	}
-
-	/**
-	 * Determines whether the current blog is accessible to
-	 * the current browser.
-	 *
-	 * @param	JUser	$my		Optional user object.
-	 * @return	boolean		True if accessible and false otherwise.
-	 **/
-	public function isAccessible()
-	{
-		$isAllowed = EasyBlogHelper::getHelper( 'Privacy' )->checkPrivacy( $this );
-
-		if( $isAllowed->allowed )
-		{
-			//now we check the category id
-			$catId  	= $this->category_id;
-			$category   = EasyBlogHelper::getTable('Category', 'Table' );
-			$category->load( $catId );
-
-			if( $category->private != '0')
-			{
-				$isAllowed = $category->checkPrivacy();
-			}
-		}
-
-		return $isAllowed;
-	}
-
-	/**
-	 * Determines whether the current blog is featured or not.
-	 *
-	 * @return	boolean		True if featured false otherwise
-	 **/
-	public function isFeatured()
-	{
-		if( $this->id == 0 )
-		{
-			return false;
-		}
-
-		static $loaded	= array();
-
-		if( !isset( $loaded[ $this->id ] ) )
-		{
-			$loaded[ $this->id ]	= EasyBlogHelper::isFeatured( 'post' , $this->id );
-		}
-		return $loaded[ $this->id ];
-	}
 
 	public function getMetaId()
 	{
@@ -796,17 +131,30 @@ class EasyBlogTableBlog extends EasyBlogTable
 		return $result;
 	}
 
-	/*
-	 * Process neccessary replacements here.
+	/**
+	 * Stores the blog post
 	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	public function store( $log = true )
+	public function store($log = true)
 	{
-		// @rule: Load language file from the front end.
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
+		// Load language file from the front end.
+		EB::loadLanguages();
 
-		$config 		= EasyBlogHelper::getConfig();
-		$my 			= JFactory::getUser();
+		// Whenever the blog post is stored, we need to clear the cache.
+		$cache = EB::getCache();
+		$cache->clean('com_easyblog');
+		$cache->clean('_system');
+		$cache->clean('page');
+
+		// Get easyblog's config
+		$config = EB::config();
+
+		// Get the current logged in user.
+		$my = JFactory::getUser();
 
 		// @rule: no guest allowed to create blog post.
 		if( JRequest::getVar('task', '') != 'cron' && JRequest::getVar('task', '') != 'cronfeed' && empty( $my->id ) )
@@ -834,7 +182,7 @@ class EasyBlogTableBlog extends EasyBlogTable
 			$isNew          = true;
 
 		// @rule: Get the rulesets for this user.
-		$acl 			= EasyBlogACLHelper::getRuleSet();
+		$acl 	= EB::acl();
 
 		// @rule: Process badword filters for title here.
 		$blockedWord 	= EasyBlogHelper::getHelper( 'String' )->hasBlockedWords( $this->title );
@@ -865,11 +213,10 @@ class EasyBlogTableBlog extends EasyBlogTable
 		}
 
 		// @rule: For edited blogs, ensure that they have permissions to edit it.
-		if( !$isNew && $this->created_by != JFactory::getUser()->id && !EasyBlogHelper::isSiteAdmin() && empty($acl->rules->moderate_entry) )
-		{
+		if (!$isNew && $this->created_by != JFactory::getUser()->id && !EasyBlogHelper::isSiteAdmin() && !$acl->get('moderate_entry')) {
 
 			// @task: Only throw error when this blog post is not a team blog post and it's not owned by the current logged in user.
-			$model 			= EasyBlogHelper::getModel( 'TeamBlogs' );
+			$model 			= EB::model( 'TeamBlogs' );
 			$contribution	= $model->getBlogContributed( $this->id );
 
 			if( !$contribution || !$model->checkIsTeamAdmin( JFactory::getUser()->id , $contribution->team_id ) )
@@ -877,13 +224,6 @@ class EasyBlogTableBlog extends EasyBlogTable
 				$this->setError( JText::_( 'COM_EASYBLOG_NO_PERMISSION_TO_EDIT_BLOG' ) );
 				return false;
 			}
-		}
-
-		// @rule: Every blog post must be assigned to a category
-		if( empty( $this->category_id ) )
-		{
-			$this->setError( JText::_( 'COM_EASYBLOG_DASHBOARD_SAVE_EMPTY_CATEGORY_ERROR' ) );
-			return false;
 		}
 
 		// Filter / strip contents that are not allowed
@@ -917,10 +257,6 @@ class EasyBlogTableBlog extends EasyBlogTable
 			$this->setError( JText::_( 'COM_EASYBLOG_DASHBOARD_SAVE_CONTENT_ERROR' ) );
 		}
 
-		// alway set this to false no matter what! TODO: remove this column.
-		$this->ispending    = '0';
-
-
 		$state  	= parent::store();
 		$source		= JRequest::getVar( 'blog_contribute_source' , 'easyblog' );
 
@@ -938,15 +274,17 @@ class EasyBlogTableBlog extends EasyBlogTable
 		$this->triggerAfterSave();
 
 		// @task: If auto featured is enabled, we need to feature the blog post automatically since the blogger is featured.
-		if( $config->get('main_autofeatured', 0) && EasyBlogHelper::isFeatured( 'blogger' , $this->created_by) && !EasyBlogHelper::isFeatured( 'post' , $this->id) )
+		if( $config->get('main_autofeatured', 0) && EB::isFeatured( 'blogger' , $this->created_by) && !EB::isFeatured( 'post' , $this->id) )
 		{
-			EasyBlogHelper::makeFeatured( 'post' , $this->id);
+			// just call the model file will do as we do not want to create stream on featured action at this migration.
+			$modelF = EB::model('Featured');
+			$modelF->makeFeatured('post', $this->id);
 		}
 
 		// @task: This is when the blog is either created or updated.
-		if( $source == 'easyblog' && $state && $this->published == POST_ID_PUBLISHED && $log )
+		if( $source == 'easyblog' && $state && $this->published == EASYBLOG_POST_PUBLISHED && $log )
 		{
-			$category = EasyBlogHelper::getTable( 'Category' );
+			$category = EB::table('Category');
 			$category->load( $this->category_id );
 
 			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
@@ -954,25 +292,14 @@ class EasyBlogTableBlog extends EasyBlogTable
 			if( $category->private == 0 )
 			{
 				// @rule: Add new stream item in jomsocial
-				EasyBlogHelper::addJomSocialActivityBlog( $this, $isNew );
+				EB::jomsocial()->addBlogActivity($this, $isNew);
 			}
 
 			// @rule: Add stream for easysocial
-			if($config->get( 'integrations_easysocial_stream_newpost' ) && $easysocial->exists())
+			if( $config->get( 'integrations_easysocial_stream_newpost' ) && $easysocial->exists() && $isNew )
 			{
-				$easysocial->createBlogStream($this , $isNew);
+				$easysocial->createBlogStream( $this , $isNew );
 			}
-
-			// @rule: Log new stream item into EasyBlog
-			$activity   = new stdClass();
-			$activity->actor_id		= $this->created_by;
-			$activity->target_id	= '0';
-			$activity->context_type	= 'post';
-			$activity->context_id	= $this->id;
-			$activity->verb         = ( $isNew ) ? 'add' : 'update';
-			$activity->uuid         = $this->title;
-			EasyBlogHelper::activityLog( $activity );
-
 
 			// update privacy in easysocial.
 			if( $config->get( 'integrations_easysocial_privacy' ) && $easysocial->exists() )
@@ -981,28 +308,15 @@ class EasyBlogTableBlog extends EasyBlogTable
 			}
 		}
 
-		// if this is an update and is set to unpublish, then we remove the stream from jomsocial.
-		if( $source == 'easyblog' && $state && $this->published == POST_ID_UNPUBLISHED && !$isNew && $log)
-		{
-			// @rule: Add new stream item in jomsocial
-			EasyBlogHelper::removeJomsocialActivity( $this );
-		}
 
 
-		if( $source == 'easyblog' && $state && $this->published == POST_ID_PUBLISHED && $isNew && $log )
+		if( $source == 'easyblog' && $state && $this->published == EASYBLOG_POST_PUBLISHED && $isNew && $log )
 		{
 			// @rule: Send email notifications out to subscribers.
-			$author 			= EasyBlogHelper::getTable( 'Profile' );
-			$author->load( $this->created_by );
+			$author = EB::user($this->created_by);
 
-			// @rule: Ping pingomatic
-			if( $config->get( 'main_pingomatic' ) )
-			{
-				if( !EasyBlogHelper::getHelper( 'Pingomatic' )->ping( $this->title , EasyBlogHelper::getExternalLink('index.php?option=com_easyblog&view=entry&id=' . $this->id, true) ) )
-				{
-					EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_DASHBOARD_SAVE_PINGOMATIC_ERROR') , 'error');
-				}
-			}
+			// Ping pingomatic
+			EB::pingomatic()->ping($this);
 
 			// Assign EasySocial points
 			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
@@ -1048,9 +362,6 @@ class EasyBlogTableBlog extends EasyBlogTable
 				$easysocial->addIndexerNewBlog( $this );
 			}
 
-			// @rule: Mighty Touch karma points
-			EasyBlogHelper::getHelper( 'MightyTouch' )->setKarma( $this->created_by , 'new_blog' );
-
 			// @rule: Integrations with EasyDiscuss
 			EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.new.blog' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_BLOG' , $this->title ) );
 			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.new.blog' , $this->created_by );
@@ -1073,14 +384,8 @@ class EasyBlogTableBlog extends EasyBlogTable
 									$link );
 			}
 
-			// @rule: Add points for AlphaUserPoints
-			if( EasyBlogHelper::isAUPEnabled() )
-			{
-				// get blog post URL
-				$url	= EasyBlogRouter::_('index.php?option=com_easyblog&view=entry&id='.$this->id);
-				$aupid	= AlphaUserPointsHelper::getAnyUserReferreID( $this->created_by );
-				AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_add_blog', $aupid , 'easyblog_add_blog_' . $this->id, JText::sprintf('COM_EASYBLOG_AUP_NEW_BLOG_CREATED', $url, $this->title) );
-			}
+			// AUP
+			EB::aup()->assignPoints('plgaup_easyblog_add_blog', $this->created_by, JText::sprintf('COM_EASYBLOG_AUP_NEW_BLOG_CREATED', $this->getPermalink(), $this->title));
 
 			// Update the isnew column so that if user edits this entry again, it doesn't send any notifications the second time.
 			$this->isnew 	= ( $this->published && $this->isnew ) ? 0 : 1;
@@ -1091,202 +396,12 @@ class EasyBlogTableBlog extends EasyBlogTable
 		return $state;
 	}
 
-	public function notify( $underApproval = false, $published = '1', $featured = false )
-	{
-		if( $this->blogpassword )
-		{
-			return false;
-		}
-
-		// @rule: Send email notifications out to subscribers.
-		$author 						= EasyBlogHelper::getTable( 'Profile' );
-		$author->load( $this->created_by );
-
-		$this->intro	= EasyBlogHelper::getHelper( 'Videos' )->strip( $this->intro );
-		$this->content	= EasyBlogHelper::getHelper( 'Videos' )->strip( $this->content );
-
-		$data[ 'blogTitle']				= $this->title;
-		$data[ 'blogAuthor']			= $author->getName();
-		$data[ 'blogAuthorAvatar' ]		= $author->getAvatar();
-		$data[ 'blogAuthorLink' ]		= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $author->id , false , true );
-		$data[ 'blogAuthorEmail' ]		= $author->user->email;
-
-		//lets test if intro contain any thing or not. ()
-		$intro = $this->intro ? $this->intro : $this->content;
-
-		$data[ 'blogIntro' ]			= $this->intro;
-		$data[ 'blogContent' ]			= $this->content;
-
-		$category     = EasyBlogHelper::getTable( 'category' );
-		$category->load( $this->category_id );
-		$data[ 'blogCategory' ]			= $category->title;
-
-		// Try to truncate introtext based on the configured settings because content is empty.
-		if( empty( $this->content ) )
-		{
-			$obj 			= clone( $this );
-			$obj->readmore	= EasyBlogHelper::requireReadmore( $obj );
-			EasyBlogHelper::truncateContent( $obj , false , true );
-			$data['blogIntro']			= $obj->text;
-		}
-
-		$data[ 'blogLink' ]				= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=entry&id='. $this->id, false, true);
-
-		$date							= EasyBlogDateHelper::dateWithOffSet( $this->created );
-		$data[ 'blogDate' ]				= EasyBlogDateHelper::toFormat( $date , '%A, %B %e, %Y' );
-
-		// If blog post is being posted from the back end and SH404 is installed, we should just use the raw urls.
-		$sh404exists	= EasyBlogRouter::isSh404Enabled();
-
-		if( JFactory::getApplication()->isAdmin() && $sh404exists )
-		{
-			$data[ 'blogLink' ]			= JURI::root() . 'index.php?option=com_easyblog&view=entry&id=' . $this->id;
-			$data[ 'blogAuthorLink' ]	= JURI::root() . 'index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $author->id;
-		}
-
-		$config 		= EasyBlogHelper::getConfig();
-		$emailBlogTitle = JString::substr( $this->title , 0 , $config->get( 'main_mailtitle_length' ) );
-		$emailTitle 	= JText::sprintf( 'COM_EASYBLOG_EMAIL_TITLE_NEW_BLOG_ADDED_WITH_TITLE' ,  $emailBlogTitle ) . ' ...';
-
-		$notification	= EasyBlogHelper::getHelper( 'Notification' );
-		$emails 		= array();
-
-		// @rule: Fetch custom emails defined at the back end.
-		if( $config->get( 'notification_blogadmin' ) )
-		{
-			if( $config->get( 'custom_email_as_admin' ) )
-			{
-				$notification->getCustomEmails( $emails );
-			}
-			else
-			{
-				$notification->getAdminEmails( $emails );
-			}
-		}
-
-		// @task: If this blog post is a team posting, we shouldn't send notification to everyone.
-		$model 			= EasyBlogHelper::getModel( 'TeamBlogs' );
-		$contribution	= $model->getBlogContributed( $this->id );
-
-		if( $contribution )
-		{
-			$team		= EasyBlogHelper::getTable( 'TeamBlog' );
-			$team->load( $contribution->team_id );
-
-			$contribution->access	= $team->access;
-		}
-		else
-		{
-			$contribution			= new stdClass();
-			$contribution->access	= EBLOG_TEAMBLOG_ACCESS_EVERYONE;
-		}
-
-		if( !$underApproval && $published && $config->get( 'mailchimp_campaign' ) )
-		{
-			$mailchimp 	= EasyBlogHelper::getHelper( 'Mailchimp' );
-
-			$mailchimp->notify( $emailTitle , $data , $this );
-
-			return true;
-		}
-
-		// if( !$underApproval && empty($this->send_notification_emails) )
-		// {
-		// 	return;
-		// }
-
-		if( !empty($this->send_notification_emails) )
-		{
-			// @task: This is when this blog post is posted into a team.
-			if( $contribution && $config->get( 'notification_teamsubscriber' ) && isset( $contribution->team_id ) )
-			{
-				// @task: Send emails to users who have subscribed to the team
-				$notification->getTeamSubscriberEmails( $emails , $this );
-
-				// @task: Send emails to users who is a member of the team
-				$notification->getTeamUserEmails( $emails , $contribution->team_id );
-			}
-
-			// @task: Only send emails to these group of users provided that, it is not a team posting or private team posting.
-			if( !$contribution || $contribution->access != EBLOG_TEAMBLOG_ACCESS_MEMBER )
-			{
-				// @rule: Get all email addresses for the whole site.
-				if( $config->get( 'notification_allmembers' ) )
-				{
-					$notification->getAllEmails( $emails );
-				}
-				else
-				{
-					// @rule: Send to subscribers that subscribe to the bloggers
-					if( $config->get( 'notification_blogsubscriber' ) )
-					{
-						$notification->getBloggerSubscriberEmails( $emails , $this );
-					}
-
-					// @rule: Send to subscribers that subscribed to the category
-					if( $config->get( 'notification_categorysubscriber' ) )
-					{
-						$notification->getCategorySubscriberEmails( $emails , $this );
-					}
-
-					// @rule: Send notification to all site's subscribers
-					if($config->get('notification_sitesubscriber') )
-					{
-						$notification->getSiteSubscriberEmails( $emails , $this );
-					}
-				}
-			}
-		}
-
-		// @rule: We need to remove the email of the creator since the creator of this blog post should not receive the email.
-		if( isset( $emails[ $author->user->email ] ) )
-		{
-			unset( $emails[ $author->user->email ] );
-		}
-
-		// @task: Add the emails into the mail queue now.
-		if( !empty($published) )
-		{
-			if( !empty( $emails ) )
-			{
-				$notification->send( $emails , $emailTitle , 'email.blog.new' , $data );
-			}
-		}
-		// @task: If the blog is featured, notification will be sent to author
-		if ($featured) {
-			$authorEmail		= array();
-
-			$obj 				= new stdClass();
-			$obj->unsubscribe	= false;
-			$obj->email 		= $author->user->email;
-
-			$authorEmail[ $author->user->email ]	= $obj;
-
-			$notification->send( $authorEmail , JText::_('COM_EASYBLOG_EMAIL_TITLE_NEW_BLOG_FEATURED')  , 'email.blog.featured' , $data );
-		}
-
-		// @task: If this blog post is under approval, we need to send email to the site admin
-		if( $underApproval )
-		{
-			// We know that this blog post requires moderation. Send notification to the author and let them know, that it is being moderated.
-			$authorEmail		= array();
-
-			$obj 				= new stdClass();
-			$obj->unsubscribe	= false;
-			$obj->email 		= $author->user->email;
-
-			$authorEmail[ $author->user->email ]	= $obj;
-
-			$notification->send( $authorEmail , JText::_('COM_EASYBLOG_EMAIL_TITLE_NEW_BLOG_APPROVED')  , 'email.blog.approved' , $data );
-		}
-	}
-
 	public function createMeta( $key , $desc )
 	{
 		$id		= $this->getMetaId();
 
 		// @rule: Save meta tags for this entry.
-		$meta		= EasyBlogHelper::getTable( 'Meta' );
+		$meta		= EB::table('Meta');
 		$meta->load( $id );
 
 		$meta->set( 'keywords'		, $key );
@@ -1294,6 +409,37 @@ class EasyBlogTableBlog extends EasyBlogTable
 		$meta->set( 'content_id'	, $this->id );
 		$meta->set( 'type'			, META_TYPE_POST );
 		$meta->store();
+	}
+
+	/**
+	 * Retrieves the external permalink for this blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getExternalPermalink()
+	{
+		static $link 	= null;
+
+		if (is_null($link)) {
+
+			// If blog post is being posted from the back end and SH404 is installed, we should just use the raw urls.
+			$sh404 = EasyBlogRouter::isSh404Enabled();
+
+			$link = EasyBlogRouter::getRoutedURL('index.php?option=com_easyblog&view=entry&id=' . $this->id, true, true);
+
+			$app = JFactory::getApplication();
+
+			// If this is being submitted from the back end we do not want to use the sef links because the URL will be invalid
+			if ($app->isAdmin() && $sh404) {
+				$link = rtrim( JURI::root() , '/' ) . $link;
+			}
+
+		}
+
+		return $link;
 	}
 
 	public function getExternalBlogLink( $url )
@@ -1311,78 +457,17 @@ class EasyBlogTableBlog extends EasyBlogTable
 		return $link;
 	}
 
-	public function processTrackbacks()
-	{
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-
-		$model 	= EasyBlogHelper::getModel( 'TrackbackSent' );
-
-		// get lists of trackback URLs based on blog ID
-		$trackbacks		= $model->getSentTrackbacks( $this->id , true );
-
-		require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'trackback.php' );
-		require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'router.php' );
-
-		if( !$trackbacks )
-		{
-			return false;
-		}
-
-		foreach( $trackbacks as $trackback )
-		{
-			$author	= EasyBlogHelper::getTable( 'Profile' );
-			$author->load( $this->created_by );
-
-			$tb		= new EasyBlogTrackBack( $author->getName() , $author->getName() , 'UTF-8' );
-			$text	= empty( $this->intro ) ? $this->content : $this->intro;
-			$url	= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=entry&id=' . $this->id , false , true );
-
-			if( $tb->ping( $trackback->url , $url , $this->title , $text ) )
-			{
-				$table		= EasyBlogHelper::getTable( 'TrackbackSent' );
-				$table->load( $trackback->id );
-				$table->markSent();
-			}
-		}
-
-		return true;
-	}
-
 	/**
-	 * Method to process trackbacks
-	 */
-	public function storeTrackbacks( $urls )
-	{
-		if( empty( $urls ) )
-		{
-			return false;
-		}
-
-		$urls 	= str_replace(array("\r\n", "\r", "\n"), '[br]', $urls);
-		$rows 	= explode( '[br]' , $urls );
-
-		foreach( $rows as $row )
-		{
-			$trackback	= EasyBlogHelper::getTable( 'TrackbackSent' , 'Table' );
-
-			if( !$trackback->load( $row , true , $this->id ) )
-			{
-				$trackback->post_id		= $this->id;
-				$trackback->url			= $row;
-				$trackback->sent		= 0;
-				$trackback->store();
-			}
-		}
-
-		return true;
-	}
-
-	/**
-	 * Get's necessary asset values from this post.
+	 * Retrieves asset associated with the post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
 	public function getAsset()
 	{
-		$asset 	= EasyBlogHelper::getTable( 'BlogAsset' );
+		$asset 	= EB::table('BlogAsset');
 		$asset->loadByPost( $this->id );
 
 		return $asset;
@@ -1430,90 +515,144 @@ class EasyBlogTableBlog extends EasyBlogTable
 	}
 
 	/**
-	 * This method should be invoked after a ->store is called so that it will process the tags.
+	 * Associates this blog post with a list of categories
 	 *
+	 * @since	4.0
 	 * @access	public
-	 * @param	Array	$tags	An array of tag titles.
+	 * @param	string
+	 * @return
 	 */
-	public function processTags( $tags , $isNew = true )
+	public function processCategories($categories, $primaryCategory)
 	{
 		// @rule: If this item is still dirty (uncleaned), we do not want to allow anything to pass through.
-		if( !$this->id || is_null( $this->id ) )
-		{
+		if (!$this->id || is_null($this->id)) {
 			return false;
 		}
 
-		// @rule: Get the rulesets for this user.
-		$acl 		= EasyBlogACLHelper::getRuleSet();
+		// Ensure that the caller is passing us a list of categories
+		if (empty($categories)) {
+			return false;
+		}
 
-		// @task: Delete existing associated tags.
-		$tagModel 		= EasyBlogHelper::getModel( 'Tags' );
-		$postTagModel	= EasyBlogHelper::getModel( 'PostTag' );
+		// Get the acl for this current user.
+		$acl = EB::acl();
 
-		$postTagModel->deletePostTag( $this->id );
+		// Delete any categories associated with this blog post
+		$model = EB::model('Categories');
+		$model->deleteAssociation($this->id);
 
-		// @rule: Only process default tags when the blog post is new.
-		if( $isNew )
-		{
-			// @rule: These are the tags that is configured to be included in the posts.
-			$defaultTags	= $tagModel->getDefaultTags();
+		foreach ($categories as $categoryId) {
+			$categoryId = (int) $categoryId;
 
-			if( !empty( $defaultTags ) )
-			{
-				foreach( $defaultTags as $key => $tagId )
-				{
-					// Associate the default tags with this blog item.
-					$postTagModel->add( $tagId , $this->id , EasyBlogHelper::getDate()->toMySQL() );
+			$table = EB::table('PostCategory');
+			$table->post_id = $this->id;
+			$table->category_id = $categoryId;
+			$table->primary = $categoryId == $primaryCategory;
+
+			$table->store();
+		}
+	}
+
+	/**
+	 * Processes a list of tags to be associated with the post.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function processTags($tags, $bindDefaultTags = true)
+	{
+		// If this item is still dirty (uncleaned), we do not want to allow anything to pass through.
+		if (!$this->id || is_null($this->id)) {
+			return false;
+		}
+
+		// If there's no tags, skip this
+		if (!$tags) {
+			return false;
+		}
+
+		// Get the rulesets for this user.
+		$acl = EB::acl();
+
+		// Delete existing associated tags.
+		$tagModel = EB::model('Tags');
+		$postTagModel = EB::model('PostTag');
+
+		// Delete related tags with this post first.
+		$postTagModel->deletePostTag($this->id);
+
+		// Cleanup whitespaces from the tags
+		foreach ($tags as &$tag) {
+			$tag = trim($tag);
+		}
+
+		// These are the tags that is configured to be included in the posts.
+		if ($bindDefaultTags) {
+
+			$defaultTags = $tagModel->getDefaultTagsTitle();
+
+			if (!empty($defaultTags)) {
+
+				$date = EB::date();
+
+				// Associate the default tags with this blog item.
+				foreach ($defaultTags as $title) {
+
+					$tags[] = $title;
 				}
 			}
 		}
+
+		// Cleanup the unique tags
+		$tags = array_unique($tags);
 
 		// @rule: Process user defined tags now
-		if( !empty( $tags ) )
-		{
+		if (!empty($tags)) {
+
 			// What if the default tag already included this?
-			foreach( $tags as $title )
-			{
-				// @rule: Skip empty tags
-				if( empty( $title ) )
-				{
+			foreach ($tags as $title) {
+
+				if (!$title) {
 					continue;
 				}
 
-				$table	= EasyBlogHelper::getTable( 'Tag' );
-				$exists	= $table->exists( $title );
+				// Load the tag table
+				$table = EB::table('Tag');
+				$exists = $table->load($title, true);
 
-				// @rule: Skip this if the user doesn't have create acl rules.
-				if( !$exists && !$acl->rules->create_tag )
-				{
+				// Skip this tag if the user is not allowed to create tags and tag does not exist on site.
+				if (!$exists && !$acl->get('create_tag')) {
 					continue;
 				}
 
-				if( !$exists )
-				{
-					// @rule: Store the tags first.
-					$table->set( 'created_by'	, $this->created_by );
-					$table->set( 'title'		, JString::trim( $title ) );
-					$table->set( 'created'		, EasyBlogHelper::getDate()->toMySQL() );
-					$table->set( 'published'	, 1 );
-					$table->set( 'status' 		, '' );
+				if (!$exists) {
+					$table->created_by = $this->created_by;
+					$table->title = $title;
+					$table->created = EB::date()->toSql();
+					$table->published = true;
+					$table->status = '';
 					$table->store();
 				}
-				else
-				{
-					$table->load( $title , true );
 
-					// @rule: Test if this tag is already associated since it may be the default tag.
-					if( $postTagModel->isAssociated( $this->id , $table->id ) )
-					{
-						continue;
-					}
-				}
-
-				// @rule: Add the association of tags here.
-				$postTagModel->add( $table->id , $this->id , EasyBlogHelper::getDate()->toMySQL() );
+				// Add the association of tags here.
+				$postTagModel->add($table->id, $this->id, EB::date()->toSql());
 			}
 		}
+	}
+
+	/**
+	 * Sets the primary category for the blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function setPrimaryCategory($id)
+	{
+		return $this->processCategories(array($id), $id);
 	}
 
 	/**
@@ -1522,7 +661,7 @@ class EasyBlogTableBlog extends EasyBlogTable
 	 * @access	private
 	 * @param	TableBlog	$blog 	The blog's database row.
 	 */
-	public function saveTags( $tags )
+	public function saveTags($tags)
 	{
 		// If there's no tags, just skip the whole block
 		if( !$tags )
@@ -1531,7 +670,7 @@ class EasyBlogTableBlog extends EasyBlogTable
 		}
 
 		$config 	= EasyBlogHelper::getConfig();
-		$acl 		= EasyBlogACLHelper::getRuleSet();
+		$acl 		= EB::acl();
 
 		// @rule: Needed to add points for each tag creation
 		if( $config->get( 'main_jomsocial_userpoint' ) )
@@ -1549,7 +688,7 @@ class EasyBlogTableBlog extends EasyBlogTable
 			$tags 	= array( $tags );
 		}
 
-		$model 		= EasyBlogHelper::getModel( 'PostTag' );
+		$model 		= EB::model( 'PostTag' );
 
 		foreach( $tags as $title )
 		{
@@ -1559,51 +698,64 @@ class EasyBlogTableBlog extends EasyBlogTable
 				continue;
 			}
 
-			$tag	= EasyBlogHelper::getTable( 'Tag' );
+			$tag	= EB::table('Tag');
 			$tag->load( $title , true );
 
-			if( !$tag->exists( $title ) && $acl->rules->create_tag )
-			{
+			if (!$tag->exists( $title ) && $acl->get('create_tag')) {
 				$tag->created_by 	= JFactory::getUser()->id;
 				$tag->title 		= $title;
-				$tag->created 		= EasyBlogHelper::getDate()->toMySQL();
+				$tag->created 		= EB::date()->toMySQL();
 				$tag->store();
 			}
 
 			// Add the association for the tag.
-			$model->add( $tag->id , $blog->id , EasyBlogHelper::getDate()->toMySQL() );
+			$model->add( $tag->id , $blog->id , EB::date()->toMySQL() );
 		}
 
 		return true;
 	}
 
-	public function autopost( $userSites , $centralizedSites = array() )
+	/**
+	 * Allows caller to explicitly auto post blog posts into social sites
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function autopost($sites = array())
 	{
-		$config 	= EasyBlogHelper::getConfig();
-		$allowed	= array( EBLOG_OAUTH_LINKEDIN , EBLOG_OAUTH_FACEBOOK , EBLOG_OAUTH_TWITTER );
-
-		// @rule: Process centralized options first
-		// See if there are any global postings enabled.
-		if( !empty( $centralizedSites ) )
-		{
-			foreach( $centralizedSites as $item )
-			{
-				if( $config->get( 'integrations_' . $item . '_centralized' ) )
-				{
-					EasyBlogSocialShareHelper::share( $this , constant( 'EBLOG_OAUTH_' . JString::strtoupper( $item ) ) , true );
-				}
-			}
+		// Ensure that the sites are not empty
+		if (!$sites) {
+			return false;
 		}
 
-		if( !empty( $userSites ) )
-		{
-			foreach( $userSites as $site )
-			{
-				if( in_array( $site , $allowed ) && $config->get( 'integrations_' . $site ) )
-				{
-					EasyBlogSocialShareHelper::share( $this , constant( 'EBLOG_OAUTH_' . JString::strtoupper( $site ) ) );
-				}
+		// Get EasyBlog's configuration
+		$config = EB::config();
+
+		// should add chechkfunction for multiple category here
+		$category = EB::table('Category');
+		$category->load($this->getPrimaryCategory());
+
+		if (!$category->autopost) {
+			return;
+		}
+
+		// These are the allowed auto posting sites
+		$allowed = array(EBLOG_OAUTH_LINKEDIN, EBLOG_OAUTH_FACEBOOK, EBLOG_OAUTH_TWITTER);
+
+		foreach ($sites as $site) {
+
+			// Skip this if the site is not known
+			if (!in_array($site, $allowed)) {
+				continue;
 			}
+
+			// Process the centralize site options first
+			// EB::oauth()->share($this, $site, true);
+
+			// Process the user's options since users can also setup their own auto posting
+			EB::oauth()->share($this, $site, false);
 		}
 	}
 
@@ -1649,6 +801,41 @@ class EasyBlogTableBlog extends EasyBlogTable
 	}
 
 	/**
+	 * Retrieves a list of custom fields associated to this blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getCustomFields()
+	{
+		$categories = $this->getCategories();
+
+		if (!$categories) {
+			return false;
+		}
+
+		$fields = array();
+		$hasFields = false;
+
+		foreach ($categories as $category) {
+			$categoryFields = $category->getCustomFields();
+
+			if ($categoryFields !== false) {
+				$fields[] = $categoryFields;
+				$hasFields = true;
+			}
+		}
+
+		if (!$hasFields) {
+			return false;
+		}
+
+		return $fields;
+	}
+
+	/**
 	 * This method invokes the trigger for events after the blog is saved
 	 *
 	 */
@@ -1685,108 +872,103 @@ class EasyBlogTableBlog extends EasyBlogTable
 		unset( $this->text );
 	}
 
-	public function isNew()
-	{
-		// @rule: Determine if this record is new or not.
-		$isNew  		= ( empty( $this->id) ) ? true : false;
-
-		// if this is blog edit, then we should see the column isnew to determine
-		// whether the post is really new or not.
-		if( !$isNew )
-		{
-			$isNew 	= $this->isnew;
-		}
-
-		return $isNew;
-	}
-
 	/**
-	 * Retrieves the blog image for this post. Each post may only contain 1 blog image.
+	 * Retrieves the blog image for this blog post
 	 *
-	 * @param	null
-	 * @return 	EasyBlogImage
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	public function getImage()
+	public function getImage($size = 'original')
 	{
-		static $image	= array();
+		static $cache	= array();
 
-		if( !isset( $image[ $this->id ] ) )
-		{
-			require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'image.php' );
-			require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR .  'json.php' );
+		$index = $this->id . '-' . $size;
 
-			if( !$this->image )
-			{
-				$image[ $this->id ]		= false;
+		// Default blog image
+		$default = rtrim(JURI::root(), '/') . '/components/com_easyblog/themes/wireframe/images/placeholder-image.png';
 
-				return false;
+		if (!isset($cache[$index])) {
+
+			// If there's no image data for this post, skip this altogether
+			if (!$this->image) {
+				$cache[$index] = $default;
+
+				return $cache[$index];
 			}
 
-			if( !class_exists( 'Services_JSON' ) )
-			{
-				require_once( JPATH_ROOT . '/components/com_easyblog/classes/json.php' );
-			}
+			// Get the json object from the image property
+			$data = json_decode($this->image);
 
-			$json 	= new Services_JSON();
+			// If the json data is corrupted, just load the default
+			if (!$data) {
+				$cache[$index] = $default;
 
-			$imageObject	= $json->decode( $this->image );
-
-			if( !$imageObject )
-			{
-				$image 		= false;
-
-				return false;
-			}
-
-			if(empty($imageObject->place) && empty($iamgeObject->path)) {
-				$image = false;
-				return false;
+				return $cache[$index];
 			}
 
 			// Get the configuration object.
-			$cfg 			= EasyBlogHelper::getConfig();
+			$config	= EB::config();
 
 			// Let's see where should we find for this.
-			$storagePath 	= '';
-			$storageURI		= '';
+			$path = '';
+			$url = '';
 
-			if( isset( $imageObject->place ) && $imageObject->place == 'shared' )
-			{
-				$storagePath	= JPATH_ROOT . DIRECTORY_SEPARATOR . trim( $cfg->get( 'main_shared_path' ) , '/\\');
-				$storageURI		= rtrim( JURI::root() , '/' ) . '/' . trim( str_ireplace( '\\' , '/' , $cfg->get( 'main_shared_path' ) ) , '/\\');
+			// If the place is on shared, we need to get the appropriate paths
+			if (isset($data->place) && $data->place == 'shared') {
+				$shared	= trim(str_ireplace('\\', '/', $config->get('main_shared_path')), '/\\');
+				$path = JPATH_ROOT . '/' . $shared;
+				$url = rtrim(JURI::root(), '/') . '/' . $shared;
 			}
-			else
-			{
-				$place 			= $imageObject->place;
-				$place 			= explode( ':' , $place );
-				$place[1]		= (int) $place[1];
 
-				$path 			= $imageObject->path;
+			// If the place is users folder, get the appropraite paths
+			if ($data->place != 'shared') {
+				$place = explode(':', $data->place);
+				$img = trim($config->get('main_image_path'), '/\\');
 
-				// Set the storage path
-				$storagePath	= JPATH_ROOT . DIRECTORY_SEPARATOR . trim( $cfg->get( 'main_image_path' ) , '/\\') . DIRECTORY_SEPARATOR . $place[1];
-
-				// @task: Set the storage URI
-				$storageURI		= rtrim( JURI::root() , '/' ) . '/' . trim( $cfg->get( 'main_image_path' ) , '/\\') . '/' . $place[1];
+				$path = JPATH_ROOT . '/' . $img . '/' . $place[1];
+				$url = rtrim(JURI::root(), '/') . '/' . $img . '/' . $place[1];
 			}
 
 			// Ensure that the item really exist before even going to do anything on the original image.
 			// If the image was manually removed from FTP or any file explorer, this shouldn't yield any errors.
-			$itemPath 			= $storagePath . DIRECTORY_SEPARATOR . trim( $imageObject->path , '/\\' );
+			$exists = JFile::exists($path . '/' . $data->path);
 
-			if( !JFile::exists( $itemPath ) )
-			{
-				// @TODO: Perhaps we should update $this->image with an empty value since image no longer exists.
-				$image[ $this->id ]		= false;
+			// If the blog image file doesn't exist, we use the default
+			if (!$exists) {
+				$cache[$index] = $default;
 
-				return false;
+				return $cache[$index];
 			}
 
+			$image = EB::blogimage($data->path, $path, $url);
 
-			$image[ $this->id ]			= new EasyBlogImage( $imageObject->path , $storagePath , $storageURI );
+			$cache[$index] = $image->getSource($size);
 		}
 
-		return $image[ $this->id ];
+		return $cache[$index];
+	}
+
+	/**
+	 * Get total number of comments for this blog post
+	 *
+	 * @access	public
+	 * @param	null
+	 * @return	int
+	 */
+	public function getTotalComments()
+	{
+		static $comments = array();
+
+		if (!isset($comments[$this->id])) {
+
+			$count 	= EB::comment()->getCommentCount($this);
+
+			$comments[$this->id]	= $count;
+		}
+
+		return $comments[$this->id];
 	}
 
 	/**
@@ -1798,11 +980,355 @@ class EasyBlogTableBlog extends EasyBlogTable
 	 */
 	public function getTags()
 	{
-		// @task: Get the tags relations model.
-		$model	= EasyBlogHelper::getModel( 'PostTag' );
+		static $instances = array();
 
-		$result	= $model->getBlogTags( $this->id );
+		if (!isset($instances[$this->id])) {
 
-		return $result;
+			$model 	= EB::model('PostTag');
+			$tags = $model->getBlogTags($this->id);
+
+			$instances[$this->id]	= $tags;
+		}
+
+		return $instances[$this->id];
+	}
+
+	/**
+	 * Allows caller to lock a blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return
+	 */
+	public function unlock()
+	{
+		$this->locked 	= false;
+
+		$this->store(false);
+	}
+
+	/**
+	 * Allows caller to lock a blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return
+	 */
+	public function lock()
+	{
+		$this->locked 	= true;
+
+		$this->store(false);
+	}
+
+	/**
+	 * Initializes the header of the html page
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function renderHeaders()
+	{
+		$doc = JFactory::getDocument();
+
+		// Set meta tags for post
+		EB::setMeta($this->id, META_TYPE_POST);
+
+		// If there's robots set on the page, initialize it
+		if ($this->robots) {
+			$doc->setMetaData('robots', $this->robots);
+		}
+
+		// If there's a copyright notice, add it into the header
+		if ($this->copyrights) {
+			$doc->setMetaData('rights', $this->copyrights);
+		}
+
+		// Determines if the user wants to print this page
+		$print = JFactory::getApplication()->input->get('print', 0, 'int');
+
+		// Add noindex for print view by default.
+		if ($print) {
+			$doc->setMetadata('robots', 'noindex,follow');
+		}
+
+		$config = EB::config();
+		$title 	= EB::getPageTitle($config->get('main_title'));
+
+		if (empty($title)) {
+			$doc->setTitle($this->title);
+		} else {
+			$doc->setTitle($this->title . ' - ' . $title );
+		}
+	}
+
+	/**
+	 * Prepares the content before displaying it out.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return
+	 */
+	public function prepareContent()
+	{
+		// Get the application
+		$app = JFactory::getApplication();
+
+		// Load up Joomla's dispatcher
+		$dispatcher	= JDispatcher::getInstance();
+
+		// @trigger: onEasyBlogPrepareContent
+		EB::triggers()->trigger('easyblog.prepareContent', $this);
+
+		// Load our own content
+		$config = EB::config();
+
+		// Because joomla plugins are looking at the following properties, we need to mimic this
+		// ->introtext
+		// ->text
+		$this->introtext = $this->intro;
+		$this->text = $this->intro . $this->content;
+
+		// @trigger: onEasyBlogPrepareContent
+		EB::triggers()->trigger('prepareContent', $this);
+
+		// For additional joomla content triggers, we need to store the output in various "sections"
+		//onAfterDisplayTitle, onBeforeDisplayContent, onAfterDisplayContent trigger start
+		$this->event		= new stdClass();
+
+		// @trigger: onAfterDisplayTitle / onContentAfterTitle
+		$results	= EB::triggers()->trigger('afterDisplayTitle', $this);
+		$this->event->afterDisplayTitle = JString::trim(implode("\n", $results));
+
+		// @trigger: onBeforeDisplayContent / onContentBeforeDisplay
+		$results	= EB::triggers()->trigger('beforeDisplayContent', $this);
+		$this->event->beforeDisplayContent = JString::trim(implode("\n", $results));
+
+		// @trigger: onAfterDisplayContent / onContentAfterDisplay
+		$results	= EB::triggers()->trigger('afterDisplayContent', $this);
+		$this->event->afterDisplayContent	= JString::trim(implode("\n", $results));
+
+		// Once the trigger is completed, we will need to re-assign the content back
+		$this->intro		= $this->introtext;
+		$this->content		= $this->text;
+
+		// If necessary, add nofollow to the anchor links of the blog post
+		if ($config->get('main_anchor_nofollow')) {
+			$this->content 	= EasyBlogHelper::addNoFollow($this->content);
+		}
+
+
+		// Once the whole fiasco of setting the attributes back and forth is done, unset unecessary attributes.
+		// unset($this->introtext);
+		// unset($this->text);
+	}
+
+	/**
+	 * Verifies the password of the blog
+	 *
+	 * @since	1.2
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function verifyPassword()
+	{
+		$session 	= JFactory::getSession();
+		$password 	= $session->get('PROTECTEDBLOG_' . $this->id, '', 'EASYBLOG');
+
+		if ($password == $this->blogpassword) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Retrieves assets associated with the blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAssets()
+	{
+		$model = EB::model('Assets', true);
+		$assets = $model->getPostAssets($this->id);
+
+		return $assets;
+	}
+
+	/**
+	 * Retrieves the category name for this blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getCategory()
+	{
+		static $loaded	= array();
+
+		if (!isset($loaded[$this->category_id])) {
+			$category 	= EB::table('Category');
+			$category->load($this->category_id);
+
+			$loaded[$this->category_id]	= $category;
+		}
+
+		return $loaded[$this->category_id];
+	}
+
+	/**
+	 * Determines if a blog post has a location value
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function hasLocation()
+	{
+		if ($this->address && $this->latitude && $this->longitude) {
+			return true;
+		}
+
+		return false;
+	}
+
+	public function isPublished()
+	{
+		// If the blog states falls under either of this, skip this
+		$disallowed 	= array(EASYBLOG_POST_UNPUBLISHED, EASYBLOG_POST_SCHEDULED, EASYBLOG_POST_DRAFT, EASYBLOG_POST_TRASHED);
+
+		if (!in_array($this->published, $disallowed)) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Determines whether the current blog is accessible to
+	 * the current browser.
+	 *
+	 * @param	JUser	$my		Optional user object.
+	 * @return	boolean		True if accessible and false otherwise.
+	 **/
+	public function isAccessible()
+	{
+		$allowed = EB::privacy()->checkPrivacy($this);
+
+		if (!$allowed->allowed) {
+			return $allowed;
+		}
+
+
+		// Check against the primary category permissions
+		$category = $this->getPrimaryCategory();
+
+		if ($category->private != 0) {
+			$allowed = $category->checkPrivacy();
+		}
+
+		return $allowed;
+	}
+
+	/**
+	 * Determines whether the current blog is featured or not.
+	 *
+	 * @since	4.0
+	 * @return	boolean		True if featured false otherwise
+	 **/
+	public function isFeatured()
+	{
+		if (!$this->id) {
+			return false;
+		}
+
+		static $featured	= array();
+
+		if (!isset($featured[$this->id])) {
+
+			$model 		= EB::model('Blog');
+			$isFeatured	= $model->isFeatured($this->id);
+
+			$featured[$this->id]	= $isFeatured;
+		}
+
+		return $featured[$this->id];
+	}
+
+	/**
+	 * Determines if the blog post is password protected to the current viewer
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isPasswordProtected()
+	{
+		$config = EB::config();
+
+
+		if($config->get('main_password_protect', true) && !empty($this->blogpassword)) {
+
+			if (!EB::verifyBlogPassword($this->blogpassword, $this->id)) {
+				return true;
+			}
+
+		}
+		return false;
+	}
+
+	/**
+	 * Determines if the blog post is a new blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isNew()
+	{
+		$isNew = !$this->id ? true : false;
+
+		// If this post is edited, we should then check the `isnew` column to determine if this blog post is really new or now.
+		// Because the blog post may be stored but it might not be processed as "new" yet.
+		if (!$isNew) {
+			$isNew = $this->isnew;
+		}
+
+		return $isNew;
+	}
+
+	/**
+	 * Determines if the blog post is imported from the feed
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isFromFeed()
+	{
+		$db 	= EB::db();
+
+		$query		= array();
+		$query[]	= 'SELECT COUNT(1) FROM ' . $db->quoteName('#__easyblog_feeds_history');
+		$query[]	= 'WHERE ' . $db->quoteName('post_id') . '=' . $db->Quote($this->id);
+
+		$query 	= implode(' ', $query);
+
+		$db->setQuery($query);
+
+		$imported 	= $db->loadResult();
+
+		return $imported;
 	}
 }

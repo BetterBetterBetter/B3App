@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,306 +9,127 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-jimport( 'joomla.html.toolbar' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewTeamBlog extends EasyBlogView
 {
-	function display( $tmpl = null )
+	/**
+	 * Default method to display a list of team blogs on the site.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tmpl = null)
 	{
-		$mainframe	= JFactory::getApplication();
-		$document	= JFactory::getDocument();
-		$config		= EasyBlogHelper::getConfig();
-		$theme		= $config->get( 'layout_theme' );
-		$my			= JFactory::getUser();
-		$acl		= EasyBlogACLHelper::getRuleSet();
+		// Set the breadcrumbs for this view
+		$this->setViewBreadcrumb('teamblog');
 
-		//setting pathway
-		$pathway	= $mainframe->getPathway();
+		// Set meta tags for team blog view
+		EB::setMeta(META_ID_TEAMBLOGS, META_TYPE_VIEW);
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'teamblog' ) )
-			$this->setPathway( JText::_( 'COM_EASYBLOG_TEAMBLOG_BREADCRUMB' ) , '' );
+		// Get the sorting options
+		$sort = $this->input->get('sort', $this->config->get('layout_postorder'));
 
-		// set meta tags for teamblog view
-		EasyBlogHelper::setMeta( META_ID_TEAMBLOGS, META_TYPE_VIEW );
+		// Get the team blogs model
+		$model = EB::model('TeamBlogs');
 
-		$sort		= JRequest::getCmd('sort', $config->get( 'layout_postorder' ) );
-		$model		= $this->getModel( 'TeamBlogs' );
-		if ( $config->get('main_listprivateteamblog') )
-		{
-			$teams		= $model->getTeamBlogs();
-		}
-		else
-		{
-			$teams		= $model->getPrivateTeamBlogs();
-		}
+		// get viewable teamblogs
+		$teams = $model->getTeamBlogs();
+
+		// Load up the pagination object
 		$pagination	= $model->getPagination();
 
-		//now get the blogs for each category
-		$blogModel	= $this->getModel( 'Blog' );
+		// Format the teams
+		$teams = EB::formatter('teamblogs', $teams);
 
-		if(! empty($teams))
-		{
-			$gid	= EasyBlogHelper::getUserGids();
+		// Set the page title
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_TEAMBLOG_PAGE_TITLE'));
+		$this->setPageTitle($title, $pagination, $this->config->get('main_pagetitle_autoappend'));
 
-			for($i = 0; $i < count($teams); $i++)
-			{
-				$row		=& $teams[$i];
-				$team		= EasyBlogHelper::getTable( 'Teamblog', 'Table' );
-				$team->load( $row->id );
+		$this->set('teams', $teams);
+		$this->set('pagination', $pagination->getPagesLinks());
 
-				// @task: Check if current logged in user is the member of this group
-				$row->isMember			= $team->isMember($my->id, $gid);
-				$row->isActualMember    = $team->isMember($my->id, $gid, false);
-
-				//now get the teams info
-				$members    	= $model->getTeamMembers( $row->id );
-				$row->members   = EasyBlogHelper::formatTeamMembers($members);
-
-				$teamBlogs		= array();
-
-				if( $team->access != EBLOG_TEAMBLOG_ACCESS_MEMBER || $row->isMember || EasyBlogHelper::isSiteAdmin() )
-				{
-					$teamBlogs		= $blogModel->getBlogsBy('teamblog', $row->id, $sort, 5, EBLOG_FILTER_PUBLISHED);
-
-					if(! empty($teamBlogs))
-					{
-						$teamBlogs	= EasyBlogHelper::formatBlog( $teamBlogs, true );
-					}
-				}
-
-				$row->tags			= $team->getTags();
-				$row->blogs			= $teamBlogs;
-				$row->totalEntries	= $team->getPostCount();
-				$row->categories	= $team->getCategories();
-
-				$row->isFeatured    = EasyBlogHelper::isFeatured('teamblog', $row->id);
-
-				if($config->get('layout_teamavatar', true))
-				{
-					$row->avatar   = $team->getAvatar();
-				}
-
-				// check if team description is emtpy or not. if yes, show default message.
-				if(empty($row->description))
-				{
-					$row->description   = JText::_('COM_EASYBLOG_TEAMBLOG_NO_DESCRIPTION');
-				}
-
-			}
-		}
-
-		$title					= EasyBlogHelper::getPageTitle( JText::_( 'COM_EASYBLOG_TEAMBLOG_PAGE_TITLE' ) );
-
-		// @task: Set the page title
-		parent::setPageTitle( $title , $pagination , $config->get( 'main_pagetitle_autoappend' ) );
-
-		$tpl	= new CodeThemes();
-		$tpl->set( 'teams', $teams );
-		$tpl->set( 'pagination' , $pagination->getPagesLinks());
-		$tpl->set('siteadmin', EasyBlogHelper::isSiteAdmin() );
-		$tpl->set('config', $config);
-		$tpl->set('my', $my );
-		$tpl->set('acl', $acl );
-
-		echo $tpl->fetch( 'blog.teams.php' );
+		parent::display('teamblogs/default');
 	}
 
-
-	function listings()
+	/**
+	 * Displays a list of blog posts from a specific team
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function listings()
 	{
-		$mainframe	= JFactory::getApplication();
-		$document	= JFactory::getDocument();
-		$config		= EasyBlogHelper::getConfig();
-		$theme 		= $config->get( 'layout_theme' );
-		$my			= JFactory::getUser();
-		$acl		= EasyBlogACLHelper::getRuleSet();
+		// Get the team id that is being accessed now
+		$id = $this->input->get('id', 0, 'int');
+		$team = EB::table('TeamBlog');
+		$team->load($id);
 
-		//setting pathway
-		$pathway	= $mainframe->getPathway();
-
-		$id		= JRequest::getInt( 'id' , 0 );
-
-		if( $id == 0 )
-		{
-			echo JText::_('COM_EASYBLOG_TEAMBLOG_INVALID_ID');
-			return;
+		if (!$id || !$team->id) {
+			return JError::raiseError(404, JText::_('COM_EASYBLOG_TEAMBLOG_INVALID_ID'));
 		}
 
 		// set meta tags for teamblog view
-		EasyBlogHelper::setMeta( $id, META_TYPE_TEAM );
+		EB::setMeta($id, META_TYPE_TEAM);
 
-		$team	= EasyBlogHelper::getTable( 'TeamBlog' , 'Table' );
-		$team->load( $id );
-		$team->avatar   = $team->getAvatar();
+		$gid = EB::getUserGids();
+		$isMember = $team->isMember($this->my->id, $gid);
 
-		$gid		= EasyBlogHelper::getUserGids();
-		$isMember   = $team->isMember($my->id, $gid);
-		//check if the logged in user a teammember when the team set to member only.
-		if($team->access == EBLOG_TEAMBLOG_ACCESS_MEMBER)
-		{
-			$isMember   = $team->isMember($my->id, $gid);
-		}
-		$team->isMember    		 = $isMember;
-		$team->isActualMember    = $team->isMember($my->id, $gid, false);
+		$team->isMember = $isMember;
+		$team->isActualMember = $team->isMember($this->my->id, $gid, false);
 
-
-		if($team->access == EBLOG_TEAMBLOG_ACCESS_EVERYONE || $team->isMember)
-		{
-			// Add rss feed link
-			$document->addHeadLink( $team->getRSS() , 'alternate' , 'rel' , array('type' => 'application/rss+xml', 'title' => 'RSS 2.0') );
-			$document->addHeadLink( $team->getAtom() , 'alternate' , 'rel' , array('type' => 'application/atom+xml', 'title' => 'Atom 1.0') );
+		// Add rss feed link
+		if ($team->access == EBLOG_TEAMBLOG_ACCESS_EVERYONE || $team->isMember) {
+			$this->doc->addHeadLink($team->getRSS(), 'alternate' , 'rel' , array('type' => 'application/rss+xml', 'title' => 'RSS 2.0') );
+			$this->doc->addHeadLink($team->getAtom(), 'alternate' , 'rel' , array('type' => 'application/atom+xml', 'title' => 'Atom 1.0') );
 		}
 
 		// check if team description is emtpy or not. if yes, show default message.
-		if(empty($team->description))
-			$team->description   = JText::_('COM_EASYBLOG_TEAMBLOG_NO_DESCRIPTION');
-
-		//add the pathway for teamblog
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'teamblog', $team->id ) )
-		{
-			if( ! EasyBlogRouter::isCurrentActiveMenu( 'teamblog' ) )
-				$this->setPathway(JText::_('COM_EASYBLOG_TEAMBLOG'), EasyBlogRouter::_('index.php?option=com_easyblog&view=teamblog'));
-
-			$this->setPathway($team->title, '');
+		if (empty($team->description)) {
+			$team->description = JText::_('COM_EASYBLOG_TEAMBLOG_NO_DESCRIPTION');
 		}
 
+		// Set the breadcrumbs for this view
+		$this->setViewBreadcrumb('teamblog');
+		$this->setPathway($team->getTitle());
 
-		$tbModel	= $this->getModel( 'TeamBlogs' );
-		$model		= $this->getModel( 'Blog' );
-		$blogs		= $model->getBlogsBy( 'teamblog' , $team->id );
-		$blogs		= EasyBlogHelper::formatBlog( $blogs, true );
+		// Retrieve the model
+		$model = EB::model('TeamBlogs');
+		$posts = $model->getPosts($team->id);
+		$posts = EB::formatter('list', $posts);
+
+		// Get the pagination
 		$pagination	= $model->getPagination();
 
-		//now get the teams info
-		$members    		= $tbModel->getTeamMembers( $team->id );
-		$teamMembers		= EasyBlogHelper::formatTeamMembers($members);
-		$isFeatured         = EasyBlogHelper::isFeatured('teamblog', $team->id);
+		// Retrieve team's information
+		$members = $model->getTeamMembers($team->id);
 
-		$title					= EasyBlogHelper::getPageTitle( $team->title );
+		// Determines if the team blog is featured
+		$team->isFeatured = EB::isFeatured('teamblog', $team->id);
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , $pagination , $config->get( 'main_pagetitle_autoappend' ) );
+		// Set the page title
+		$title = EB::getPageTitle($team->title);
+		$this->setPageTitle($title, $pagination, $this->config->get('main_pagetitle_autoappend'));
 
-		EasyBlogHelper::storeSession($team->id, 'EASYBLOG_TEAMBLOG_ID');
+		// Check if subscribed
+		$isTeamSubscribed = $model->isTeamSubscribedEmail($team->id, $this->my->email);
 
-		$tpl	= new CodeThemes();
-		$tpl->set( 'team', $team );
-		$tpl->set( 'teamMembers', $teamMembers );
-		$tpl->set( 'data' , $blogs );
-		$tpl->set( 'isFeatured' , $isFeatured );
-		$tpl->set( 'pagination', $pagination->getPagesLinks());
-		$tpl->set( 'siteadmin', EasyBlogHelper::isSiteAdmin() );
-		$tpl->set( 'currentURL' , 'index.php?option=com_easyblog&view=teamblog&layout=listings&id=' . $team->id );
-		$tpl->set( 'config', $config);
-		$tpl->set('my', $my );
-		$tpl->set('acl', $acl );
+		// Get the current url
+		$return = $team->getPermalink();
 
-		echo $tpl->fetch( 'blog.teamblogs.php' );
+		$this->set('return', $return);
+		$this->set('team', $team);
+		$this->set('members', $members);
+		$this->set('pagination', $pagination->getPagesLinks());
+		$this->set('posts', $posts);
+		$this->set('isTeamSubscribed', $isTeamSubscribed);
+
+		parent::display('teamblogs/item');
 	}
-
-	function statistic()
-	{
-		JPluginHelper::importPlugin( 'easyblog' );
-		$dispatcher = JDispatcher::getInstance();
-		$mainframe	= JFactory::getApplication();
-		$document	= JFactory::getDocument();
-		$config		= EasyBlogHelper::getConfig();
-		$my			= JFactory::getUser();
-		$acl		= EasyBlogACLHelper::getRuleSet();
-
-		$sort	= JRequest::getCmd('sort','latest');
-		$id		= JRequest::getInt( 'id' , 0 );
-
-		//setting pathway
-		$pathway	= $mainframe->getPathway();
-		$this->setPathway(JText::_('COM_EASYBLOG_TEAMBLOG'), EasyBlogRouter::_('index.php?option=com_easyblog&view=teamblog'));
-
-		$id		= JRequest::getInt( 'id' , 0 );
-
-		if( $id == 0 )
-		{
-			echo JText::_('COM_EASYBLOG_TEAMBLOG_INVALID_ID');
-			return;
-		}
-
-		// set meta tags for teamblog view
-		EasyBlogHelper::setMeta( $id, META_TYPE_TEAM );
-
-		//stats type
-		$statType	= JRequest::getString('stat','');
-		$statId     = ($statType == 'tag') ? JRequest::getString('tagid','') : JRequest::getString('catid','');
-
-		$statObject = null;
-		if($statType == 'category')
-		{
-			$statObject = EasyBlogHelper::getTable( 'Category', 'Table' );
-			$statObject->load($statId);
-		}
-		else
-		{
-			$statObject = EasyBlogHelper::getTable( 'Tag', 'Table' );
-			$statObject->load($statId);
-		}
-
-
-		$team	= EasyBlogHelper::getTable( 'TeamBlog' , 'Table' );
-		$team->load( $id );
-		$team->avatar   = $team->getAvatar();
-
-		$gid		= EasyBlogHelper::getUserGids();
-		$isMember   = $team->isMember($my->id, $gid);
-		//check if the logged in user a teammember when the team set to member only.
-		if($team->access == EBLOG_TEAMBLOG_ACCESS_MEMBER)
-		{
-			$isMember   = $team->isMember($my->id, $gid);
-		}
-		$team->isMember    = $isMember;
-
-		// check if team description is emtpy or not. if yes, show default message.
-		if(empty($team->description))
-			$team->description   = JText::_('COM_EASYBLOG_TEAMBLOG_NO_DESCRIPTION');
-
-		//add the pathway for teamblog
-		$this->setPathway($team->title, '');
-
-
-		$tbModel	= $this->getModel( 'TeamBlogs' );
-		$model		= $this->getModel( 'Blog' );
-		$blogs		= $model->getBlogsBy( 'teamblog' , $team->id );
-		$blogs		= EasyBlogHelper::formatBlog( $blogs );
-		$pagination	= $model->getPagination();
-
-		//now get the teams info
-		$members    		= $tbModel->getTeamMembers( $team->id );
-		$teamMembers		= EasyBlogHelper::formatTeamMembers($members);
-		$isFeatured         = EasyBlogHelper::isFeatured('teamblog', $team->id);
-
-		$pageTitle	= EasyBlogHelper::getPageTitle($config->get('main_title'));
-		$pageNumber	= $pagination->get( 'pages.current' );
-		$pageText	= ($pageNumber == 1) ? '' : ' - ' . JText::sprintf( 'COM_EASYBLOG_PAGE_NUMBER', $pageNumber );
-		$document->setTitle( $team->title . $pageText . $pageTitle );
-
-		EasyBlogHelper::storeSession($team->id, 'EASYBLOG_TEAMBLOG_ID');
-
-		//var_dump($blogs);exit;
-		$tpl	= new CodeThemes();
-		$tpl->set( 'team', $team );
-		$tpl->set( 'teamMembers', $teamMembers );
-		$tpl->set( 'data' , $blogs );
-		$tpl->set( 'isFeatured' , $isFeatured );
-		$tpl->set( 'pagination', $pagination->getPagesLinks());
-		$tpl->set( 'siteadmin', EasyBlogHelper::isSiteAdmin() );
-		$tpl->set( 'config', $config);
-		$tpl->set('my', $my );
-		$tpl->set('acl', $acl );
-
-		$tpl->set('statType', $statType );
-		$tpl->set('statObject', $statObject );
-
-		echo $tpl->fetch( 'blog.teamblogs.php' );
-	}
-
 }

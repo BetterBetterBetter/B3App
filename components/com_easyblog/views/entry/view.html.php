@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,557 +9,221 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'image.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'date.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'comment.php' );
-require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'adsense.php' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewEntry extends EasyBlogView
 {
-	function display( $tmpl = null )
+	/**
+	 * Main display for the blog entry view
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tpl = null)
 	{
-		JPluginHelper::importPlugin( 'easyblog' );
-		$dispatcher = JDispatcher::getInstance();
-		$mainframe	= JFactory::getApplication();
-		$document	= JFactory::getDocument();
-		$config 	= EasyBlogHelper::getConfig();
-		$my			= JFactory::getUser();
-		$notice		= '';
+		// Get the blog post id from the request
+		$id = $this->input->get('id', 0, 'int');
 
-		//for trigger
-		$params		= $mainframe->getParams('com_easyblog');
-		$limitstart	= JRequest::getInt('limitstart', 0, '');
-		$blogId		= JRequest::getVar('id');
+		// Load the blog post now
+		$post = EB::post($id);
 
-		if( JRequest::getInt( 'print' ) == 1 )
-		{
-			// Add noindex for print view by default.
-			$document->setMetadata( 'robots' , 'noindex,follow' );
+		// If blog id is not provided correctly, throw a 404 error page
+		if (!$id || !$post->id) {
+			return JError::raiseError(404, JText::_('COM_EASYBLOG_ENTRY_BLOG_NOT_FOUND'));
 		}
 
-		if( empty($blogId) )
-		{
-			$mainframe->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=latest' , false ) , JText::_('COM_EASYBLOG_ENTRY_BLOG_NOT_FOUND') );
-			$mainframe->close();
-		}
+		// If the settings requires the user to be logged in, do not allow guests here.
+		$post->requiresLoginToRead();
 
-		if( $my->id <= 0 && $config->get( 'main_login_read' ) )
-		{
-			$mainframe->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=entry&id=' . $blogId . '&layout=login' , false ) );
-			$mainframe->close();
-		}
+		// After the post is loaded, set it into the cache
+		EB::cache()->insert(array($post));
 
-		$team = JRequest::getVar('team','');
+		// Render necessary data on the headers
+		$post->renderHeaders();
 
-		if(empty($team))
-		{
-			//try get from session.
-			$team	= EasyBlogHelper::getSession('EASYBLOG_TEAMBLOG_ID');
-		}
+		// Check if blog is password protected.
+		$protected = $this->isProtected($post);
 
-		// set meta tags for post
-		EasyBlogHelper::setMeta( $blogId, META_TYPE_POST );
-
-		$print = JRequest::getBool('print');
-
-		if ($print)
-		{
-			$document->setMetaData( 'robots' , 'noindex, nofollow' );
-		}
-
-		$my 	= JFactory::getUser();
-		$blog	= EasyBlogHelper::getTable( 'Blog', 'Table' );
-
-		if( !$blog->load($blogId) )
-		{
-			$mainframe->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=latest' , false ) , JText::_('COM_EASYBLOG_ENTRY_BLOG_NOT_FOUND') );
-			$mainframe->close();
-		}
-
-		if( !empty( $blog->robots ) )
-		{
-			$document->setMetaData( 'robots' , $blog->robots );
-		}
-
-		if( !empty( $blog->copyrights ) )
-		{
-			$document->setMetaData( 'rights' , $blog->copyrights );
-		}
-
-		//assign the teamid here.
-		$checkIsPrivate = false;
-
-		//check if blog is password protected.
-		if($config->get('main_password_protect', true) && !empty($blog->blogpassword))
-		{
-			if(!EasyBlogHelper::verifyBlogPassword($blog->blogpassword, $blog->id))
-			{
-				$errmsg = '';
-
-				$jSession = JFactory::getSession();
-				if($jSession->has( 'PROTECTEDBLOG_'.$blog->id, 'EASYBLOG'))
-				{
-					$errmsg = JText::_('COM_EASYBLOG_PASSWORD_PROTECTED_BLOG_INVALID_PASSWORD');
-				}
-
-				$theme = new CodeThemes();
-				$theme->set('id', $blog->id);
-				$theme->set('return', base64_encode(JURI::getInstance()->toString()));
-				$theme->set('errmsg', $errmsg);
-				echo $theme->fetch( 'blog.protected.php' );
-				return false;
-			}
-		}
-
-		//if team id provided, then we need to check if the user belong to the team or not.
-		if($blog->issitewide)
-		{
-			$checkIsPrivate = true;
-		}
-		else
-		{
-			if(empty($team))
-			{
-				// blog post is not sitewide and teamid is empty? this is not so right. need to check this post contributed to which team one more time.
-				$team   = $blog->getTeamContributed();
-			}
-
-			/*
-			 * if teamblog access set to 'member only' | 'registered user', team blog will supersede blog permision
-			 * if teamblog access set to 'everyone' then blog's permission will supersede teamblog access (logged user vs guest)
-			 */
-
-			if(! empty($team))
-			{
-				$teamblog	= EasyBlogHelper::getTable( 'TeamBlog', 'Table' );
-				$teamblog->load($team);
-
-				if($teamblog->access == '1')
-				{
-					if(! EasyBlogHelper::isTeamBlogJoined($my->id, $team))
-					{
-						//show error.
-						EasyBlogHelper::showAccessDenied('teamblog', $teamblog->access);
-						return;
-					}
-				}
-				else if($teamblog->access == '2')
-				{
-					if(! EasyBlogHelper::isLoggedIn())
-					{
-						EasyBlogHelper::showLogin();
-						return;
-					}
-				}
-				else
-				{
-					// if teamblog the access set to 'everyone' then blog permission will supersede teamblog access
-					$checkIsPrivate = true;
-				}
-
-			}
-			else
-			{
-				$checkIsPrivate = true;
-			}
-		}
-
-		$blog->team_id 	= $team;
-
-		//check if the blog permission set to private or public. if private, we
-		//need to check if the user has login or not.
-		if($checkIsPrivate)
-		{
-			$privacy	= $blog->isAccessible();
-
-			if( !$privacy->allowed )
-			{
-				echo $privacy->error;
-				return;
-			}
-		}
-
-		// added checking for other statuses
-		switch ( $blog->published )
-		{
-			case 0:
-			case 2:
-			case 3:
-				// Unpublished post
-				// Only Admin and blog owner can view this post
-				if ( $my->id == $blog->created_by )
-				{
-					$notice = JText::_('COM_EASYBLOG_ENTRY_BLOG_UNPUBLISHED_VISIBLE_TO_OWNER');
-				}
-				elseif ( EasyBlogHelper::isSiteAdmin() )
-				{
-					$notice = JText::_('COM_EASYBLOG_ENTRY_BLOG_UNPUBLISHED_VISIBLE_TO_ADMIN');
-				}
-				else
-				{
-					EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_ENTRY_BLOG_NOT_FOUND') );
-					$mainframe->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=latest', false) );
-				}
-				break;
-
-			case 5:
-				// Trashed posts.
-				EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_ENTRY_BLOG_NOT_FOUND') );
-				$mainframe->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=latest', false) );
-
-				break;
-			case 1:
-			default:
-				break;
-		}
-
-		//update the hits
-		$blog->hit();
-		$acl = EasyBlogACLHelper::getRuleSet();
-
-
-
-		$pageTitle	= EasyBlogHelper::getPageTitle( $config->get('main_title'));
-		if( empty( $pageTitle  ))
-		{
-			$document->setTitle( $blog->title );
-		}
-		else
-		{
-			$document->setTitle( $blog->title . ' - ' . $pageTitle );
-		}
-
-		// There is a possibility that the intro is hidden in the entry view, so we need to get this data.
-		$rawIntroText   = $blog->intro;
-
-		// @rule: Process microblog post
-		if( $blog->source )
-		{
-			EasyBlogHelper::formatMicroBlog( $blog );
-		}
-
-		// process the video here if nessary
-		$blog->intro	= EasyBlogHelper::getHelper( 'Videos' )->processVideos( $blog->intro );
-		$blog->content	= EasyBlogHelper::getHelper( 'Videos' )->processVideos( $blog->content );
-
-		// @rule: Process audio files.
-		$blog->intro		= EasyBlogHelper::getHelper( 'Audio' )->process( $blog->intro );
-		$blog->content		= EasyBlogHelper::getHelper( 'Audio' )->process( $blog->content );
-
-		// @rule: Process adsense codes.
-		$blog->intro	= EasyBlogGoogleAdsense::processsAdsenseCode( $blog->intro, $blog->created_by );
-		$blog->content	= EasyBlogGoogleAdsense::processsAdsenseCode( $blog->content, $blog->created_by );
-
-
-		// @trigger: onEasyBlogPrepareContent
-		EasyBlogHelper::triggerEvent( 'easyblog.prepareContent' , $blog , $params , $limitstart );
-
-		// @rule: Hide introtext if necessary
-		if( $config->get( 'main_hideintro_entryview' ) && !empty( $blog->content ) )
-		{
-			$blog->intro	= '';
-		}
-
-
-		//onPrepareContent trigger start
-		$blog->introtext	= $blog->intro;
-		$blog->text 		= $blog->intro . $blog->content;
-
-		// @trigger: onEasyBlogPrepareContent
-		EasyBlogHelper::triggerEvent( 'prepareContent' , $blog , $params , $limitstart );
-
-		$blog->intro		= $blog->introtext;
-		$blog->content		= $blog->text;
-
-		// @legacy: since 3.5 has blog images, we can remove this in the future.
-		// Remove first image for featured blogs
-		if( $blog->isFeatured() )
-		{
-			$blog->content		= EasyBlogHelper::removeFeaturedImage( $blog->content );
-		}
-
-		$isFeatured    		= EasyBlogHelper::isFeatured('post', $blog->id);
-
-		/* Post Tags */
-		$modelPT	= $this->getModel( 'PostTag' );
-		$tags		= $modelPT->getBlogTags($blog->id);
-
-		//page setup
-		$blogHtml		= '';
-		$commentHtml	= '';
-		$blogHeader		= '';
-		$blogFooter		= '';
-		$adsenseHtml	= '';
-		$trackbackHtml  = '';
-
-		$blogger		= null;
-		if($blog->created_by != 0)
-		{
-			$blogger 	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blogger->load( $blog->created_by );
-		}
-
-		// @rule: Set the author object into the table.
-		$blog->author 	= $blogger;
-		$blog->blogger 	= $blogger;
-
-		// @rule: Before any trigger happens, try to replace the gallery first and append it at the bottom.
-		$blog->intro	= EasyBlogHelper::getHelper( 'Gallery' )->process( $blog->intro , $blog->created_by );
-		$blog->content	= EasyBlogHelper::getHelper( 'Gallery' )->process( $blog->content , $blog->created_by );
-
-		$blog->intro	= EasyBlogHelper::getHelper( 'Album' )->process( $blog->intro , $blog->created_by );
-		$blog->content	= EasyBlogHelper::getHelper( 'Album' )->process( $blog->content , $blog->created_by );
-
-		//onAfterDisplayTitle, onBeforeDisplayContent, onAfterDisplayContent trigger start
-		$blog->event		= new stdClass();
-		$blog->introtext	= $blog->intro;
-		$blog->text			= $blog->content;
-
-		// @trigger: onAfterDisplayTitle / onContentAfterTitle
-		$results	= EasyBlogHelper::triggerEvent( 'afterDisplayTitle' , $blog , $params , $limitstart );
-		$blog->event->afterDisplayTitle = JString::trim(implode("\n", $results));
-
-		// @trigger: onBeforeDisplayContent / onContentBeforeDisplay
-		$results	= EasyBlogHelper::triggerEvent( 'beforeDisplayContent' , $blog , $params , $limitstart );
-		$blog->event->beforeDisplayContent = JString::trim(implode("\n", $results));
-
-		// @trigger: onAfterDisplayContent / onContentAfterDisplay
-		$results	= EasyBlogHelper::triggerEvent( 'afterDisplayContent' , $blog , $params , $limitstart );
-		$blog->event->afterDisplayContent	= JString::trim(implode("\n", $results));
-
-		$blog->intro		= $blog->introtext;
-		$blog->content		= $blog->text;
-
-		unset($blog->introtext);
-		unset($blog->text);
-
-		if($print)
-		{
-			$theme		= new CodeThemes();
-
-			$theme->set('blog'		, $blog );
-			$theme->set('tags'		, $tags );
-			$theme->set('config'	, $config );
-			$theme->set('blogger'	, $blogger );
-
-			echo $theme->fetch( 'blog.read.print.php' );
+		if ($protected !== false) {
 			return;
 		}
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'blogger', $blogger->id ) && $config->get( 'layout_blogger_breadcrumb') )
-		{
-			$this->setPathway( $blogger->getName() , $blogger->getLink() );
+		// Perform validation checks to see if post is valid
+		$exception = $post->checkView();
+
+		if ($exception instanceof EasyBlogException) {
+			return JError::raiseError(400, $exception->getMessage());
 		}
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'entry', $blog->id ) )
-		{
-			$this->setPathway( $blog->title , '' );
+		// Increment the hit counter for the blog post.
+		$post->hit();
+
+		// Format the post
+		$post = EB::formatter('entry', $post);
+
+		// Add bloggers breadcrumbs
+		if (!EBR::isCurrentActiveMenu('blogger', $post->author->id) && $this->config->get('layout_blogger_breadcrumb')) {
+			$this->setPathway($post->author->getName(), $post->author->getPermalink());
 		}
 
-		$blogModel		= $this->getModel( 'Blog' );
-		$theme			= new CodeThemes();
-
-		// add checking if comment system disabled by site owner
-		if ( $config->get('main_comment') && $blog->allowcomment )
-		{
-			// getting blog comments
-			$commentModel		= $this->getModel( 'Comment' );
-			$blogComments		= EasyBlogHelper::getHelper( 'Comment' )->getBlogComment( $blogId );
-			$commtPagination	= EasyBlogHelper::getHelper( 'Comment' )->pagination;
-			$comments			= array();
-
-			if(! empty( $blogComments ) )
-			{
-				foreach ($blogComments as $comment)
-				{
-					$row 				= $comment;
-
-					$row->comment   	= EasyBlogCommentHelper::parseBBCode($row->comment);
-
-
-					if($config->get('comment_likes'))
-					{
-						$row->likesAuthor   = EasyBlogHelper::getLikesAuthors($row->id, 'comment', $my->id);
-						$row->isLike   		= $commentModel->isLikeComment($row->id, $my->id);
-					}
-					else
-					{
-						$row->likesAuthor   = '';
-						$row->isLike   		= 0;
-					}
-					$comments[] 	= $row;
-				}
-			}
-
-			// compliant with the #comments at blog.item.comment.php
-			$commentHtml	= ( $config->get('comment_jcomments' ) ) ? '' : '<a id="comments"></a>';
-			$commentHtml	.= EasyBlogCommentHelper::getCommentHTML( $blog , $comments , $commtPagination );
-		}
-		$blog->totalComments	= EasyBlogHelper::getHelper( 'Comment' )->getCommentCount( $blog );
-
-		//get related blog post
-		$blogRelatedPost    = '';
-		if($config->get('main_relatedpost', true))
-		{
-			$blogRelatedPost    = $blogModel->getRelatedBlog($blogId);
+		// Add entry breadcrumb
+		if (!EBR::isCurrentActiveMenu('entry', $post->id)) {
+			$this->setPathway($post->title, '');
 		}
 
+		// Load up the blog model
+		$model = EB::model('Blog');
 
-		//get author's recent posts.
-		$authorRecentPosts = '';
-		if( $config->get('main_showauthorinfo') && $config->get('main_showauthorposts') ) 
-		{
-			$authorPostLimit 	= $config->get('main_showauthorpostscount');
-			$authorRecentPosts 	= $blogModel->getBlogsBy( 'blogger', $blog->created_by, 'latest', $authorPostLimit );
+		// Get author's recent posts.
+		$recent = $this->getRecentPosts($post);
+
+		// Add canonical URLs for the blog post
+		if ($this->config->get('main_canonical_entry')) {
+			$this->canonical('index.php?option=com_easyblog&view=entry&id=' . $post->id);
 		}
 
-		// Facebook Like integrations
-		require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'facebook.php' );
-		$facebookLike	= EasyBlogFacebookLikes::getLikeHTML( $blog , $rawIntroText );
+		// Prepare navigation object
+		$navigation = $this->prepareNavigation($post);
 
-		$url			= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=entry&id=' . $blog->id , false , true );
+		// Retrieve Google Adsense codes
+		$adsense = EB::adsense()->html($post);
 
-		// @rule: Add opengraph tags if required.
-		if( $config->get( 'main_facebook_opengraph' ) )
-		{
-			EasyBlogFacebookLikes::addOpenGraphTags( $blog , $rawIntroText );
+		// If a custom theme is setup for entries in the category, set a different theme
+		if (!empty($post->category->theme)) {
+			$this->setTheme($post->category->theme);
 		}
 
-		// Add Twitter card details on page.
-		EasyBlogHelper::getHelper( 'Twitter' )->addCard( $blog , $rawIntroText );
+		// Check if the user subscribed to this post.
+		$subscription = EB::table('Subscriptions');
+		$subscription->load(array('uid' => $post->id, 'utype' => 'entry', 'user_id' => $this->my->id));
 
-		// @task: Add canonical URLs.
-		if( $config->get( 'main_canonical_entry') )
-		{
-			$canonicalUrl   = EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=entry&id=' . $blog->id , false , true, true );
-			$document->addCustomTag( '<link rel="canonical" href="' . $canonicalUrl . '"/>' );
+		$theme = EB::template();
+
+		// Prepare related post
+		$relatedPosts = array();
+
+		// Related posts seems to be missing from the theme file.
+		if ($theme->params->get('post_related', true)) {
+			$relatedPosts = $model->getRelatedPosts($post->id, $post->category->getParam('post_related_limit', 5));
 		}
 
-		// @task: Add rel="nofollow" if necessary.
-		if( $config->get( 'main_anchor_nofollow' ) )
-		{
-			$blog->content 	= EasyBlogHelper::addNoFollow( $blog->content );
+		if (!$post->posttype) {
+			$post->posttype = 'standard';
 		}
 
-		$prevLink	= array();
-		$nextLink	= array();
+		$this->set('post', $post);
+		$this->set('navigation', $navigation);
+		$this->set('relatedPosts', $relatedPosts);
+		$this->set('recent', $recent);
+		$this->set('preview', false);
+		$this->set('adsense' , $adsense);
+		$this->set('subscription', $subscription);
 
-		// construct prev & next link
-		//get blog navigation object
-		if( $config->get( 'layout_navigation') )
-		{
-			$blogNav    = EasyBlogHelper::getBlogNavigation($blogId, $blog->created, $team, 'team'); //$team
+		// Get the menu params associated with this post
+		$params = $post->getMenuParams();
 
-			$prevLink = array();
-			if ( !empty($blogNav['prev'] ) )
-			{
-				$prevLink['id']		=  $blogNav['prev'][0]->id;
-				$prevLink['title']	=  (JString::strlen($blogNav['prev'][0]->title) > 50) ? JString::substr($blogNav['prev'][0]->title, 0, 50) . '...' : $blogNav['prev'][0]->title;
-			}
+		$this->theme->entryParams = $params;
 
-			$nextLink = array();
-			if ( !empty($blogNav['next'] ) )
-			{
-				$nextLink['id']		=  $blogNav['next'][0]->id;
-				$nextLink['title']	=  (JString::strlen($blogNav['next'][0]->title) > 50) ? JString::substr($blogNav['next'][0]->title, 0, 50) . '...' : $blogNav['next'][0]->title;
-			}
-		}
-
-		// @rule: Mark notifications item in EasyDiscuss when the blog entry is viewed
-		if( $config->get( 'integrations_easydiscuss_notification_blog' ) )
-		{
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->readNotification( $blog->id , EBLOG_NOTIFICATIONS_TYPE_BLOG );
-		}
-
-		if( $config->get( 'integrations_easydiscuss_notification_comment' ) )
-		{
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->readNotification( $blog->id , EBLOG_NOTIFICATIONS_TYPE_COMMENT );
-		}
-
-		if( $config->get( 'integrations_easydiscuss_notification_rating' ) )
-		{
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->readNotification( $blog->id , EBLOG_NOTIFICATIONS_TYPE_RATING );
-		}
-
-
-		//get social bookmark provider.
-		require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'bookmark.php' );
-		$bookmark	= EasyBlogBookmark::getHTML();
-
-		// @task: As we are standardizing the admin tools, we fix the necessary properties here.
-		$blog->isFeatured	= $isFeatured;
-
-		$theme->set( 'currentURL'		, EasyBlogRouter::_( 'index.php?option=com_easyblog&view=latest') );
-		$theme->set( 'facebookLike' 	, $facebookLike );
-		$theme->set( 'notice'			, $notice );
-		$theme->set( 'team'				, $team );
-		$theme->set('blog'				, $blog );
-		$theme->set('tags'				, $tags );
-		$theme->set('blogger'			, $blogger );
-		$theme->set('prevLink'			, $prevLink);
-		$theme->set('nextLink'			, $nextLink);
-		$theme->set('blogRelatedPost'	, $blogRelatedPost );
-		$theme->set('authorRecentPosts'	, $authorRecentPosts );
-		$theme->set('isFeatured'		, $isFeatured );
-		$theme->set('isMineBlog'		, EasyBlogHelper::isMineBlog($blog->created_by, $my->id) );
-		$theme->set( 'acl'				, $acl );
-		$theme->set( 'url'				, $url );
-		$theme->set( 'commentHTML'		, $commentHtml );
-		$theme->set( 'bookmark'			, $bookmark );
-		$theme->set( 'pdfLinkProperties', EasyBlogHelper::getPDFlinkProperties() );
-		$theme->set( 'ispreview', false );
-
-		// @task: trackbacks
-		$trackbacks		= $blogModel->getTrackback( $blogId );
-		$theme->set( 'trackbackURL'		, EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=trackback&post_id=' . $blog->id  , true , true ) );
-		$theme->set( 'trackbacks'		, $trackbacks );
-
-
-		//google adsense
-		$adsense	= EasyBlogGoogleAdsense::getHTML( $blogger->id );
-
-		$blogHeader     = $adsense->header;
-		$blogFooter     = $adsense->footer;
-
-		$theme->set( 'adsenseHTML' , $adsense->beforecomments );
-		$blogHtml	= $theme->fetch( 'blog.read' . EasyBlogHelper::getHelper( 'Sources' )->getTemplateFile( $blog->source ) . '.php' );
-
-		echo $blogHeader;
-		echo $blogHtml;
-		echo $blogFooter;
+		parent::display('blogs/entry/default');
 	}
 
 	/**
-	 * Displays a single latest blog entry.
+	 * Login layout for entry view
 	 *
-	 * @since	3.5
-	 * @author	Mark Lee <mark@stackideas.com>
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function login()
+	{
+		$return = $this->input->get('return', '', 'string');
+
+		if (!$return) {
+			$return = base64_encode(EBR::_('index.php?option=com_easyblog', false));
+		}
+
+		$this->set('return', $return);
+
+		parent::display('blogs/entry/login');
+	}
+
+
+	/**
+	 * Determines if the current post is protected
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isProtected(EasyBlogPost &$post)
+	{
+		// Password protection disabled
+		if (!$this->config->get('main_password_protect')) {
+			return false;
+		}
+
+		// Site admin should not be restricted
+		if (EB::isSiteAdmin()) {
+			return false;
+		}
+
+		// Blog does not contain any password protection
+		if (!$post->isPasswordProtected()) {
+			return false;
+		}
+
+		// User already entered password
+		if ($post->verifyPassword()) {
+			return false;
+		}
+
+		$post = EB::formatter('entry', $post);
+
+		// Set the return url to the current url
+		$return = base64_encode($post->getPermalink(false));
+
+		// Get the menu params associated with this post
+		$this->theme->params = $post->getMenuParams();
+
+		$this->set('post', $post);
+
+		parent::display('blogs/entry/default.protected');
+
+		return;
+	}
+
+	/**
+	 * Displays the latest entry on the site using the entry view
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
 	public function latest()
 	{
 		// Fetch the latest blog entry
-		$model 	= $this->getModel( 'Blog' );
+		$model 	= EB::model('Blog');
 
 		// Get the current active menu's properties.
-		$app		= JFactory::getApplication();
-		$menu 		= $app->getMenu()->getActive();
-		$inclusion	= '';
+		$app = JFactory::getApplication();
+		$menu = $app->getMenu()->getActive();
+		$inclusion = '';
 
-		if( is_object( $menu ) )
-		{
-			$params 	= EasyBlogHelper::getRegistry( $menu->params );
-			$inclusion	= EasyBlogHelper::getCategoryInclusion( $params->get( 'inclusion' ) );
+		if (is_object($menu)) {
+			$params = EB::registry($menu->params);
+			$inclusion = EB::getCategoryInclusion($params->get('inclusion'));
 		}
 
 		$items 	= $model->getBlogsBy( 'latest' , 0 , '' , 1 , EBLOG_FILTER_PUBLISHED , null , true , array() , false , false , true , array() , $inclusion );
 
-		if( is_array( $items ) && !empty( $items ))
-		{
+		if (is_array($items) && !empty($items)) {
 			JRequest::setVar( 'id' , $items[ 0 ]->id );
 			return $this->display();
 		}
@@ -567,235 +231,202 @@ class EasyBlogViewEntry extends EasyBlogView
 		echo JText::_( 'COM_EASYBLOG_NO_BLOG_ENTRY' );
 	}
 
-	public function login()
+	/**
+	 * Main display for the blog entry view
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function preview($tpl = null)
 	{
-		$theme	= new CodeThemes();
-		$id		= JRequest::getInt( 'id' );
+		// Get the blog post id from the request
+		$id = $this->input->get('uid', '', 'default');
 
-		$theme->set( 'return' , base64_encode( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=entry&id=' . $id , false ) ) );
-		echo $theme->fetch( 'blog.read.login.php' );
-	}
+		// Load the blog post now
+		$post = EB::post($id);
 
-	function preview()
-	{
-		JPluginHelper::importPlugin( 'easyblog' );
-		$dispatcher = JDispatcher::getInstance();
-		$mainframe	= JFactory::getApplication();
-		$acl		= EasyBlogACLHelper::getRuleSet();
-		$config 	= EasyBlogHelper::getConfig();
-		$document	= JFactory::getDocument();
-		$my			= JFactory::getUser();
-		$params		= $mainframe->getParams('com_easyblog');
+		// After the post is loaded, set it into the cache
+		EB::cache()->insert(array($post));
 
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
+		// If blog id is not provided correctly, throw a 404 error page
+		if (!$id || !$post->id) {
+			return JError::raiseError(404, JText::_('COM_EASYBLOG_ENTRY_BLOG_NOT_FOUND'));
+		}
+
+		// If the settings requires the user to be logged in, do not allow guests here.
+		$post->requiresLoginToRead();
+
+		// Render necessary data on the headers
+		$post->renderHeaders();
+
+		// Check if blog is password protected.
+		$protected = $this->isProtected($post);
+
+		if ($protected !== false) {
 			return;
 		}
 
-		$draftId    = JRequest::getVar( 'draftid', '');
-		$draft		= EasyBlogHelper::getTable( 'Draft' , 'Table' );
-		$draft->load( $draftId );
+		// Perform validation checks to see if post is valid
+		$exception = $post->checkView();
 
-
-		$blog       = EasyBlogHelper::getTable( 'Blog' , 'Table' );
-		$blog->bind( $draft );
-
-		$blogger	= null;
-		if($blog->created_by != 0)
-		{
-			$blogger 	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blogger->load( $blog->created_by );
+		if ($exception instanceof EasyBlogException) {
+			return JError::raiseError(400, $exception->getMessage());
 		}
 
-		// @rule: Set the author object into the table.
-		$blog->author 	= $blogger;
-		$blog->blogger 	= $blogger;
-
-		$blogId		= ( empty( $draft->entry_id ) ) ? $draft->id : $draft->entry_id;
-		$limitstart = '0';
-		$notice     = '';
-		$team       = '';
-
-		$blog->tags		= empty( $draft->tags ) ? array() : $this->bindTags( explode( ',' , $draft->tags ) );
-
-		// metas
-		$meta				= new stdClass();
-		$meta->id			= '';
-		$meta->keywords		= $draft->metakey;
-		$meta->description	= $draft->metadesc;
-
-		$pageTitle	= EasyBlogHelper::getPageTitle($config->get('main_title'));
-		$document->setTitle( $blog->title . $pageTitle );
-
-		// process the video here if nessary
-		$blog->intro	= EasyBlogHelper::getHelper( 'Videos' )->processVideos( $blog->intro );
-		$blog->content	= EasyBlogHelper::getHelper( 'Videos' )->processVideos( $blog->content );
-
-		// @rule: Process audio files.
-		$blog->intro		= EasyBlogHelper::getHelper( 'Audio' )->process( $blog->intro );
-		$blog->content		= EasyBlogHelper::getHelper( 'Audio' )->process( $blog->content );
-
-		// @rule: Before any trigger happens, try to replace the gallery first and append it at the bottom.
-		$blog->intro	= EasyBlogHelper::getHelper( 'Gallery' )->process( $blog->intro , $blog->created_by );
-		$blog->content	= EasyBlogHelper::getHelper( 'Gallery' )->process( $blog->content , $blog->created_by );
-
-		// Process jomsocial album's.
-		$blog->intro	= EasyBlogHelper::getHelper( 'Album' )->process( $blog->intro , $blog->created_by );
-		$blog->content	= EasyBlogHelper::getHelper( 'Album' )->process( $blog->content , $blog->created_by );
-
-		// @trigger: onEasyBlogPrepareContent
-		EasyBlogHelper::triggerEvent( 'easyblog.prepareContent' , $blog , $params , $limitstart );
-
-		//onPrepareContent trigger start
-		$blog->introtext	= $blog->intro;
-		$blog->text			= $blog->intro . $blog->content;
-
-		// @trigger: onEasyBlogPrepareContent
-		EasyBlogHelper::triggerEvent( 'prepareContent' , $blog , $params , $limitstart );
-
-		$blog->intro		= $blog->introtext;
-		$blog->content		= $blog->text;
-
-		$isFeatured    		= false;
-
-		//page setup
-		$blogHtml		= '';
-		$commentHtml	= '';
-		$blogHeader		= '';
-		$blogFooter		= '';
-		$adsenseHtml	= '';
-		$trackbackHtml  = '';
-
-
-		$blogger	= null;
-		if($blog->created_by != 0)
-		{
-			$blogger 	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$blogger->load( $blog->created_by );
+		// If the viewer is the owner of the blog post, display a proper message
+		if ($this->my->id == $post->created_by && !$post->isPublished()) {
+			$notice = JText::_('COM_EASYBLOG_ENTRY_BLOG_UNPUBLISHED_VISIBLE_TO_OWNER');
 		}
 
-		//onAfterDisplayTitle, onBeforeDisplayContent, onAfterDisplayContent trigger start
-		$blog->event = new stdClass();
-
-		// @trigger: onAfterDisplayTitle / onContentAfterTitle
-		$results	= EasyBlogHelper::triggerEvent( 'afterDisplayTitle' , $blog , $params , $limitstart );
-		$blog->event->afterDisplayTitle = JString::trim(implode("\n", $results));
-
-		// @trigger: onBeforeDisplayContent / onContentBeforeDisplay
-		$results	= EasyBlogHelper::triggerEvent( 'beforeDisplayContent' , $blog , $params , $limitstart );
-		$blog->event->beforeDisplayContent = JString::trim(implode("\n", $results));
-
-		// @trigger: onAfterDisplayContent / onContentAfterDisplay
-		EasyBlogHelper::triggerEvent( 'afterDisplayContent' , $blog , $params , $limitstart );
-		$blog->event->afterDisplayContent	= JString::trim(implode("\n", $results));
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'blogger', $blogger->id ) )
-			$this->setPathway( $blogger->getName() , $blogger->getLink() );
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'entry', $blog->id ) )
-			$this->setPathway( $blog->title , '' );
-
-		$blog->totalComments	= 0;
-
-		// Facebook Like integrations
-		require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'facebook.php' );
-		$facebookLike	= EasyBlogFacebookLikes::getLikeHTML( $blog );
-
-		$url	= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=entry&id=' . $blog->id , false , true );
-
-		//get blog navigation object
-		$blogNav    = EasyBlogHelper::getBlogNavigation($blog->id, $blog->created, $team, 'team'); //$team
-
-		$prevLink = array();
-		if ( !empty($blogNav['prev'] ) )
-		{
-			$prevLink['id']		=  $blogNav['prev'][0]->id;
-			$prevLink['title']	=  (JString::strlen($blogNav['prev'][0]->title) > 50) ? JString::substr($blogNav['prev'][0]->title, 0, 50) . '...' : $blogNav['prev'][0]->title;
+		if (EB::isSiteAdmin() && !$post->isPublished()) {
+			$notice = JText::_('COM_EASYBLOG_ENTRY_BLOG_UNPUBLISHED_VISIBLE_TO_ADMIN');
 		}
 
-		$nextLink = array();
-		if ( !empty($blogNav['next'] ) )
-		{
-			$nextLink['id']		=  $blogNav['next'][0]->id;
-			$nextLink['title']	=  (JString::strlen($blogNav['next'][0]->title) > 50) ? JString::substr($blogNav['next'][0]->title, 0, 50) . '...' : $blogNav['next'][0]->title;
+		// Format the post
+		$post = EB::formatter('entry', $post);
+
+		// Add bloggers breadcrumbs
+		if (!EBR::isCurrentActiveMenu('blogger', $post->author->id) && $this->config->get('layout_blogger_breadcrumb')) {
+			$this->setPathway($post->author->getName(), $post->author->getPermalink());
 		}
 
-		// @rule: Hide introtext if necessary
-		if( $config->get( 'main_hideintro_entryview' ) )
-		{
-			$blog->intro	= '';
+		// Add entry breadcrumb
+		if (!EBR::isCurrentActiveMenu('entry', $post->id)) {
+			$this->setPathway($post->title, '');
 		}
 
-		//get social bookmark provider.
-		require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'bookmark.php' );
-		$bookmark	= EasyBlogBookmark::getHTML();
+		// Load up the blog model
+		$model = EB::model('Blog');
 
+		// Get author's recent posts.
+		$recent = $this->getRecentPosts($post);
 
-		$theme			= new CodeThemes();
-		$theme->set( 'facebookLike' 	, $facebookLike );
-		$theme->set( 'notice'			, $notice );
-		$theme->set( 'blog'				, $blog );
-		$theme->set( 'tags'				, $blog->tags );
-		$theme->set( 'blogger'			, $blogger );
-		$theme->set( 'prevLink'			, $prevLink);
-		$theme->set( 'nextLink'			, $nextLink);
-		$theme->set( 'blogRelatedPost'	, '' );
-		$theme->set( 'isFeatured'		, $isFeatured );
-		$theme->set( 'isMineBlog'		, true );
-		$theme->set( 'acl'				, $acl );
-		$theme->set( 'url'				, $url );
-		$theme->set( 'commentHTML'		, $commentHtml );
-		$theme->set( 'bookmark'			, $bookmark );
-		$theme->set( 'pdfLinkProperties', EasyBlogHelper::getPDFlinkProperties() );
-		$theme->set( 'ispreview', true );
+		// Add canonical URLs for the blog post
+		if ($this->config->get('main_canonical_entry')) {
+			$this->canonical('index.php?option=com_easyblog&view=entry&id=' . $post->id);
+		}
 
-		// @task: trackbacks
-		$trackbacks		= '';
-		$theme->set( 'trackbackURL'		, EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=trackback&post_id=' . $blog->id  , true , true ) );
-		$theme->set( 'trackbacks'		, $trackbacks );
+		// Prepare navigation object
+		$navigation = $this->prepareNavigation($post);
 
-		//google adsense
-		require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'adsense.php' );
-		$adsense	= EasyBlogGoogleAdsense::getHTML( $blogger->id );
+		// Retrieve Google Adsense codes
+		$adsense = EB::adsense()->html($post);
 
-		$blogHeader     = $adsense->header;
-		$blogFooter     = $adsense->footer;
+		// If a custom theme is setup for entries in the category, set a different theme
+		if (!empty($post->category->theme)) {
+			$this->setTheme($post->category->theme);
+		}
 
-		$theme->set( 'adsenseHTML' , $adsense->beforecomments );
-		$blogHtml	= $theme->fetch( 'blog.read.php' );
+		// Check if the user subscribed to this post.
+		$isBlogSubscribed = $model->isBlogSubscribedEmail($post->id, $this->my->email);
 
-		echo $blogHeader;
-		echo $blogHtml;
-		echo $blogFooter;
+		$theme = EB::template();
+
+		// Prepare related post
+		$relatedPosts = array();
+
+		// @TODO: Related posts seems to be missing from the theme file.
+		if ($theme->params->get('post_related', true)) {
+			$relatedPosts = $model->getRelatedPosts($post->id, $theme->params->get('post_related_limit', 5));
+		}
+
+		if (!$post->posttype) {
+			$post->posttype = 'standard';
+		}
+
+		$this->set('post', $post);
+		$this->set('navigation', $navigation);
+		$this->set('relatedPosts', $relatedPosts);
+		$this->set('recent', $recent);
+		$this->set('preview', true);
+		$this->set('adsense' , $adsense);
+		$this->set('isBlogSubscribed', $isBlogSubscribed);
+
+		// Get the menu params associated with this post
+		$params = $post->getMenuParams();
+
+		$this->theme->entryParams = $params;
+
+		parent::display('blogs/entry/default');
 	}
 
-	function bindTags( $arrayData )
+	/**
+	 * Retrieves a list of recent posts
+	 *
+	 * @since	4.0
+	 * @access	private
+	 * @param	string
+	 * @return
+	 */
+	public function getRecentPosts(EasyBlogPost &$post)
 	{
-		$result	= array();
-
-		if( count( $arrayData ) > 0 )
-		{
-			foreach( $arrayData as $tag )
-			{
-				$obj		= new stdClass();
-				$obj->title	= $tag;
-				$result[]	= $obj;
-			}
+		$recent = array();
+		if (!$post->category->getParam('show_author_box', true) || !$post->category->getParam('post_author_recent', true)) {
+			return $recent;
 		}
-		return $result;
+
+		$limit = $post->category->getParam('post_author_recent_limit', 5);
+
+		$model = EB::model('Blog');
+		$result = $model->getBlogsBy('blogger', $post->created_by, 'latest', $limit);
+
+		if (!$result) {
+			return $recent;
+		}
+
+		$posts = array();
+
+		foreach ($result as $row) {
+			$item = EB::post();
+			$item->bind($row, array('force' => true));
+
+			$posts[] = $item;
+		}
+
+		return $posts;
 	}
 
-	function bindContribute( $contribution = '' )
+	/**
+	 * Prepares the blog navigation
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function prepareNavigation(EasyBlogPost &$post)
 	{
-		if( $contribution )
-		{
-			$contributed			= new stdClass();
-			$contributed->team_id	= $contribution;
-			$contributed->selected	= 1;
-
-			return $contributed;
+		// If it's not enabled, skip this
+		if (!$this->config->get('layout_navigation')) {
+			return;
 		}
-		return false;
+
+		// Determines if the blog is associated with any teams
+		$navigationType = 'team';
+
+		// This should change to the menu params
+		if ($this->theme->params->get('layout_navigation_restrict_author')) {
+			$navigationType = 'author';
+		}
+
+		$model = EB::model('Blog');
+		$navigation = $model->getPostNavigation($post, $navigationType);
+
+		if ($navigation->prev) {
+
+			$navigation->prev->link = EBR::_('index.php?option=com_easyblog&view=entry&id=' . $navigation->prev->id);
+			$navigation->prev->title = JString::strlen($navigation->prev->title) > 50 ? JString::substr($navigation->prev->title, 0, 50) . JText::_('COM_EASYBLOG_ELLIPSES') : $navigation->prev->title;
+		}
+
+		if ($navigation->next) {
+			$nextPost = EB::post($navigation->next->id);
+
+			$navigation->next->link = $nextPost->getPermalink();
+			$navigation->next->title = JString::strlen($navigation->next->title) > 50 ? JString::substr($navigation->next->title, 0, 50) . JText::_('COM_EASYBLOG_ELLIPSES') : $navigation->next->title;
+		}
+
+		return $navigation;
 	}
 }

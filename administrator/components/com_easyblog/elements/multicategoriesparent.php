@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,46 +9,42 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-class JElementMultiCategoriesParent extends JElement
+require_once(__DIR__ . '/abstract.php');
+
+class JFormFieldMultiCategoriesParent extends EasyBlogFormField
 {
-	var	$_name = 'MultiCategoriesParent';
+	protected $type = 'MultiCategoriesParent';
 
-	function fetchElement($name, $value, &$node, $control_name)
+	/**
+	 * Displays only parent categories for the form
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	protected function getInput()
 	{
-		$mainframe	= JFactory::getApplication();
-		$db			= JFactory::getDBO();
-		$doc 		= JFactory::getDocument();
+		// Retrieve the list of categories on the site.
+		$model = EB::model('Category');
+		$categories	= $model->getAllCategories(true);
 
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-
-		require_once( JPATH_ROOT . DS . 'administrator' . DS . 'components' . DS . 'com_easyblog' . DS . 'models' . DS . 'categories.php' );
-		$model		= new EasyBlogModelCategories();
-		$categories	= $model->getAllCategories( true );
-
-		if( !is_array( $value ) )
-		{
-			$value	= array( $value );
+		// Ensure that the selected value is always an array
+		if (!is_array($this->value)) {
+			$this->value = array($this->value);
 		}
-		ob_start();
-		?>
-		<select name="<?php echo $control_name;?>[<?php echo $name;?>][]" multiple="multiple" style="width:300px;height:250px;">
-		<?php $selected	= in_array( 'all' , $value ) ? ' selected="selected"' : ''; ?>
-		<option value="all"<?php echo $selected;?>><?php echo JText::_('COM_EASYBLOG_ALL_PARENT_CATEGORIES'); ?></option>
-		<?php		
-		foreach($categories as $category)
-		{
-			$selected	= in_array( $category->id , $value ) ? ' selected="selected"' : '';
-		?>
-			<option value="<?php echo $category->id;?>"<?php echo $selected;?>><?php echo $category->title;?></option>
-		<?php
-		}
-		?>
-		</select>
-		<?php
-		$html	= ob_get_contents();
-		ob_end_clean();
-		return $html;
+
+		$theme = EB::template();
+		$theme->set('categories', $categories);
+		$theme->set('id', $this->id);
+		$theme->set('name', $this->name);
+		$theme->set('value', $this->value);
+
+		$output = $theme->output('admin/elements/multicategories.parent');
+
+		return $output;
 	}
+
 }

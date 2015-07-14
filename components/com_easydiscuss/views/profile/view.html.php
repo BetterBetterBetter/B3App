@@ -32,9 +32,9 @@ class EasyDiscussViewProfile extends EasyDiscussView
 		$config 	= DiscussHelper::getConfig();
 
 		// Custom parameters.
-		$sort			= JRequest::getString('sort', 'latest');
-		$filteractive	= JRequest::getString('filter', 'allposts');
-		$viewType		= JRequest::getString('viewtype', 'questions');
+		$sort = JRequest::getString('sort', 'latest');
+		$filteractive = JRequest::getWord('filter', 'allposts');
+		$viewType = JRequest::getWord('viewtype', 'questions');
 
 		$profile		= DiscussHelper::getTable( 'Profile' );
 		$profile->load( $my->id );

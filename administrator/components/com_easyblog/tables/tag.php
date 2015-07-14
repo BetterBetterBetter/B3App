@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,121 +9,125 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
-require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'constants.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'router.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableTag extends EasyBlogTable
 {
-	var $id 			= null;
-	var $created_by		= null;
-	var $title			= null;
-	var $alias			= null;
-	var $created		= null;
-	var $status			= null;
-	var $published		= null;
-	var $default		= null;
-	var $ordering		= null;
+	public $id = null;
+	public $created_by = null;
+	public $title = null;
+	public $alias = null;
+	public $created = null;
+	public $status = null;
+	public $published = null;
+	public $default = null;
+	public $ordering = null;
 
-
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(& $db )
 	{
 		parent::__construct( '#__easyblog_tag' , 'id' , $db );
 	}
 
-	function load( $id = null , $loadByTitle = false)
+	/**
+	 * Loads a tag
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function load($id = null, $loadByTitle = false, $debug = false)
 	{
-		if( !$loadByTitle)
-		{
-			static $titles	= null;
+		if (!$loadByTitle) {
+			static $items = null;
 
-			if( !isset( $titles[ $id ] ) )
-			{
-				$titles[ $id ]	= parent::load( $id );
+			if (!isset($items[$id])) {
+				$items[$id] = parent::load($id);
 			}
-			return $titles[ $id ];
+
+			return $items[$id];
 		}
 
-		static $tags	= null;
+		static $tags = array();
 
-		if( !isset( $tags[ $id ] ) )
-		{
-			$db		= EasyBlogHelper::db();
-			$query	= 'SELECT *';
-			$query	.= ' FROM ' 	. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_tag');
-			$query	.= ' WHERE (' 	. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('title') . ' = ' .  $db->Quote( JString::str_ireplace( ':' , '-' , $id ) );
-			$query	.= ' OR ' 	. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('title') . ' = ' .  $db->Quote( JString::str_ireplace( '-' , ' ' , $id ) ) . ' ';
-			$query	.= ' OR ' 	. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('alias') . ' = ' .  $db->Quote( JString::str_ireplace( ':' , '-' , $id ) ) . ')';
-			$query	.= ' LIMIT 1';
+		$index = $id . $loadByTitle;
+
+		if (!isset($tags[$index])) {
+			$db = EB::db();
+
+			$query = array();
+			$query[] = 'SELECT * FROM ' . $db->quoteName('#__easyblog_tag');
+			$query[] = 'WHERE (';
+			$query[] = $db->quoteName('title') . '=' . $db->Quote(JString::str_ireplace('-', ' ', $id));
+			$query[] = 'OR ' . $db->quoteName('alias') . '=' . $db->Quote(JString::str_ireplace(':', '-', $id));
+			$query[] = ')';
+
+			$query = implode(' ', $query);
 
 			$db->setQuery($query);
-			$result	= $db->loadObject();
+			$result = $db->loadObject();
 
-			if( $result )
-			{
-				$this->id		= $result->id;
-				$this->title	= $result->title;
-				$this->created_by	= $result->created_by;
-				$this->alias		= $result->alias;
-				$this->created		= $result->created;
-				$this->status		= $result->status;
-				$this->published	= $result->published;
-				$this->ordering		= $result->ordering;
-				
-				$tags[ $id ]		= clone $this;
+			if ($result) {
+				parent::bind($result);
 
-			}
-			else
-			{
-				$tags[ $id ]		= false;
+				$tags[$index] = clone $this;
+			} else {
+				$tags[$index] = false;
 			}
 		}
-		else
-		{
-			parent::bind( $tags[ $id ] );
-		}
 
-		return $tags[ $id ];
+		parent::bind($tags[$index]);
 	}
 
-	function aliasExists()
+	/**
+	 * Determines if the alias exists
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function aliasExists()
 	{
 		$db		= $this->getDBO();
 
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_tag' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'alias' ) . '=' . $db->Quote( $this->alias );
+		$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__easyblog_tag' ) . ' '
+				. 'WHERE ' . $db->nameQuote( 'alias' ) . '=' . $db->Quote( $this->alias );
 
-		if( $this->id != 0 )
-		{
-			$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
+		if ($this->id != 0){
+			$query	.= ' AND ' . $db->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
 		}
 		$db->setQuery( $query );
 
 		return $db->loadResult() > 0 ? true : false;
 	}
 
-	function exists( $title , $isNew = true )
+	/**
+	 * Determines if the tag already exists
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function exists($title, $isNew = true)
 	{
-		$db	= EasyBlogHelper::db();
+		$db	= EB::db();
 
-		$query	= 'SELECT COUNT(1) '
-				. 'FROM ' 	. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('#__easyblog_tag') . ' '
-				. 'WHERE ' 	. EasyBlogHelper::getHelper( 'SQL' )->nameQuote('title') . ' = ' . $db->quote($title);
+		$query = array();
+		$query[] = 'SELECT COUNT(1) FROM ' . $db->quoteName('#__easyblog_tag');
+		$query[] = 'WHERE ' . $db->quoteName('title') . '=' . $db->Quote($title);
 
-		if( !$isNew )
-		{
-			$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
+		if (!$isNew){
+			$query[] = 'AND ' . $db->quoteName('id') . '!=' . $db->Quote($this->id);
 		}
 
-		$query 		.= ' LIMIT 1';
+		$query[] = 'LIMIT 1';
+
+		$query = implode(' ', $query);
+
 		$db->setQuery($query);
 
 		$result	= $db->loadResult() > 0 ? true : false;
@@ -136,216 +140,254 @@ class EasyBlogTableTag extends EasyBlogTable
 	 *
 	 * @param Array $data
 	 **/
-	function bind( $data, $ignore = array() )
+	public function bind($data, $ignore = array())
 	{
-		parent::bind( $data, $ignore );
+		parent::bind($data, $ignore);
 
-		if( empty( $this->created ) )
-		{
-			$date			= EasyBlogHelper::getDate();
-			$this->created	= $date->toMySQL();
+		if (empty($this->created)) {
+			$date = EB::date();
+			$this->created = $date->toMySQL();
 		}
 
-		jimport( 'joomla.filesystem.filter.filteroutput');
-
-		$i	= 1;
-		while( $this->aliasExists() || empty($this->alias) )
-		{
-			$this->alias	= empty($this->alias) ? $this->title : $this->alias . '-' . $i;
-			$i++;
+		if (!$this->title) {
+			return;
 		}
 
-		$this->alias 	= EasyBlogRouter::generatePermalink( $this->alias );
+		// we only do this when this is a new tag or tag with empty alias
+		if (empty($this->id) || empty($this->alias)) {
+			jimport('joomla.filesystem.filter.filteroutput');
+
+			$i = 1;
+			while ($this->aliasExists()) {
+
+				$this->alias = empty($this->alias) ? $this->title : $this->alias . '-' . $i;
+				$i++;
+			}
+		}
+
+		$this->alias = EBR::normalizePermalink($this->alias);
 
 	}
 
 	/**
 	 * Overrides parent's delete method to add our own logic.
 	 *
+	 * @since 4.0
 	 * @return boolean
 	 * @param object $db
 	 */
-	function delete($pk = null)
+	public function delete($pk = null)
 	{
-		$db		= $this->getDBO();
+		$db = EB::db();
 
 		// Ensure that tag associations are removed
 		$this->deletePostTag();
 
-		if( $this->created_by != 0 )
-		{
-	    	JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-	    	$config 	= EasyBlogHelper::getConfig();
+		if ($this->created_by != 0) {
 
-			// @rule: Integrations with EasyDiscuss
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.delete.tag' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_TAG' , $this->title ) );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.delete.tag' , $this->created_by );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.delete.tag' , $this->created_by );
+			// Load site language files
+			EB::loadLanguages();
+
+			$config = EB::config();
+
+			// Integrations with EasyDiscuss
+			$easydiscuss = EB::helper('EasyDiscuss');
+			$easydiscuss->log( 'easyblog.delete.tag' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_TAG' , $this->title ) );
+			$easydiscuss->addPoint( 'easyblog.delete.tag' , $this->created_by );
+			$easydiscuss->addBadge( 'easyblog.delete.tag' , $this->created_by );
 
 			// Assign EasySocial points
-			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
+			$easysocial 	= EB::helper( 'EasySocial' );
 			$easysocial->assignPoints( 'tag.remove' , $this->created_by );
 
-			if( $config->get('main_jomsocial_userpoint') )
-			{
-				$jsUserPoint	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'userpoints.php';
-				if( JFile::exists( $jsUserPoint ) )
-				{
-					require_once( $jsUserPoint );
-					CUserPoints::assignPoint( 'com_easyblog.tag.remove' , $this->created_by );
-				}
-			}
+			// Assign jomsocial points
+			EB::jomsocial()->assignPoints('com_easyblog.tag.remove', $this->created_by);
 
-			// AlphaUserPoints
-			// since 1.2
-			if( EasyBlogHelper::isAUPEnabled() )
-			{
-				AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_delete_tag', AlphaUserPointsHelper::getAnyUserReferreID( $this->created_by ) , '', JText::sprintf('COM_EASYBLOG_AUP_TAG_DELETED', $this->title) );
-			}
-
+			// Assign AUP points
+			EB::aup()->assignPoints('plgaup_easyblog_delete_tag', JText::sprintf('COM_EASYBLOG_AUP_TAG_DELETED', $this->title));
 		}
 
-		$my = JFactory::getUser();
-		//activity logging.
-		$activity   = new stdClass();
-		$activity->actor_id		= $my->id;
-		$activity->target_id	= '0';
-		$activity->context_type	= 'tag';
-		$activity->context_id	= $this->id;
-		$activity->verb         = 'delete';
-		$activity->uuid         = $this->title;
-
-		$state  = parent::delete();
-		if( $state )
-		{
-			EasyBlogHelper::activityLog( $activity );
-		}
-		return $state;
+		return parent::delete();
 	}
 
-	// method to delete all the blog post that associated with the current tag
-	function deletePostTag()
+	/**
+	 * Delete all associated blog posts with this tag
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function deletePostTag()
 	{
-		$db		= $this->getDBO();
+		$model = EB::model('Tags');
 
-		$query	= 'DELETE FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post_tag' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'tag_id' ) . '=' . $db->Quote( $this->id );
-		$db->setQuery( $query );
-
-		if($db->query($db))
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
+		return $model->deleteAssociation($this->post_id);
 	}
 
-	function getPostCount()
+	/**
+	 * Retrieves the number of posts that are associated with this tag.
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getPostCount()
 	{
-		$db		= $this->getDBO();
+		$db = EB::db();
 
-		$query  = 'select count(1) from `#__easyblog_post_tag`';
-		$query  .= ' where `tag_id` = ' . $db->Quote( $this->id );
+		$query = array();
+		$query[] = 'SELECT COUNT(1) FROM ' . $db->qn('#__easyblog_post_tag');
+		$query[] = 'WHERE ' . $db->qn('tag_id') . '=' . $db->Quote($this->id);
 
-		$db->setQuery( $query );
+		$query = implode(' ', $query);
+		$db->setQuery($query);
 
 		$result = $db->loadResult();
-		return ( empty( $result ) ) ? 0 : $result;
+		return $result;
 	}
 
+
+	/**
+	 * Retrieves rss link for the tag
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getRssLink()
+	{
+		return EB::feeds()->getFeedURL('index.php?option=com_easyblog&view=tags&layout=tag&id=' . $this->id, false, 'tag');
+	}
+
+	/**
+	 * Gets the translated tag title
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getTitle()
+	{
+		return JText::_($this->title);
+	}
+
+	/**
+	 * Retrieves the external permalink for this blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getExternalPermalink($format = null)
+	{
+		$format = !is_null($format) ? '&format=' . $format : '';
+		$link = EasyBlogRouter::getRoutedURL('index.php?option=com_easyblog&view=tags&layout=tag&id=' . $this->id . $format, false, true, true);
+
+		return $link;
+	}
+
+	/**
+	 * Retrieves the alias of a tag
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAlias()
+	{
+		$config = EB::config();
+		$alias = $this->alias;
+
+		if ($config->get('main_sef_unicode') || !EBR::isSefEnabled()) {
+			$alias = $this->id . '-' . $this->alias;
+		}
+
+		return $alias;
+	}
+
+	/**
+	 * Gets the tag permalink
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getPermalink($xhtml = true)
+	{
+		$link = 'index.php?option=com_easyblog&view=tags&layout=tag&id=' . $this->getAlias();
+		$link = EBR::_($link, $xhtml);
+
+		return $link;
+	}
+
+	/**
+	 * Saves a tag on the site
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function store($updateNulls = false)
 	{
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-
-		// @rule: Check for empty title
-		if( empty( $this->title ) )
-		{
-			$this->setError( JText::_( 'COM_EASYBLOG_INVALID_TAG' ) );
+		// Check for empty title
+		if (empty($this->title)){
+			$this->setError(JText::_('COM_EASYBLOG_INVALID_TAG'));
 			return false;
 		}
 
 		// @rule: Check if such tag exists.
-		if( $this->exists( $this->title , !$this->id ) )
-		{
-			$this->setError( JText::_( 'COM_EASYBLOG_TAG_ALREADY_EXISTS' ) );
+		if ($this->exists($this->title, !$this->id)){
+			$this->setError(JText::_('COM_EASYBLOG_TAG_ALREADY_EXISTS'));
 
 			return false;
 		}
 
 		// @task: If alias is null, we need to generate them here.
-		jimport( 'joomla.filesystem.filter.filteroutput');
+		jimport('joomla.filesystem.filter.filteroutput');
 
-		$i	= 1;
-		while( $this->aliasExists() || empty($this->alias) )
-		{
-			$this->alias	= empty($this->alias) ? $this->title : $this->alias . '-' . $i;
+		$i = 1;
+
+		while($this->aliasExists() || empty($this->alias)) {
+			$this->alias = empty($this->alias) ? $this->title : $this->alias . '-' . $i;
 			$i++;
 		}
 
-		$this->alias 	= EasyBlogRouter::generatePermalink( $this->alias );
+		$this->alias = EBR::normalizePermalink($this->alias);
 
-		if( !empty( $this->created ))
-		{
-			$offset     	= EasyBlogDateHelper::getOffSet();
-			$newDate    = EasyBlogHelper::getDate($this->created, $offset);
-			$this->created  = $newDate->toMySQL();
-		}
-		else
-		{
-			$newDate    = EasyBlogHelper::getDate();
-			$this->created  = $newDate->toMySQL();
-		}
+		$date = EB::date($this->created);
+		$this->created = $date->toSql();
 
 	    $isNew	= !$this->id;
 	    $state	= parent::store();
 	    $my		= JFactory::getUser();
 
-	    if( $isNew && $my->id != 0 )
-	    {
-	    	JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-	    	$config 	= EasyBlogHelper::getConfig();
+	    // Integrate with 3rd party extension
+	    if ($isNew && $my->id != 0) {
+
+	    	EB::loadLanguages();
+	    	$config = EB::getConfig();
 
 			// @rule: Integrations with EasyDiscuss
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.new.tag' , $my->id , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_TAG' , $this->title ) );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.new.tag' , $my->id );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.new.tag' , $my->id );
+			EB::easydiscuss()->log('easyblog.new.tag', $my->id, JText::sprintf('COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_TAG', $this->title));
+			EB::easydiscuss()->addPoint('easyblog.new.tag', $my->id);
+			EB::easydiscuss()->addBadge('easyblog.new.tag', $my->id);
 
 			// Assign EasySocial points
-			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-			$easysocial->assignPoints( 'tag.create' , $my->id );
+			EB::easysocial()->assignPoints('tag.create', $my->id);
 
-			if( $config->get('main_jomsocial_userpoint') )
-			{
-				$jsUserPoint	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'userpoints.php';
-				if( JFile::exists( $jsUserPoint ) )
-				{
-					require_once( $jsUserPoint );
-					CUserPoints::assignPoint( 'com_easyblog.tag.add' , $my->id );
-				}
-			}
+			// Assign jomsocial points
+			EB::jomsocial()->assignPoints('com_easyblog.tag.add', $my->id);
 
-			// AlphaUserPoints
-			// since 1.2
-			if( EasyBlogHelper::isAUPEnabled() )
-			{
-				AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_add_tag', '', 'easyblog_add_tag_' . $this->id, JText::sprintf('COM_EASYBLOG_AUP_TAG_ADDED', $this->title) );
-			}
-	    }
-
-		if( $state )
-		{
-			//activity logging.
-			$activity   = new stdClass();
-			$activity->actor_id		= $my->id;
-			$activity->target_id	= '0';
-			$activity->context_type	= 'tag';
-			$activity->context_id	= $this->id;
-			$activity->verb         = ( $isNew ) ? 'add' : 'update';
-			$activity->uuid         = $this->title;
-
-			EasyBlogHelper::activityLog( $activity );
+			// AUP
+			EB::aup()->assignPoints('plgaup_easyblog_add_tag', $my->id, JText::sprintf('COM_EASYBLOG_AUP_TAG_ADDED', $this->title));
 		}
 
 	    return $state;

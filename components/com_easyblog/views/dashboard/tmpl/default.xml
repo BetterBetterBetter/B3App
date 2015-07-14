@@ -6,8 +6,4 @@
 		</message>
 		<view>dashboard</view>
 	</layout>
-	<state>
-		<name><![CDATA[COM_EASYBLOG_MENU_DASHBOARD_LAYOUT]]></name>
-		<description><![CDATA[COM_EASYBLOG_MENU_DASHBOARD_LAYOUT_DESC]]></description>
-	</state>
 </metadata>

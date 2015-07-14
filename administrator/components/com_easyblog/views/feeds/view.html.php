@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -11,109 +11,154 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewFeeds extends EasyBlogAdminView
 {
-	function display($tpl = null)
+
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.feeds' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
+		// Check for access
+		$this->checkAccess('easyblog.manage.feeds');
+
+		$layout = $this->getLayout();
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout();
+		}
+
+		$this->setHeading('COM_EASYBLOG_BLOGS_FEEDS_TITLE', '', 'fa-rss-square');
+
+		$model = EB::model('Feeds');
+		$feeds = $model->getData();
+		$pagination = $model->getPagination();
+
+		if ($feeds) {
+
+			foreach ($feeds as &$feed) {
+
+				if ($feed->last_import == '0000-00-00 00:00:00') {
+					$feed->import_text = JText::_('COM_EASYBLOG_NEVER');
+				} else {
+					$feed->import_text = $feed->last_import;
+				}
 			}
 		}
 
-		//initialise variables
-		$document	= JFactory::getDocument();
-		$user		= JFactory::getUser();
-		$mainframe	= JFactory::getApplication();
+		$filter_state = $this->app->getUserStateFromRequest( 'com_easyblog.feeds.filter_state', 		'filter_state', 	'*', 'word' );
+		$search = $this->app->getUserStateFromRequest( 'com_easyblog.feeds.search', 			'search', 			'', 'string' );
+		$search = trim(JString::strtolower($search));
 
-		JHTML::_('behavior.tooltip');
+		$this->set('state', JHTML::_('grid.state', $filter_state));
+		$this->set('search', $search);
+		$this->set('feeds', $feeds);
+		$this->set('pagination', $pagination);
 
-		$layout		= $this->getLayout();
+		parent::display('feeds/default');
+	}
 
-		if( $layout != 'default' )
-		{
-			$this->$layout( $tpl );
+	/**
+	 * Displays the new feed form
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function form()
+	{
+		// Load the feed table
+		$feed = EB::table('Feed');
+		$id = $this->input->get('id', 0, 'int');
+
+		$feed->load($id);
+
+		JHTML::_('behavior.modal');
+
+		if (!empty($post)) {
+			$feed->bind($post);
+		}
+
+		$category 	= '';
+		$author 	= '';
+		$teamName 	= '';
+
+		if (!empty($feed->item_category)) {
+			$category = $feed->getCategoryName();
+		}
+
+		if (!empty($feed->item_creator)) {
+			$user = JFactory::getUser($feed->item_creator);
+			$author	= $user->name;
+		}
+
+		if (!empty($feed->item_team)) {
+			$team = EB::table('TeamBlog');
+	   		$team->load($feed->item_team);
+	   		$teamName = $team->title;
+		}
+		
+		// Get a new params object
+		$params = EB::getRegistry($feed->params);
+
+		$this->set('params', $params);
+		$this->set('feed', $feed);
+		$this->set('category', $category);
+		$this->set('author', $author);
+		$this->set('teamName', $teamName);
+
+		parent::display('feeds/form');
+	}
+
+	/**
+	 * Displays the Joomla toolbar
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function registerToolbar()
+	{
+
+		$layout = $this->getLayout();
+
+		if ($layout == 'form') {
+
+			// Load the feed table
+			$feed 	= EB::table('Feed');
+			$id 	= JRequest::getInt('id');
+
+			$feed->load($id);
+
+			$title 	= 'COM_EASYBLOG_FEEDS_CREATE_NEW_TITLE';
+
+			if ($feed->id) {
+				$title 	= 'COM_EASYBLOG_FEEDS_EDIT_TITLE';
+			}
+
+			JToolBarHelper::title(JText::_($title));
+			$this->setHeading($title, '', 'fa-rss-square');
+
+			// Set the toolbars
+			JToolBarHelper::apply('feeds.apply');
+			JToolBarHelper::save('feeds.save');
+			JToolbarHelper::save2new('feeds.savenew');
+			JToolBarHelper::divider();
+			JToolbarHelper::cancel('feeds.cancel');
+
 			return;
 		}
 
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_TITLE' ), 'feeds' );
+		// Set page details
+		$this->setHeading('COM_EASYBLOG_BLOGS_FEEDS_TITLE', '', 'fa-rss-square');
 
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
+		JToolBarHelper::title(JText::_('COM_EASYBLOG_BLOGS_FEEDS_TITLE'), 'feeds');
+
+		JToolbarHelper::addNew('feeds.add');
 		JToolBarHelper::divider();
-		JToolBarHelper::custom('addNew','new.png','new_f2.png', JText::_( 'COM_EASYBLOG_ADD_BUTTON' ) , false);
-		JToolbarHelper::divider();
-		JToolbarHelper::publishList('publish');
-		JToolbarHelper::unpublishList('unpublish');
+		JToolbarHelper::publishList('feeds.publish');
+		JToolbarHelper::unpublishList('feeds.unpublish');
 		JToolBarHelper::divider();
-		JToolBarHelper::custom('download','download','download.png', JText::_( 'Execute' ) , false);
-		JToolBarHelper::divider();
-		JToolbarHelper::deleteList();
+		JToolbarHelper::deleteList(JText::_('COM_EASYBLOG_FEEDS_DELETE_CONFIRMATION'), 'feeds.remove');
 
-		$feeds			= $this->get( 'Data' );
-		$pagination		= $this->get( 'Pagination' );
-
-		$filter_state	= $mainframe->getUserStateFromRequest( 'com_easyblog.categories.filter_state', 		'filter_state', 	'*', 'word' );
-		$search			= $mainframe->getUserStateFromRequest( 'com_easyblog.categories.search', 			'search', 			'', 'string' );
-		$search			= trim(JString::strtolower( $search ) );
-
-		$this->assign( 'state'	, JHTML::_('grid.state', $filter_state ) );
-		$this->assign( 'search' , $search );
-		$this->assign( 'feeds'	, $feeds );
-		$this->assign( 'pagination'	, $pagination );
-		parent::display($tpl);
-	}
-
-	public function form( $tpl = null )
-	{
-		JHTML::_('behavior.modal' , 'a.modal' );
-		$feed	= EasyBlogHelper::getTable( 'Feed' , 'Table' );
-
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_BLOGS_FEEDS_CREATE_NEW_TITLE' ), 'feeds' );
-
-		JToolBarHelper::custom('save','save.png','save_f2.png', 'COM_EASYBLOG_SAVE', false);
-		JToolbarHelper::cancel();
-
-		$cid	= JRequest::getVar( 'cid' , '' , 'REQUEST' );
-
-		if( !empty( $cid ) )
-		{
-			$feed->load( $cid );
-		}
-
-		$post	= JRequest::get( 'POST' );
-
-		if( ! empty( $post ) )
-		{
-			$feed->bind( $post );
-		}
-
-		$categoryName	= '';
-		$authorName		= '';
-
-		if( !empty($feed->item_category) )
-		{
-			$categoryName	= $feed->getCategoryName();
-		}
-
-		if( !empty($feed->item_creator) )
-		{
-			$author			= JFactory::getUser($feed->item_creator);
-			$authorName		= $author->name;
-		}
-
-		$params				= EasyBlogHelper::getRegistry( $feed->params );
-
-		$this->assignRef( 'params'			, $params );
-		$this->assignRef( 'feed' 			, $feed );
-		$this->assignRef( 'categoryName' 	, $categoryName );
-		$this->assignRef( 'authorName' 		, $authorName );
-
-		parent::display( $tpl );
 	}
 }

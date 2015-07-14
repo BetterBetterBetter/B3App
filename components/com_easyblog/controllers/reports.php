@@ -1,85 +1,81 @@
 <?php
 /**
- * @package		EasyBlog
- * @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
- * @license		GNU/GPL, see LICENSE.php
- *
- * EasyBlog is free software. This version may have been modified pursuant
- * to the GNU General Public License, and as distributed it includes or
- * is derivative of works licensed under the GNU General Public License or
- * other free or open source software licenses.
- * See COPYRIGHT.php for copyright notices and details.
- */
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
+* @license		GNU/GPL, see LICENSE.php
+* EasyBlog is free software. This version may have been modified pursuant
+* to the GNU General Public License, and as distributed it includes or
+* is derivative of works licensed under the GNU General Public License or
+* other free or open source software licenses.
+* See COPYRIGHT.php for copyright notices and details.
+*/
+defined('_JEXEC') or die('Unauthorized Access');
 
-defined('_JEXEC') or die('Restricted access');
+require_once(dirname(__FILE__) . '/controller.php');
 
-require_once( EBLOG_ROOT . DIRECTORY_SEPARATOR . 'controller.php' );
-
-class EasyBlogControllerReports extends EasyBlogParentController
+class EasyBlogControllerReports extends EasyBlogController
 {
 	/**
-	 * Process report items.
+	 * Allows caller to submit a report
 	 *
+	 * @since	4.0
 	 * @access	public
-	 * @param	null
-	 **/
-	public function submitReport()
+	 * @param	string
+	 * @return	
+	 */
+	public function submit()
 	{
-		JRequest::checkToken() or die( 'Invalid Token' );
+		// Check for request forgeries
+		EB::checkToken();
 
-		$my 		= JFactory::getUser();
-		$config 	= EasyBlogHelper::getConfig();
+		// Get the composite keys
+		$id = $this->input->get('id', 0, 'int');
+		$type = $this->input->get('type', '', 'cmd');
+
+		// Initialize redirection link
+		$redirect = EB::_( 'index.php?option=com_easyblog&view=entry&id=' . $id, false);
+
+		// Check if guest is allowed to report or not.
+		if ($this->my->guest && !$this->config->get('main_reporting_guests')) {
+			$this->info->set('COM_EASYBLOG_CATEGORIES_FOR_REGISTERED_USERS_ONLY', 'error');
+
+			return $this->app->redirect($redirect);
+		}
+
+		// Ensure that the report reason is not empty.
+		$reason = $this->input->get('reason', '', 'default');
+
+		if (!$reason) {
+			EB::info()->set(JText::_('COM_EASYBLOG_REPORT_PLEASE_SPECIFY_REASON'), 'error');
+
+			return $this->app->redirect($redirect);
+		}
+
+		$report = EB::table('Report');
+		$report->obj_id = $id;
+		$report->obj_type = $type;
+		$report->reason = $reason;
+		$report->created = EB::date()->toSql();
+		$report->created_by = $this->my->id;
+		$report->ip = @$_SERVER['REMOTE_ADDR'];
+
+		$state = $report->store();
+
+		if (!$state) {
+			$this->info->set($report->getError());
+
+			return $this->app->redirect($redirect);
+		}
+
+		// Notify the site admin when there's a new report made
+		$post = EB::post($id);
+
+		$report->notify($post);
 		
-		if( !$my->id && !$config->get( 'main_reporting_guests' ) )
-		{
-			echo JText::_( 'COM_EASYBLOG_CATEGORIES_FOR_REGISTERED_USERS_ONLY' );
-			exit;
-		}
-
-		$objId		= JRequest::getInt( 'obj_id' );
-		$objType	= JRequest::getCmd( 'obj_type' );
-		$reason		= JRequest::getString( 'reason' );
-
-		// @task: Ensure that the reason is never empty.
-		if( empty( $reason ) )
-		{
-			EasyBlogHelper::setMessageQueue( JText::_( 'COM_EASYBLOG_REPORT_PLEASE_SPECIFY_REASON' ) , 'error' );
-			$this->setRedirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=entry&id=' . $objId , false ) );
-			return;
-		}
-
-		$report		= EasyBlogHelper::getTable( 'Report' );
-		$report->set( 'obj_id'		, $objId );
-		$report->set( 'obj_type'	, $objType );
-		$report->set( 'reason'		, $reason );
-		$report->set( 'created'		, EasyBlogHelper::getDate()->toMySQL() );
-		$report->set( 'created_by'	, $my->id );
-		$report->set( 'ip'			, @$_SERVER['REMOTE_ADDR'] );
+		$message = JText::_('COM_EASYBLOG_THANKS_FOR_REPORTING');
 		
-		if( !$report->store() )
-		{
-			$error 	= $report->getError();
-
-			EasyBlogHelper::setMessageQueue( $error , 'error' );
-			$this->setRedirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=entry&id=' . $objId , false ) );
-			return;
-		}
-
-		// @TODO: Configurable report links
-		switch( $objType )
-		{
-			case EBLOG_REPORTING_POST:
-			default:
-				$blog 		= EasyBlogHelper::getTable( 'Blog' );
-				$blog->load( $objId );
-
-				$report->notify( $blog );
-				
-				$message 	= JText::_( 'COM_EASYBLOG_THANKS_FOR_REPORTING' );
-				$redirect 	= EasyBlogRouter::_( 'index.php?option=com_easyblog&view=entry&id=' . $objId , false );
-			break;
-		}
-		EasyBlogHelper::setMessageQueue( $message );
-		$this->setRedirect( $redirect );
+		$this->info->set($message, 'success');
+		return $this->app->redirect($redirect);
 	}
+
 }

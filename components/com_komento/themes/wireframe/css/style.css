@@ -3364,6 +3364,7 @@ div#section-kmt.kmt .kmt-avatar img {
   width: 50px;
   height: 50px;
   border-radius: 2px;
+  max-width: none !important;
 }
 div#section-kmt.kmt .kmt-avatar-sm {
   display: inline-block;
@@ -3373,6 +3374,7 @@ div#section-kmt.kmt .kmt-avatar-sm img {
   width: 40px;
   height: 40px;
   border-radius: 2px;
+  max-width: none !important;
 }
 div#section-kmt.kmt img {
   max-width: none;
@@ -4180,8 +4182,8 @@ body div#section-kmt.kmt .markItUpFooter {
   font-weight: normal;
   background: #ddd;
 }
-.foundryDialog .dialog-wrap {
-  width: 500px !important;
+.foundryDialog .dialog-closeButton {
+  background: url('../../../../../media/foundry/3.1/styles/dialog/images/cross-8.png') center !important;
 }
 .foundryDialog .dialog-wrap {
   width: 500px !important;
@@ -4200,9 +4202,7 @@ body div#section-kmt.kmt .markItUpFooter {
 .kmt-liker-thumb b {
   display: none;
 }
-/* =profile
-****************************************/
-#section-kmt .kmt-profile-avatar {
+.foundryDialog .dialog-closeButton #section-kmt .kmt-profile-avatar {
   float: left;
   display: inline-block;
 }

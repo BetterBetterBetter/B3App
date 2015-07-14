@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,108 +9,113 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'image.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'string.php' );
+require_once(dirname(__FILE__) . '/table.php');
 
 class EasyBlogTableProfile extends EasyBlogTable
 {
-	var $id				= null;
-	var $title			= null;
-	var $nickname		= null;
-	var $avatar			= null;
-	var $description	= null;
-	var $biography		= null;
-	var $url			= null;
-	var $params			= null;
-	var $user			= null;
-	var $permalink		= null;
+	public $id = null;
+	public $title = null;
+	public $nickname = null;
+	public $avatar = null;
+	public $description = null;
+	public $biography = null;
+	public $url = null;
+	public $params = null;
+	public $user = null;
+	public $permalink = null;
+	public $custom_css = null;
+
+	static $oauthClients = array();
+
+	public function __construct(&$db)
+	{
+		parent::__construct('#__easyblog_users', 'id', $db);
+	}
 
 	/**
-	 * Constructor for this class.
+	 * Binds an array of data with the current profile object.
 	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
 	 * @return
-	 * @param object $db
 	 */
-	function __construct(& $db )
+	public function bind($data, $ignore = array())
 	{
-		parent::__construct( '#__easyblog_users' , 'id' , $db );
-	}
+		// Load the parent bind method
+		$state = parent::bind($data, $ignore);
 
-	function bind( $data, $ignore = array() )
-	{
-		parent::bind( $data, $ignore );
+		// Normalize the url
+		$this->url = EB::string()->normalizeUrl($this->url);
 
-		$this->url	= $this->_appendHTTP( $this->url );
-
-		//default to username for blogger permalink if empty
-		if(empty($this->permalink))
-		{
-			$user	= JFactory::getUser($this->id);
-			$this->permalink	= ( isset($user->username) ) ? $user->username : $this->id;
-			$this->permalink 	= JFilterOutput::stringURLSafe( $this->permalink );
-		}
-		else
-		{
-			$this->permalink	= JFilterOutput::stringURLSafe($this->permalink);
+		// If user's permalink is empty, we need to generate one for them.
+		if (empty($this->permalink)) {
+			$user = JFactory::getUser($this->id);
+			$this->permalink = $user->username;
 		}
 
-		return true;
+		// Ensure that the permalink is valid
+		$this->permalink = JFilterOutput::stringURLSafe($this->permalink);
+
+		return $state;
 	}
 
+	/**
+	 * Override the parents implementation of storing a profile
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function store($updateNulls = false)
 	{
-		$isNew  = ( empty( $this->id ) ) ? true : false;
+		$isNew = empty($this->id) ? true : false;
 
 		$state 	= parent::store($updateNulls);
 		$my 	= JFactory::getUser();
 
-		if( $my->id == $this->id )
-		{
-			JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
+		// If the user is updating their own profile
+		if ($my->id == $this->id) {
+			JFactory::getLanguage()->load('com_easyblog', JPATH_ROOT);
 
 			// @rule: Integrations with EasyDiscuss
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.update.profile' , $this->id , JText::_( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_UPDATE_PROFILE' ) );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.update.profile' , $this->id );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.update.profile' , $this->id );
-		}
-
-		if( ! $isNew )
-		{
-			$activity   = new stdClass();
-			$activity->actor_id		= $my->id;
-			$activity->target_id	= ( $my->id == $this->id ) ? '0' : $this->id;
-			$activity->context_type	= 'profile';
-			$activity->context_id	= $this->id;
-			$activity->verb         = 'update';
-			EasyBlogHelper::activityLog( $activity );
+			EB::easydiscuss()->log('easyblog.update.profile', $this->id, JText::_('COM_EASYBLOG_EASYDISCUSS_HISTORY_UPDATE_PROFILE'));
+			EB::easydiscuss()->addPoint('easyblog.update.profile', $this->id);
+			EB::easydiscuss()->addBadge('easyblog.update.profile', $this->id);
 		}
 
 		return $state;
 	}
 
-	function _createDefault( $id )
+	/**
+	 * Creates a new record for the user.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	int		The user's id.
+	 * @return
+	 */
+	public function createDefault($id)
 	{
-		$db	= $this->getDBO();
+		$db = EB::db();
+		$user = JFactory::getUser($id);
 
-		$user	= JFactory::getUser($id);
+		$obj = new stdClass();
+		$obj->id = $user->id;
+		$obj->nickname = $user->name;
+		$obj->avatar = 'default_blogger.png';
+		$obj->description = '';
+		$obj->url = '';
+		$obj->params = '';
 
-		$obj				= new stdClass();
-		$obj->id 			= $user->id;
-		$obj->nickname		= $user->name;
-		$obj->avatar		= 'default_blogger.png';
-		$obj->description 	= '';
-		$obj->url			= '';
-		$obj->params		= '';
-
-		//default to username for blogger permalink
-		$obj->permalink		= JFilterOutput::stringURLSafe( $user->username );
+		// Default to username for blogger permalink
+		$obj->permalink = JFilterOutput::stringURLSafe( $user->username );
 
 		// we do not insert 0 id into users table.
-		if( $user->id )
-		{
+		if ($user->id) {
 			$db->insertObject('#__easyblog_users', $obj);
 		}
 
@@ -118,401 +123,477 @@ class EasyBlogTableProfile extends EasyBlogTable
 	}
 
 	/**
-	 * override load method.
-	 * if user record not found in eblog_profile, create one record.
+	 * Loads the blogger record
 	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	int
+	 * @return
 	 */
-	function load($id = null, $reset = true)
+	public function load($id = null, $reset = true)
 	{
 		static $users = null;
 
 		$id = ( $id == '0' ) ? null : $id;
-		if( is_null($id) )
-		{
-			$this->bind( JFactory::getUser(0) );
+
+		if (is_null($id)) {
+			$this->bind(JFactory::getUser(0));
 			return $this;
 		}
 
-		if (empty($id))
-		{
+		if (empty($id)) {
 			// When the id is null or 0
 			$this->bind( JFactory::getUser() );
 			return $this;
 		}
 
-		if( !isset( $users[ $id ] ) )
-		{
-			if((! parent::load($id)) && ($id != 0))
-			{
-				$obj	= $this->_createDefault($id);
-				$this->bind( $obj );
+		if (!isset($users[$id])) {
+
+			if ((! parent::load($id)) && ($id != 0)) {
+				$obj	= $this->createDefault($id);
+				$this->bind($obj);
 			}
 
-			$users[ $id ] = clone $this;
+			$users[$id] = clone $this;
 		}
 
-		$this->user	= JFactory::getUser( $id );
-		$this->bind( $users[ $id ] );
+		$this->user	= JFactory::getUser($id);
+		$this->bind($users[$id]);
 
-		return $users[ $id ];
+		return $users[$id];
 	}
 
-	function setUser( $my )
+	public function setUser($my)
 	{
-		$this->load( $my->id );
+		$this->load($my->id);
 		$this->user = $my;
 	}
 
-	function getLink()
+	/**
+	 * Determines if the author is associated with any teams or not
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function hasTeams()
 	{
-		return EasyBlogRouter::_('index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $this->id);
+		static $teams = array();
+
+		if (!isset($teams[$this->id])) {
+			$model = EB::model('TeamBlogs');
+
+			$teams[$this->id] = $model->getUserTeams();
+		}
+
+		return count($teams[$this->id]) >= 1;
 	}
 
-	function getName(){
-
-		if($this->id == 0)
-		{
+	/**
+	 * Retrieves the blogger's name
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	string
+	 */
+	public function getName()
+	{
+		if($this->id == 0) {
 			return JText::_('COM_EASYBLOG_GUEST');
 		}
 
-		$config 		= EasyBlogHelper::getConfig();
-		$displayname    = $config->get('layout_nameformat');
-
-		if( !$this->user )
-		{
-			$this->user	= JFactory::getUser( $this->id );
+		if (!$this->user) {
+			$this->user	= JFactory::getUser($this->id);
 		}
 
-		switch($displayname)
-		{
-			case "name" :
-				$name = $this->user->name;
-				break;
-			case "username" :
-				$name = $this->user->username;
-				break;
-			case "nickname" :
-			default :
-				$name = (empty($this->nickname)) ? $this->user->name : $this->nickname;
-				break;
+		$config = EB::config();
+		$type = $config->get('layout_nameformat');
+
+		// Default to the person's name
+		$name = $this->user->name;
+
+		if ($type == 'username') {
+			$name = $this->user->username;
 		}
 
-		return EasyBlogStringHelper::escape( $name );
+		if ($type == 'nickname' && !empty($this->nickname)) {
+			$name = $this->nickname;
+		}
+
+		// Ensure that the name cannot be exploited.
+		$name = EB::string()->escape($name);
+
+		return $name;
 	}
 
-	function getId(){
-		return $this->id;
+	/**
+	 * Sets an author as featured author
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function setFeatured()
+	{
+		$model = EB::model('Featured');
+
+		$state = $model->makeFeatured(EBLOG_FEATURED_BLOGGER, $this->id);
+
+		return $state;
+	}
+
+	/**
+	 * Remove a featured status for author on the site
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function removeFeatured()
+	{
+		$model = EB::model('Featured');
+		$state = $model->removeFeatured(EBLOG_FEATURED_BLOGGER, $this->id);
+
+		return $state;
+	}
+
+	/**
+	 * Retrieves author's acl
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAcl()
+	{
+		$acl = EB::acl($this->id);
+
+		return $acl;
 	}
 
 	/**
 	 * Retrieves the user's avatar
 	 *
-	 **/
-	function getAvatar()
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAvatar()
 	{
-		// not sure why when reach here, the $this->id is NULL, this is not suppose to happen.
-		if( is_null( $this->id ) || $this->id == "")
-		{
-			$this->id = '0';
-		}
+		$avatar = EB::avatar()->getAvatarURL($this);
 
-		return EasyBlogHelper::getHelper( 'avatar' )->getAvatarURL( $this );
+		return $avatar;
 	}
 
-	function getDescription($raw = false)
+	/**
+	 * Retrieve the editor to use for this user
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getEditor()
+	{
+		$config = EB::config();
+		$editor = $config->get('layout_editor');
+
+		return $editor;
+		// if ($editor != 'composer' && !$config->get('layout_editor_author')) {
+		// 	return $editor;
+		// }
+
+		// $params = $this->user->params;
+		// $params = json_decode($params);
+
+		// if (!isset($params->editor) || !$params->editor) {
+		// 	return $editor;
+		// }
+
+		// return $params->editor;
+	}
+
+	/**
+	 * Retrieves the description of the blogger
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getDescription($raw = false)
 	{
 		$description = $raw ? $this->description : nl2br($this->description);
 		return $description;
 	}
 
 	/**
-	 * Retrieves the user's twitter link
-	 **/
-	function getTwitterLink()
+	 * Retrieves author's twitter link
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getTwitterLink()
 	{
-		return EasyBlogHelper::getHelper( 'SocialShare' )->getLink( 'twitter' , $this->id );
+		static $links = array();
+
+		if (!isset($links[$this->id])) {
+
+			$links[$this->id] = '';
+
+			$oauth = EB::table('OAuth');
+			$oauth->loadByUser($this->id, 'twitter');
+
+			$params = EB::registry($oauth->params);
+			$screenName = $params->get('screen_name');
+
+			if ($screenName) {
+				$links[$this->id] = 'https://twitter.com/' . $screenName;
+			}
+		}
+
+		return $links[$this->id];
 	}
 
 	/**
-	 * Determines whether the blogger is a featured blogger
-	 **/
-	function isFeatured()
+	 * Determines if the blogger is featured on the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isFeatured()
 	{
-		return EasyBlogHelper::isFeatured( 'blogger', $this->id );
+		$model = EB::model('Featured');
+
+		return $model->isFeatured('blogger', $this->id);
+	}
+
+	/**
+	 * Retrieves the total number of posts created by the author
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getTotalPosts()
+	{
+		static $total = array();
+
+		if (!isset($total[$this->id])) {
+			$model = EB::model('Blogger');
+
+			$total[$this->id] = $model->getTotalBlogCreated($this->id);
+		}
+
+		return $total[$this->id];
 	}
 
 	/**
 	 * Retrieves the biography from the specific blogger
-	 **/
-	function getBiography($raw = false)
-	{
-		static $loaded	= array();
-
-		if( !isset( $loaded[ $this->id ] ) )
-		{
-			$status		= '';
-			$config		= EasyBlogHelper::getConfig();
-
-			if( $config->get( 'integrations_jomsocial_blogger_status' ) )
-			{
-				$path		= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'core.php';
-
-				if( JFile::exists( $path ) )
-				{
-					require_once( $path );
-					require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'helpers' . DIRECTORY_SEPARATOR . 'string.php' );
-					$user	= CFactory::getUser( $this->id );
-					$status	= $user->getStatus();
-				}
-			}
-
-			if( !empty( $this->biography ) && empty( $status ) )
-			{
-				$status	= $raw ? $this->biography : nl2br( $this->biography );
-			}
-
-			if( empty( $status ) )
-			{
-				$lang	= JFactory::getLanguage();
-				$lang->load( 'com_easyblog' , JPATH_ROOT );
-
-				$status	= JText::sprintf( 'COM_EASYBLOG_BIOGRAPHY_NOT_SET' , $this->getName() );
-			}
-
-			$loaded[ $this->id ]	= $status;
-		}
-
-		return $loaded[ $this->id ];
-	}
-
-	function getWebsite()
-	{
-		$url 	= $this->url == 'http://' ? '' : $this->url;
-
-		return $url;
-	}
-
-	/*
-	 * Generates profile links for the author.
 	 *
-	 * @param	null
-	 * @return	string	The link to their profile
+	 * @since	4.0
+	 * @access	public
+	 * @param	boolean		True to retrieve raw data
+	 * @return	string
 	 */
-	public function getProfileLink( $defaultItemId = '' )
+	public function getBiography($raw = false)
 	{
-		static $instance	= array();
-		static $phpbbDB		= null;
-		static $phpbbpath	= null;
-		static $isBlogger	= array();
+		static $items = array();
 
-		// since it's for avatar, we'll follow the avatar's integration
-		$config	= EasyBlogHelper::getConfig();
-		$source	= $config->get( 'layout_avatarIntegration' );
+		if (!isset($items[$this->id])) {
 
-		if(! $config->get('main_nonblogger_profile') )
-		{
-			// 1st check if this user a blogger or not.
-			$showLink   = false;
-			if( isset($isBlogger[$this->id]) )
-			{
-				$showLink   = $isBlogger[$this->id];
-			}
-			else
-			{
-				$showLink	= EasyBlogHelper::isBlogger( $this->id );
-				$isBlogger[$this->id]   = $showLink;
+			EB::loadLanguages();
+
+			$biography = $raw ? $this->biography : nl2br($this->biography);
+
+			if (!$biography) {
+				$biography = JText::sprintf('COM_EASYBLOG_BIOGRAPHY_NOT_SET', $this->getName());
 			}
 
-			if( !$showLink )
-			{
-				return 'javascript: void(0);';
-			}
+			$items[$this->id] = $biography;
 		}
 
-		// phpbb case
-		if($source == 'phpbb' && $phpbbDB === null)
-		{
-			$phpbbpath	= $config->get( 'layout_phpbb_path' );
-			$file		= JPATH_ROOT . DIRECTORY_SEPARATOR . $phpbbpath . DIRECTORY_SEPARATOR . 'config.php';
-
-			if (JFile::exists($file))
-			{
-				require($file);
-
-				$host		= $dbhost;
-				$user		= $dbuser;
-				$password	= $dbpasswd;
-				$database	= $dbname;
-				$prefix		= $table_prefix;
-				$driver		= $dbms;
-				$debug		= 0;
-
-				$options	= array ( 'driver' => $driver, 'host' => $host, 'user' => $user, 'password' => $password, 'database' => $database, 'prefix' => $prefix );
-				$phpbbDB	= JDatabase::getInstance( $options );
-			} else {
-				$phpbbDB	= false;
-			}
-		}
-		if ($phpbbDB === false)
-		{
-			// can't get phpbb's config file, fallback to default profile link
-			$source		= 'default';
-		}
-
-		// Always use the core linking if user does not wants this.
-		if( !$config->get( 'layout_avatar_link_name') )
-		{
-			$source		= 'default';
-		}
-
-		// to ensure the passed in value is only a number
-		$defaultItemId  = str_replace( '&Itemid=', '', $defaultItemId);
-
-		// to ensure the uniqueness of the key
-		$key = $source . '-' . $defaultItemId;
-
-		// this is where the magic starts
-		if (!isset($instance[$this->id][$key]))
-		{
-			$defaultItemId  = ( !empty( $defaultItemId ) ) ? '&Itemid=' . $defaultItemId : '';
-			$defaultLink	= EasyBlogRouter::_( 'index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $this->id . $defaultItemId );
-
-			switch ($source)
-			{
-				case 'k2':
-
-					$file1 = JPATH_ROOT . '/components/com_k2/helpers/route.php';
-					$file2 = JPATH_ROOT . '/components/com_k2/helpers/utilities.php';
-
-					jimport( 'joomla.filesystem.file' );
-
-					if( JFile::exists( $file1 ) && JFile::exists( $file2 ) )
-					{
-						require_once($file1);
-						require_once($file2);
-
-						$ret	= K2HelperRoute::getUserRoute( $this->id );
-					}
-					else
-					{
-						$ret 	= $defaultLink;
-					}
-
-					break;
-				case 'mightyregistration':
-					$ret	= JRoute::_( 'index.php?option=com_community&view=profile&user_id=' . $this->id , false );
-					break;
-				case 'communitybuilder':
-					$ret	= JRoute::_('index.php?option=com_comprofiler&task=userProfile&user=' . $this->id, false);
-					break;
-
-				case 'easysocial':
-
-					$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-					$ret 			= '';
-
-					if( $easysocial->exists() )
-					{
-						$easysocial->init();
-
-						$user 		= Foundry::user( $this->id );
-						$ret 		= $user->getPermalink();
-					}
-					break;
-
-				case 'jomsocial':
-					$file	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'core.php';
-					$ret	= ( JFile::exists($file) && require_once($file) )? CRoute::_( 'index.php?option=com_community&view=profile&userid=' . $this->id ) : '';
-					break;
-
-				case 'kunena':
-
-					$app = JFactory::getApplication(); 
-					$menu = $app->getMenu();
-					$menuItem = $menu->getItems( 'link', 'index.php?option=com_kunena&view=user', true);
-
-					if ($menuItem) {
-						$ret = JRoute::_('index.php?Itemid=' . $menuItem->id . '&userid=' . $this->id, false);
-					} else {
-						$ret = JRoute::_('index.php?option=com_kunena&func=fbprofile&userid=' . $this->id, false);	
-					}
-					
-					break;
-
-				case 'phpbb':
-					$juser	= JFactory::getUser( $this->id );
-					$query	= 'SELECT ' . $phpbbDB->quoteName('user_id') . ' '
-							. 'FROM ' . $phpbbDB->quoteName('#__users') . ' WHERE LOWER('.$phpbbDB->quoteName('username') . ') = LOWER(' . $phpbbDB->quote($juser->username) . ') ';
-					$phpbbDB->setQuery($query, 0, 1);
-					$phpbbuserid	= $phpbbDB->loadResult();
-					$ret	= $phpbbuserid ? JURI::root() . rtrim( $phpbbpath , '/' ) . '/memberlist.php?mode=viewprofile&u=' . $phpbbuserid : '';
-					break;
-				case 'anahita':
-					$person	= KFactory::get( 'lib.anahita.se.person.helper' )->getPerson( $this->id );
-
-					$ret	= $person->getURL();
-					break;
-				case 'easydiscuss':
-					$file = JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easydiscuss' . DIRECTORY_SEPARATOR . 'helpers' . DIRECTORY_SEPARATOR . 'router.php';
-					$ret	= ( JFile::exists($file) && require_once($file) ) ? DiscussRouter::_( 'index.php?option=com_easydiscuss&view=profile&id='.$this->id, false ) : '';
-					break;
-				case 'gravatar':
-				case 'default':
-				default:
-					$ret	= '';
-					break;
-			}
-			$instance[$this->id][$key]	= $ret ? $ret : $defaultLink;
-		}
-
-		return $instance[$this->id][$key];
+		return $items[$this->id];
 	}
 
-	public function getPermalink()
+	/**
+	 * Retrieves the website for the author
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getWebsite()
 	{
-		$url	= EasyBlogRouter::_( 'index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $this->id );
+		$url = $this->url == 'http://' ? '' : $this->url;
 
 		return $url;
 	}
 
-	function getParams(){
-		return $this->params;
+	/**
+	 * Generates the profile link for an author
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getProfileLink()
+	{
+		$profile = EB::profile($this);
+
+		return $profile->getLink();
 	}
 
-	function getUserType(){
+	/**
+	 * Retrieves the alias for this author
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAlias()
+	{
+		static $permalinks = array();
+
+		if (!isset($permalinks[$this->id])) {
+			$config = EB::config();
+
+			if (!$this->user && $this->id) {
+				$this->user = JFactory::getuser($this->id);
+			}
+
+			// If the username is invalid
+			if (! $this->user->username) {
+				return JText::_('COM_EASYBLOG_INVALID_PERMALINK_BLOGGER');
+			}
+
+			// If user doesn't have a permalink, generate it for them
+			if (!$this->permalink) {
+				$this->permalink = EBR::normalizePermalink($this->user->username);
+				$this->store();
+			}
+
+			$permalink = $this->permalink;
+
+			if ($config->get('main_sef_unicode') || !EBR::isSefEnabled()) {
+				$permalink = $this->id . '-' . $this->permalink;
+			}
+
+			$permalinks[$this->id] = $permalink;
+		}
+
+		return $permalinks[$this->id];
+	}
+
+	/**
+	 * Retrieves the external permalink for this author
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getExternalPermalink()
+	{
+		$link = EBR::getRoutedURL('index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $this->id, false, true, true);
+
+		return $link;
+	}
+
+	/**
+	 * Retrieves the permalink for this author
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getPermalink($xhtml = true)
+	{
+		$url = EB::_('index.php?option=com_easyblog&view=blogger&layout=listings&id=' . $this->id, $xhtml);
+
+		return $url;
+	}
+
+	/**
+	 * Retrieves the user's parameters
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return	JRegistry
+	 */
+	public function getParam()
+	{
+		$registry	 = new JRegistry($this->params);
+
+		return $registry;
+	}
+
+	/**
+	 * Retrieves the user type
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getUserType()
+	{
 		return $this->user->usertype;
 	}
 
-	function _appendHTTP($url)
+	/**
+	 * Retrieves rss link for the category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getRssLink()
 	{
-		$returnStr	= '';
-		$regex = '/^(http|https|ftp):\/\/*?/i';
-		if (preg_match($regex, trim($url), $matches)) {
-			$returnStr	= $url;
-		} else {
-			$returnStr	= 'http://' . $url;
-		}
+		$config = EB::config();
 
-		return $returnStr;
-	}
+		if ($config->get('main_feedburnerblogger')) {
 
-	function getRSS()
-	{
-		$config			= EasyBlogHelper::getConfig();
-
-		if( $config->get( 'main_feedburnerblogger' ) )
-		{
-			$feedburner	= EasyBlogHelper::getTable( 'Feedburner', 'Table' );
+			$feedburner	= EB::table('Feedburner');
 			$feedburner->load($this->id);
 
-			if(! empty($feedburner->url))
-			{
+			if (!empty($feedburner->url)) {
+
 				$rssLink    = $feedburner->url;
 				return $rssLink;
 			}
 		}
 
-		return EasyBlogHelper::getHelper( 'Feeds' )->getFeedURL( 'index.php?option=com_easyblog&view=blogger&id=' . $this->id );
+		return EB::feeds()->getFeedURL('index.php?option=com_easyblog&view=blogger&id=' . $this->id, false, true);
+	}
+
+	/**
+	 * Retrieves bloggers rss link
+	 *
+	 * @deprecated	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getRSS()
+	{
+		return $this->getRssLink();
 	}
 
 	function getAtom()
@@ -520,21 +601,168 @@ class EasyBlogTableProfile extends EasyBlogTable
 		return EasyBlogHelper::getHelper( 'Feeds' )->getFeedURL( 'index.php?option=com_easyblog&view=blogger&id=' . $this->id, true );
 	}
 
-	function isOnline()
+	/**
+	 * Binds avatar
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function bindAvatar($file, $acl)
+	{
+		if (!$acl->get('upload_avatar') ) {
+			return false;
+		}
+
+		// Try to upload the avatar
+		$avatar = EB::avatar();
+
+		// Get the avatar path
+		$this->avatar = $avatar->upload($file);
+
+		// Assign points for aup
+		EB::aup()->assign('plgaup_easyblog_upload_avatar', '', 'easyblog_upload_avatar_' . $this->user->id, JText::_('COM_EASYBLOG_AUP_UPLOADED_AVATAR'));
+	}
+
+	/**
+	 * Binds users oauth settings
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function bindOauth($post, $acl)
+	{
+		// Store twitter settings
+		if ($acl->get('update_twitter') ) {
+			$twitter	= EB::table('Oauth');
+			$twitter->loadByUser($this->user->id, EBLOG_OAUTH_TWITTER);
+
+			$twitter->auto		= isset($post['integrations_twitter_auto']) ? $post['integrations_twitter_auto'] : false;
+			$twitter->message	= isset($post['integrations_twitter_message']) ? $post['integrations_twitter_message'] : '';
+
+			$twitter->store();
+		}
+
+		// Store linkedin settings
+		if ($acl->get('update_linkedin')) {
+			$linkedin	= EB::table('Oauth');
+			$linkedin->loadByUser($this->user->id, EBLOG_OAUTH_LINKEDIN);
+
+			$linkedin->auto		= isset($post['integrations_linkedin_auto']) ? $post['integrations_linkedin_auto'] : false;
+			$linkedin->message	= isset($post['integrations_linkedin_message']) ? $post['integrations_linkedin_message'] : '';
+			$linkedin->private	= isset($post['integrations_linkedin_private']) ? $post['integrations_linkedin_private'] : true;
+
+			$linkedin->store();
+		}
+
+		// Store fb settings
+		if ($acl->get('update_linkedin')) {
+			$facebook	= EB::table('Oauth');
+			$facebook->loadByUser($this->user->id, EBLOG_OAUTH_FACEBOOK);
+
+			$facebook->auto		= isset($post['integrations_facebook_auto']) ? $post['integrations_facebook_auto'] : false;
+			$facebook->message	= '';
+
+			$facebook->store();
+		}
+	}
+
+	/**
+	 * Binds feedburner settings
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function bindFeedburner($post, $acl)
+	{
+		$config 	= EB::config();
+
+		if (!$config->get('main_feedburner') || !$config->get('main_feedburnerblogger')) {
+			return false;
+		}
+
+		if (!$acl->get('allow_feedburner')) {
+			return false;
+		}
+
+		$feedburner	= EB::table('Feedburner');
+		$feedburner->load($this->user->id);
+		$feedburner->url	= $post['feedburner_url'];
+
+		$state = $feedburner->store();
+
+		return $state;
+	}
+
+	/**
+	 * Binds users oauth settings
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function bindAdsense($post, $acl)
+	{
+		$config 	= EB::config();
+
+		if (!$config->get( 'integration_google_adsense_enable')) {
+			return false;
+		}
+
+		if (!$acl->get('add_adsense')) {
+			return false;
+		}
+
+		$adsense = EB::table('Adsense');
+		$adsense->load($this->user->id);
+
+		// Prevent Joomla from acting funny as on some site's it automatically adds the quote character at the end.
+		$adsense->code 		= rtrim( $post['adsense_code'] , '"' );
+		$adsense->display 	= $post['adsense_display'];
+		$adsense->published = $post['adsense_published'];
+
+		$state 	= $adsense->store();
+
+		if (!$state) {
+			$this->setError($adsense->getError());
+
+			return false;
+		}
+
+		return true;
+	}
+
+
+	/**
+	 * Determines if the user is currently online
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isOnline()
 	{
 		static	$loaded	= array();
 
-		if( !isset( $loaded[ $this->id ] ) )
-		{
-			$db		= EasyBlogHelper::db();
-			$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__session' ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'userid' ) . '=' . $db->Quote( $this->id ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'client_id') . '<>' . $db->Quote( 1 );
-			$db->setQuery( $query );
+		if(!isset($loaded[$this->id])) {
+			$db		= EB::db();
 
-			$loaded[ $this->id ]	= $db->loadResult() > 0 ? true : false;
+			$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__session' ) . ' '
+					. 'WHERE ' . $db->nameQuote( 'userid' ) . '=' . $db->Quote( $this->id ) . ' '
+					. 'AND ' . $db->nameQuote( 'client_id') . '<>' . $db->Quote( 1 );
+			$db->setQuery($query);
+
+			$loaded[$this->id]	= $db->loadResult() > 0 ? true : false;
 		}
-		return $loaded[ $this->id ];
+
+		return $loaded[$this->id];
 	}
 
 	/**
@@ -543,16 +771,16 @@ class EasyBlogTableProfile extends EasyBlogTable
 	public function getTags()
 	{
 		$db		= EasyBlogHelper::db();
-		$query	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_tag' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'created_by' ) .'=' . $db->Quote( $this->id ) . ' '
-				. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( 1 );
+		$query	= 'SELECT * FROM ' . $db->nameQuote( '#__easyblog_tag' ) . ' '
+				. 'WHERE ' . $db->nameQuote( 'created_by' ) .'=' . $db->Quote( $this->id ) . ' '
+				. 'AND ' . $db->nameQuote( 'published' ) . '=' . $db->Quote( 1 );
 		$db->setQuery( $query );
 		$rows	= $db->loadObjectList();
 		$tags	= array();
 
 		foreach( $rows as $row )
 		{
-			$tag	= EasyBlogHelper::getTable( 'Tag' , 'Table' );
+			$tag	= EB::table('Tag');
 			$tag->bind( $row );
 			$tags[]	= $tag;
 		}
@@ -561,14 +789,90 @@ class EasyBlogTableProfile extends EasyBlogTable
 	}
 
 	/**
-	 * Retrieve a list of tags created by this user
-	 **/
+	 * Retrieves a list of oauth clients
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function getOauthClients()
+	{
+		// Load this only once.
+		if (!self::$oauthClients) {
+			$model = EB::model('Oauth');
+			$result = $model->getUserClients($this->id);
+
+			if ($result) {
+				foreach ($result as $row) {
+
+					$client = EB::table('Oauth');
+					$client->bind($row);
+
+					self::$oauthClients[$row->type] = $client;
+				}
+			}
+		}
+
+		return self::$oauthClients;
+	}
+
+	/**
+	 * Determines if the user has oauth setup for specific site
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function hasOauth($site)
+	{
+		$clients = $this->getOauthClients();
+
+		if (!isset($clients[$site])) {
+			return false;
+		}
+		
+		return true;
+	}
+
+	/**
+	 * Determines if the user has oauth setup for specific site
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function getOauth($site)
+	{
+		$clients = $this->getOauthClients();
+		
+		if (!isset($clients[$site])) {
+			return false;
+		}
+		
+		return $clients[$site];
+	}
+	/**
+	 * Retrieves total number of comments the author made on the site.
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function getCommentsCount()
 	{
-		$db		= EasyBlogHelper::db();
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_comment' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'created_by' ) .'=' . $db->Quote( $this->id ) . ' '
-				. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( 1 );
+		if (!EB::comment()->isBuiltin()) {
+			return 0;
+		}
+
+		$db = EB::db();
+
+		$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__easyblog_comment' ) . ' '
+				. 'WHERE ' . $db->nameQuote( 'created_by' ) .'=' . $db->Quote( $this->id ) . ' '
+				. 'AND ' . $db->nameQuote( 'published' ) . '=' . $db->Quote( 1 );
 		$db->setQuery( $query );
 		return $db->loadResult();
 	}

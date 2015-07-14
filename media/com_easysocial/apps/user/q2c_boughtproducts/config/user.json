@@ -1,0 +1,43 @@
+[
+	{
+		"title"		: "APP_Q2CMYPRODUCTS_PARAMS_PROFILE_GROUP",
+		"desc"		: "APP_Q2CMYPRODUCTS_PARAMS_PROFILE_GROUP_DESC",
+		"fields"	:
+		[
+			{
+				"label"		: "APP_Q2C_BOUGHTPRODUCTS_PRIVACY",
+				"tooltip"	: "APP_Q2C_BOUGHTPRODUCTS_PRIVACY_DESC",
+				"name"		: "profile_show_friends",
+				"type"		: "select",
+				"options"	:
+				[
+					{
+						"title"	: "APP_Q2C_BOUGHTPRODUCTS_ONLY_ME",
+						"value" : "onlyme"
+					},
+					{
+						"title"	: "APP_Q2C_BOUGHTPRODUCTS_FRIEND",
+						"value" : "friend"
+					},
+					{
+						"title"	: "APP_Q2C_BOUGHTPRODUCTS_FOF",
+						"value" : "fof"
+					},
+					{
+						"title"	: "APP_Q2C_BOUGHTPRODUCTS_ALL_USER",
+						"value" : "all"
+					}
+				],
+				"default"	: "onlyme"
+			},
+			{
+				"label"		: "APP_Q2CMYPRODUCTS_PRODUCTS_LIMIT",
+				"tooltip"	: "APP_Q2CMYPRODUCTS_PRODUCTS_LIMIT_DESC",
+				"name"		: "total",
+				"class"		: "input-mini center",
+				"type"		: "text",
+				"default"	: 10
+			}
+		]
+	}
+]

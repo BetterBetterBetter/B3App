@@ -1,0 +1,17 @@
+[
+	{
+		"title"		: "APP_Q2CMYPRODUCTS_PARAMS_PROFILE_GROUP",
+		"desc"		: "APP_Q2CMYPRODUCTS_PARAMS_PROFILE_GROUP_DESC",
+		"fields"	:
+		[
+			{
+				"label"		: "APP_Q2CMYPRODUCTS_PRODUCTS_LIMIT",
+				"tooltip"	: "APP_Q2CMYPRODUCTS_PRODUCTS_LIMIT_DESC",
+				"name"		: "total",
+				"class"		: "input-mini center",
+				"type"		: "text",
+				"default"	: 9
+			}
+		]
+	}
+]

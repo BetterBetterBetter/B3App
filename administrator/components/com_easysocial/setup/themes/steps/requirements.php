@@ -114,7 +114,7 @@ jQuery( document ).ready( function(){
 						<i class="ies-help" data-original-title="<?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_PHP_VERSION_TIPS' );?>" data-toggle="tooltip" data-placement="bottom"></i>
 
 						<?php if( version_compare( $phpVersion , '5.3.10') == -1 ){ ?>
-						<a href="http://docs.stackideas.com/administrators/welcome/getting_started" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
+						<a href="http://stackideas.com/docs/easysocial/administrators/welcome/getting-started" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
 						<?php } ?>
 					</div>
 				</td>
@@ -132,7 +132,7 @@ jQuery( document ).ready( function(){
 						<i class="ies-help" data-original-title="<?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_PHP_GD_TIPS' );?>" data-toggle="tooltip" data-placement="bottom"></i>
 
 						<?php if( !$gd ){ ?>
-						<a href="http://docs.stackideas.com/administrators/setup/gd_library" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
+						<a href="http://stackideas.com/docs/easysocial/administrators/setup/gd-library" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
 						<?php } ?>
 					</div>
 				</td>
@@ -157,7 +157,7 @@ jQuery( document ).ready( function(){
 						<i class="ies-help" data-original-title="<?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_PHP_ZIP_TIPS' );?>" data-toggle="tooltip" data-placement="bottom"></i>
 
 						<?php if( !$zipLibrary ){ ?>
-						<a href="http://docs.stackideas.com/administrators/setup/zip_library" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
+						<a href="http://stackideas.com/docs/easysocial/administrators/setup/zip-library" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
 						<?php } ?>
 					</div>
 				</td>
@@ -181,7 +181,7 @@ jQuery( document ).ready( function(){
 						<span class="label label-info"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_PHP' );?></span> CURL Library
 						<i class="ies-help" data-original-title="<?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_PHP_CURL_TIPS' );?>" data-toggle="tooltip" data-placement="bottom"></i>
 						<?php if( !$curl ){ ?>
-						<a href="http://docs.stackideas.com/administrators/setup/curl" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
+						<a href="http://stackideas.com/docs/easysocial/administrators/setup/curl" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
 						<?php } ?>
 					</div>
 				</td>
@@ -205,7 +205,7 @@ jQuery( document ).ready( function(){
 						<i class="ies-help" data-original-title="<?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_PHP_MAGICQUOTES_TIPS' );?>" data-toggle="tooltip" data-placement="bottom"></i>
 
 						<?php if( $magicQuotes ){ ?>
-						<a href="http://docs.stackideas.com/administrators/setup/magic_quotes" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
+						<a href="http://stackideas.com/docs/easysocial/administrators/setup/magic-quotes" target="_blank" class="pull-right btn btn-es-danger btn-mini"><?php echo JText::_( 'COM_EASYSOCIAL_INSTALLATION_FIX_THIS' );?></a>
 						<?php } ?>
 					</div>
 				</td>

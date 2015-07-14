@@ -1,75 +1,98 @@
 <?php
 /**
- * @package		EasyBlog
- * @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
- * @license		GNU/GPL, see LICENSE.php
- *
- * EasyBlog is free software. This version may have been modified pursuant
- * to the GNU General Public License, and as distributed it includes or
- * is derivative of works licensed under the GNU General Public License or
- * other free or open source software licenses.
- * See COPYRIGHT.php for copyright notices and details.
- */
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
+* @license		GNU/GPL, see LICENSE.php
+* EasySocial is free software. This version may have been modified pursuant
+* to the GNU General Public License, and as distributed it includes or
+* is derivative of works licensed under the GNU General Public License or
+* other free or open source software licenses.
+* See COPYRIGHT.php for copyright notices and details.
+*/
+defined('_JEXEC') or die('Unauthorized Access');
 
-defined('_JEXEC') or die('Restricted access');
+require_once(dirname(__FILE__) . '/controller.php');
 
-require_once( EBLOG_ROOT . DIRECTORY_SEPARATOR . 'controller.php' );
-
-class EasyBlogControllerFoundry extends EasyBlogParentController
+class EasyBlogControllerFoundry extends EasyBlogController
 {
-	function getResource()
+	/**
+	 * Responsible to retrieve resources
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getResource()
 	{
-		$resources = JRequest::getVar( 'resource' );
+		$resources 	= JRequest::getVar('resource');
 
-		foreach( $resources as &$resource )
-		{
+		if (!$resources) {
+			die('Invalid request');
+		}
+
+		foreach ($resources as &$resource) {
+
 			$resource = (object) $resource;
-			$func = 'get' . ucfirst( $resource->type );
-			$result = self::$func( $resource->name );
 
-			if( $result !== false )
-			{
+			// Convert "view" into "FoundryView" because the getView method
+			// will be overriding the parent's getView method and it will fail
+			if ($resource->type == 'view') {
+				$method = 'getFoundryView';
+			} else {
+				$method = 'get' . ucfirst($resource->type);
+			}
+
+			if (!method_exists($this, $method)) {
+				continue;
+			}
+
+			$result = $this->$method($resource->name);
+
+			if ($result !== false) {
 				$resource->content = $result;
 			}
 		}
 
 		header('Content-type: text/x-json; UTF-8');
-		$json = new Services_JSON();
-		echo $json->encode( $resources );
+		echo json_encode($resources);
 		exit;
 	}
 
-	function getView( $name = '', $type = '', $prefix = '', $config = Array() )
+	/**
+	 * Retrieves a view file
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function getFoundryView($name = '', $type = '', $prefix = '', $config = array())
 	{
 		$file = $name;
+		$parts = explode('/', $file);
 
-		$dashboard = explode( '/' , $file );
+		$template = EB::template();
+		$output = $template->output($file, array(), 'ejs');
 
-		if( $dashboard[0]=="dashboard" )
-		{
-			$template 	= new CodeThemes( true );
-			$out		= $template->fetch( $dashboard[1] . '.ejs' );
-		}
-		elseif ( $dashboard[0]=="media" )
-		{
-			$template 	= new CodeThemes( true );
-			$out		= $template->fetch( "media." . $dashboard[1] . '.ejs' );
-		}
-		else
-		{
-			$template 	= new CodeThemes();
-			$out		= $template->fetch( $file . '.ejs' );
-		}
-
-		return $out;
+		return $output;
 	}
 
-	function getLanguage( $lang )
+	/**
+	 * Translates text
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string	The language string to translate
+	 * @return	string
+	 */
+	public function getLanguage($constant)
 	{
-		// Load language support for frontend and backend.
-		JFactory::getLanguage()->load( JPATH_ROOT . DIRECTORY_SEPARATOR . 'administrator' );
-		JFactory::getLanguage()->load( JPATH_ROOT );
+		// Load languages on the site
+		EB::loadLanguages();
 
-		return JText::_( strtoupper( $lang ) );
+		$string	= JText::_(strtoupper($constant));
+
+		return $string;
 	}
 }

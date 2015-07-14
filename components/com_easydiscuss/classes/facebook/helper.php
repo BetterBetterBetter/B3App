@@ -67,7 +67,8 @@ class DiscussFacebook extends Facebook
 		$scope	= array(
 							'publish_actions',
 							'user_likes',
-							'offline_access',
+							//'offline_access', since the Facebook API 2.0 already removed this user permission
+							'publish_pages', //since Facebook API 2.0 already added this new user permission required when the user want to autopost to FB page
 							'manage_pages',
 							'user_status'
 						);

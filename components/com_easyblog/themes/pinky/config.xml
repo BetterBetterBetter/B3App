@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <install version="1.5" type="template">
-	<name>Pinky</name>
+	<name>Pinky </name>
 	<version>3.5</version>
 	<created>17/01/2012</created>
 	<updated>17/01/2012</updated>
-	<author>StackIdeas</author>
+	<author>StackIdeas Sdn Bhd</author>
 	<description>COM_EASYBLOG_THEME_PINKY_DESC</description>
 	<params addpath="/administrator/components/com_easyblog/elements">
 		<param type="themes" name="parent" label="COM_EASYBLOG_THEME_PARENT_THEME" description="COM_EASYBLOG_THEME_PARENT_THEME_DESC" />
@@ -135,6 +135,10 @@
 					<option value="created">COM_EASYBLOG_CREATED</option>
 					<option value="modified">COM_EASYBLOG_LAST_MODIFIED</option>
 				</field>
+				<field type="radio" name="show_last_modified" label="COM_EASYBLOG_THEME_SHOW_LAST_MODIFIED" description="COM_EASYBLOG_THEME_SHOW_LAST_MODIFIED_DESC" default="1">
+					<option value="1">Yes</option>
+					<option value="0">No</option>
+				</field>
 				<field type="radio" name="show_category" label="COM_EASYBLOG_THEME_SHOW_CATEGORY" description="COM_EASYBLOG_THEME_SHOW_CATEGORY_DESC" default="1">
 					<option value="1">Yes</option>
 					<option value="0">No</option>
@@ -148,10 +152,6 @@
 					<option value="orange">COM_EASYBLOG_THEME_TAG_COLOR_SCHEME_ORANGE</option>
 					<option value="grey">COM_EASYBLOG_THEME_TAG_COLOR_SCHEME_GREY</option>
 					<option value="blue">COM_EASYBLOG_THEME_TAG_COLOR_SCHEME_BLUE</option>
-				</field>
-				<field type="radio" name="show_last_modified" label="COM_EASYBLOG_THEME_SHOW_LAST_MODIFIED" description="COM_EASYBLOG_THEME_SHOW_LAST_MODIFIED_DESC" default="1">
-					<option value="1">Yes</option>
-					<option value="0">No</option>
 				</field>
 				<field type="radio" name="show_tags_frontpage" label="COM_EASYBLOG_THEME_SHOW_TAGS_ON_FRONTPAGE" description="COM_EASYBLOG_THEME_SHOW_TAGS_ON_FRONTPAGE_DESC" default="1">
 					<option value="1">Yes</option>

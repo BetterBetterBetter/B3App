@@ -26,7 +26,7 @@
 #eblog-wrapper li:after { background: none; display: none;}
 /*Showing list bullets with images for content only*/
 #eblog-wrapper .blog-text li:before,
-#eblog-wrapper .blog-text li:after { display: inline-block;}
+#eblog-wrapper .blot-text li:after { display: inline-block;}
 /*JOOMLA 2.5*/
 #eblog-wrapper .small{margin:auto;padding:auto;}
 #eblog-wrapper .reset-ul,

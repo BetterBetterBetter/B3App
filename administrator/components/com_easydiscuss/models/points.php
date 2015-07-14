@@ -176,20 +176,18 @@ class EasyDiscussModelPoints extends EasyDiscussAdminModel
 				. $db->Quote( 'easydiscuss.answer.reply' ) . ',' . $db->Quote( 'easydiscuss.new.comment' ) . ','
 				. $db->Quote( 'easydiscuss.like.discussion' ) . ',' . $db->Quote( 'easydiscuss.like.reply' ) . ','
 				. $db->Quote( 'easydiscuss.resolved.discussion' ) . ',' . $db->Quote( 'easydiscuss.vote.reply' ) . ','
-				. $db->Quote( 'easydiscuss.unvote.reply' ) . ')'
+				. $db->Quote( 'easydiscuss.unvote.reply' ) . ')';
 
-				. ' AND b.' . $db->nameQuote( 'category_id' ) . ' IN(' . implode( $viewableCats, ',' ) . ')'
+		if ($viewableCats) {
+			$query .= ' AND b.' . $db->nameQuote( 'category_id' ) . ' IN(' . implode( $viewableCats, ',' ) . ')';
+		}
 
-				. ' UNION'
-
+		$query .= ' UNION'
 				. ' SELECT a.*, ' . $db->Quote( 'profile' ) . ' as `type`'
 				. ' FROM ' . $db->nameQuote( '#__discuss_users_history' ) . ' AS a'
 				. ' WHERE a.' . $db->nameQuote( 'user_id' ) . '=' . $db->Quote( $userId )
 				. ' AND a.' . $db->nameQuote( 'command' )
 				. ' IN(' . $db->Quote( 'easydiscuss.new.avatar') . ' , ' . $db->Quote( 'easydiscuss.update.profile' ) .  ')'
-
-
-
 				. ' ORDER BY ' . $db->nameQuote( 'created' ) . ' DESC'
 				. ' LIMIT 0,20';
 

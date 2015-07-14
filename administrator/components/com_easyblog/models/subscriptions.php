@@ -1,76 +1,53 @@
 <?php
 /**
- * @package		EasyBlog
- * @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
- * @license		GNU/GPL, see LICENSE.php
- *  
- * EasyBlog is free software. This version may have been modified pursuant
- * to the GNU General Public License, and as distributed it includes or
- * is derivative of works licensed under the GNU General Public License or
- * other free or open source software licenses.
- * See COPYRIGHT.php for copyright notices and details.
- */
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
+* @license		GNU/GPL, see LICENSE.php
+* EasyBlog is free software. This version may have been modified pursuant
+* to the GNU General Public License, and as distributed it includes or
+* is derivative of works licensed under the GNU General Public License or
+* other free or open source software licenses.
+* See COPYRIGHT.php for copyright notices and details.
+*/
+defined('_JEXEC') or die('Unauthorized Access');
 
-defined('_JEXEC') or die('Restricted access');
+require_once(dirname(__FILE__) . '/model.php');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'parent.php' );
-
-class EasyBlogModelSubscriptions extends EasyBlogModelParent
+class EasyBlogModelSubscriptions extends EasyBlogAdminModel
 {
-	/**
-	 * Category total
-	 *
-	 * @var integer
-	 */
-	var $_total = null;
+	public $total = null;
+	public $pagination = null;
+	public $data = null;
 
-	/**
-	 * Pagination object
-	 *
-	 * @var object
-	 */
-	var $_pagination = null;
-
-	/**
-	 * Category data array
-	 *
-	 * @var array
-	 */
-	var $_data = null;
-	
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
-		
-		$mainframe	= JFactory::getApplication();
-				
-		//$limit		= ($mainframe->getCfg('list_limit') == 0) ? 5 : $mainframe->getCfg('list_limit');
-		$limit		= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.limit', 'limit', $mainframe->getCfg('list_limit'), 'int');
-	    $limitstart = (int) JRequest::getVar('limitstart', 0, 'REQUEST');
-	    
+		$limit = $this->app->getUserStateFromRequest('com_easyblog.subscriptions.limit', 'limit', $this->app->getCfg('list_limit'), 'int');
+		$limitstart = $this->input->get('limitstart', 0, 'int');
+
 		// In case limit has been changed, adjust it
-		$limitstart = ($limit != 0 ? (floor($limitstart / $limit) * $limit) : 0);		
+		$limitstart = ($limit != 0 ? (floor($limitstart / $limit) * $limit) : 0);
 
 		$this->setState('limit', $limit);
 		$this->setState('limitstart', $limitstart);
 	}
-	
-	function getSubscriptions($sort = 'latest', $filter='site')
+
+	public function getSubscriptions($sort = 'latest', $filter='site')
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_data))
 		{
 			$query = $this->_buildQuery();
-			
+
 			//echo $query;
-			
+
 			$this->_data = $this->_getList($query, $this->getState('limitstart'), $this->getState('limit'));
 		}
 
 		return $this->_data;
 	}
-	
+
 	/**
 	 * Method to build the query for the tags
 	 *
@@ -79,90 +56,96 @@ class EasyBlogModelSubscriptions extends EasyBlogModelParent
 	 */
 	function _buildQuery()
 	{
-		
+
 		$db			= EasyBlogHelper::db();
 		$mainframe  = JFactory::getApplication();
-		
-		$filter		= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.filter', 		'filter', 	'site', 'word' );
+
+		$filter		= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.filter', 		'filter', 	EBLOG_SUBSCRIPTION_SITE, 'word' );
 
 		// Get the WHERE and ORDER BY clauses for the query
 		$where		= $this->_buildQueryWhere();
 		$orderby	= $this->_buildQueryOrderBy();
 
 		$query  = '';
-		
-		if($filter	== 'blog')
+
+		if($filter	== EBLOG_SUBSCRIPTION_ENTRY)
 		{
 			$query	.= 'SELECT a.*, b.`title` as `bname`, c.`name`, c.`username`';
-			$query	.= '  FROM `#__easyblog_post_subscription` a';
-			$query	.= '    left join `#__easyblog_post` b on a.`post_id` = b.`id`';
+			$query	.= '  FROM `#__easyblog_subscriptions` a';
+			$query	.= '    inner join `#__easyblog_post` b on a.`uid` = b.`id`';
 			$query	.= '    left join `#__users` c on a.`user_id` = c.`id`';
 		}
-		else if($filter == 'category')
+		else if($filter == EBLOG_SUBSCRIPTION_CATEGORY)
 		{
 			$query	.= 'SELECT a.*, b.`title` as `bname`, c.`name`, c.`username`';
-			$query	.= '  FROM `#__easyblog_category_subscription` a';
-			$query	.= '    left join `#__easyblog_category` b on a.`category_id` = b.`id`';
+			$query	.= '  FROM `#__easyblog_subscriptions` a';
+			$query	.= '    inner join `#__easyblog_category` b on a.`uid` = b.`id`';
 			$query	.= '    left join `#__users` c on a.`user_id` = c.`id`';
 		}
-		else if($filter == 'site')
+		else if($filter == EBLOG_SUBSCRIPTION_SITE)
 		{
 			$query	.= 'SELECT a.*, '.$db->Quote('site').' as `bname`, c.`name`, c.`username`';
-			$query	.= '  FROM `#__easyblog_site_subscription` a';
+			$query	.= '  FROM `#__easyblog_subscriptions` a';
 			$query	.= '    left join `#__users` c on a.`user_id` = c.`id`';
 		}
-		else if($filter == 'team')
+		else if($filter == EBLOG_SUBSCRIPTION_TEAMBLOG)
 		{
 			$query	.= 'SELECT a.*, b.`title` as `bname`, c.`name`, c.`username`';
-			$query	.= '  FROM `#__easyblog_team_subscription` a';
-			$query	.= '    left join `#__easyblog_team` b on a.`team_id` = b.`id`';
+			$query	.= '  FROM `#__easyblog_subscriptions` a';
+			$query	.= '    inner join `#__easyblog_team` b on a.`uid` = b.`id`';
 			$query	.= '    left join `#__users` c on a.`user_id` = c.`id`';
 		}
 		else
 		{
 			$query	.= 'SELECT a.*, b.`name` as `bname`, b.`username` as `busername`, c.`name`, c.`username`';
-			$query	.= '  FROM `#__easyblog_blogger_subscription` a';
-			$query	.= '    left join `#__users` b on a.`blogger_id` = b.`id`';
+			$query	.= '  FROM `#__easyblog_subscriptions` a';
+			$query	.= '    inner join `#__users` b on a.`uid` = b.`id`';
 			$query	.= '    left join `#__users` c on a.`user_id` = c.`id`';
 		}
 
 		$query	.= $where;
 		$query	.= $orderby;
-		
+
 		//echo $query . '<br>';
 
 		return $query;
 	}
-	
-	function _buildQueryWhere()
+
+	public function _buildQueryWhere()
 	{
 		$mainframe	= JFactory::getApplication();
-		$db			= EasyBlogHelper::db();
-		
+		$db			= EB::db();
+
 		//$filter     = JRequest::getVar('filter', 'blogger', 'REQUEST');
-		$filter		= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.filter', 'filter', 'site', 'word' );
+		$filter		= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.filter', 'filter', EBLOG_SUBSCRIPTION_SITE, 'word' );
 
 		$search 	= $mainframe->getUserStateFromRequest( 'com_easyblog.subscriptions.search', 'search', '', 'string' );
 		$search 	= $db->getEscaped( trim(JString::strtolower( $search ) ) );
 
+		$queryWhere = ' WHERE a.`utype` = ' . $db->Quote($filter);
+
 		$where = array();
 
-		if ($search)
-		{
+		if ($search) {
 			$where[] = ' LOWER( a.`email` ) LIKE \'%' . $search . '%\'';
-			
-			if($filter == 'blogger')
+
+			if ($filter == EBLOG_SUBSCRIPTION_BLOGGER) {
 				$where[] = ' LOWER( b.`name` ) LIKE \'%' . $search . '%\'';
-			else if( $filter != 'site')
+
+			} else if ($filter != EBLOG_SUBSCRIPTION_SITE) {
 				$where[] = ' LOWER( b.`title` ) LIKE \'%' . $search . '%\'';
+
+			}
+
+			$where 		= implode( ' OR ', $where );
+
+			$queryWhere .= ' AND (' . $where . ')';
 		}
 
-		$where 		= ( count( $where ) ? ' WHERE ' . implode( ' OR ', $where ) : '' );
-
-		return $where;
+		return $queryWhere;
 	}
 
-	function _buildQueryOrderBy()
+	public function _buildQueryOrderBy()
 	{
 		$mainframe			= JFactory::getApplication();
 
@@ -173,7 +156,7 @@ class EasyBlogModelSubscriptions extends EasyBlogModelParent
 
 		return $orderby;
 	}
-	
+
 	/**
 	 * Method to get the total number of records
 	 *
@@ -191,7 +174,7 @@ class EasyBlogModelSubscriptions extends EasyBlogModelParent
 
 		return $this->_total;
 	}
-	
+
 
 	/**
 	 * Method to get a pagination object
@@ -210,18 +193,57 @@ class EasyBlogModelSubscriptions extends EasyBlogModelParent
 
 		return $this->_pagination;
 	}
-	
+
     function getSiteSubscribers()
     {
         $db = EasyBlogHelper::db();
 
-        $query  = "SELECT *, 'sitesubscription' as `type` FROM `#__easyblog_site_subscription`";
+        $query  = "SELECT *, 'sitesubscription' as `type` FROM `#__easyblog_subscriptions` where `utype` = " . $db->Quote(EBLOG_SUBSCRIPTION_SITE);
 
         $db->setQuery($query);
         $result = $db->loadObjectList();
 
         return $result;
     }
-	
+
+	/**
+	 * Retrieves a list of subscriptions a user has
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+    public function getSubscriptionsByUser($userId = null)
+    {
+    	$user = JFactory::getUser($userId);
+    	$id = $user->id;
+
+		$db = EB::db();
+
+		$query = array();
+		$query[] = 'SELECT * FROM ' . $db->qn('#__easyblog_subscriptions');
+		$query[] = 'WHERE ' . $db->qn('user_id') . '=' . $db->Quote($id);
+
+		$query = implode(' ', $query);
 		
+		$db->setQuery($query);
+
+		$rows = $db->loadObjectlist();
+
+		if (!$rows) {
+			return $rows;
+		}
+
+		$subscriptions = array();
+
+		foreach ($rows as $row) {
+			$subscription = EB::table('Subscriptions');
+			$subscription->bind($row);
+
+			$subscriptions[] = $subscription;
+		}
+
+		return $subscriptions;
+    }
 }

@@ -12,8 +12,63 @@
  */
 
 defined('_JEXEC') or die('Restricted access');
+$view = JRequest::getCmd('view', '');
 ?>
-<?php if( $system->config->get( 'main_postsubscription' )  ){ ?>
+<?php if ($system->config->get('main_sitesubscription') && $view == 'index'){ ?>
+	<?php if( $isSubscribed && $system->my->id != 0 ) { ?>
+		<a id="unsubscribe-<?php echo $sid; ?>" class="cancel-email has-tip atr <?php echo ($class) ? ' '.$class : ''; ?>" href="javascript:void(0);" onclick="disjax.loadingDialog();disjax.load('index', 'ajaxUnSubscribe', '<?php echo $type; ?>', '<?php echo $isSubscribed; ?>', '<?php echo $cid; ?>');">
+			<i class="icon-ed-email-minus" ></i>
+			<div class="tooltip tooltip-ed top in">
+				<div class="tooltip-arrow"></div>
+				<div class="tooltip-inner"><?php echo JText::_( 'COM_EASYDISCUSS_UNSUBSCRIBE_VIAEMAIL_'.strtoupper($type) ); ?></div>
+			</div>
+			<?php if( $type == 'site' ) { ?>
+			<?php echo JText::_('COM_EASYDISCUSS_UNSUBSCRIBE'); ?>
+			<?php } ?>
+
+		</a>
+	<?php } else { ?>
+		<a data-original-title="<?php echo JText::_( 'COM_EASYDISCUSS_SUBSCRIBE_VIAEMAIL_'.strtoupper($type) ); ?>" id="subscribe-<?php echo $type.'-'.$cid; ?>" class="via-email has-tip atr <?php echo ($class) ? ' '.$class : ''; ?>" href="javascript:void(0);" onclick="disjax.loadingDialog();disjax.load('index', 'ajaxSubscribe', '<?php echo $type; ?>', '<?php echo $cid; ?>');">
+			<i class="icon-ed-email" ></i>
+			<div class="tooltip tooltip-ed top in">
+				<div class="tooltip-arrow"></div>
+				<div class="tooltip-inner"><?php echo JText::_('COM_EASYDISCUSS_SUBSCRIBE_VIA_EMAIL'); ?></div>
+			</div>
+			<?php if( $type == 'site' ) { ?>
+			<?php echo JText::_('COM_EASYDISCUSS_SUBSCRIBE_VIA_EMAIL'); ?>
+			<?php } ?>
+		</a>
+	<?php } ?>
+<?php } ?>
+
+<?php if ($system->config->get('main_postsubscription') && $view == 'post'){ ?>
+	<?php if( $isSubscribed && $system->my->id != 0 ) { ?>
+		<a id="unsubscribe-<?php echo $sid; ?>" class="cancel-email has-tip atr <?php echo ($class) ? ' '.$class : ''; ?>" href="javascript:void(0);" onclick="disjax.loadingDialog();disjax.load('index', 'ajaxUnSubscribe', '<?php echo $type; ?>', '<?php echo $isSubscribed; ?>', '<?php echo $cid; ?>');">
+			<i class="icon-ed-email-minus" ></i>
+			<div class="tooltip tooltip-ed top in">
+				<div class="tooltip-arrow"></div>
+				<div class="tooltip-inner"><?php echo JText::_( 'COM_EASYDISCUSS_UNSUBSCRIBE_VIAEMAIL_'.strtoupper($type) ); ?></div>
+			</div>
+			<?php if( $type == 'site' ) { ?>
+			<?php echo JText::_('COM_EASYDISCUSS_UNSUBSCRIBE'); ?>
+			<?php } ?>
+
+		</a>
+	<?php } else { ?>
+		<a data-original-title="<?php echo JText::_( 'COM_EASYDISCUSS_SUBSCRIBE_VIAEMAIL_'.strtoupper($type) ); ?>" id="subscribe-<?php echo $type.'-'.$cid; ?>" class="via-email has-tip atr <?php echo ($class) ? ' '.$class : ''; ?>" href="javascript:void(0);" onclick="disjax.loadingDialog();disjax.load('index', 'ajaxSubscribe', '<?php echo $type; ?>', '<?php echo $cid; ?>');">
+			<i class="icon-ed-email" ></i>
+			<div class="tooltip tooltip-ed top in">
+				<div class="tooltip-arrow"></div>
+				<div class="tooltip-inner"><?php echo JText::_('COM_EASYDISCUSS_SUBSCRIBE_VIA_EMAIL'); ?></div>
+			</div>
+			<?php if( $type == 'site' ) { ?>
+			<?php echo JText::_('COM_EASYDISCUSS_SUBSCRIBE_VIA_EMAIL'); ?>
+			<?php } ?>
+		</a>
+	<?php } ?>
+<?php } ?>
+
+<?php if ($system->config->get('main_ed_categorysubscription') && $view == 'categories') { ?>
 	<?php if( $isSubscribed && $system->my->id != 0 ) { ?>
 		<a id="unsubscribe-<?php echo $sid; ?>" class="cancel-email has-tip atr <?php echo ($class) ? ' '.$class : ''; ?>" href="javascript:void(0);" onclick="disjax.loadingDialog();disjax.load('index', 'ajaxUnSubscribe', '<?php echo $type; ?>', '<?php echo $isSubscribed; ?>', '<?php echo $cid; ?>');">
 			<i class="icon-ed-email-minus" ></i>

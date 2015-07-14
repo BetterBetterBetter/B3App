@@ -23,7 +23,7 @@ class EasyDiscussViewCategories extends EasyDiscussView
 
 		$mainframe	= JFactory::getApplication();
 		$config		= DiscussHelper::getConfig();
-		$my			= JFactory::getUser();
+		$my			=  JFactory::getUser();
 
 		$sortConfig	= $config->get('layout_ordering_category','latest');
 		$sort		= JRequest::getCmd('sort',$sortConfig);
@@ -71,7 +71,8 @@ class EasyDiscussViewCategories extends EasyDiscussView
 		// Try to detect if there's any category id being set in the menu parameter.
 		$activeMenu = $app->getMenu()->getActive();
 
-		if ($activeMenu) {
+		// we only need to retrive the category id from menu if the menu is set to categories view
+		if ($activeMenu && isset($activeMenu->query['view']) && $activeMenu->query['view'] == 'categories') {
 			// Load menu params to the registry.
 			$registry->loadString( $activeMenu->params );
 

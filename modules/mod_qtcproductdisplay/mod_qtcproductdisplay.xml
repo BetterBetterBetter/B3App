@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension version="3.0" type="module" client ="site" method="upgrade">
+
+	<name>Quick2Cart - Product Display</name>
+
+	<author>TechJoomla</author>
+	<authorEmail>extensions@techjoomla.com</authorEmail>
+	<authorUrl>www.techjoomla.com</authorUrl>
+	<copyright>Copyright(C)2012-13 TechJoomla</copyright>
+	<license>http://www.gnu.org/licenses/gpl-2.0.html GNU/GPL</license>
+
+	<creationDate>02 Jul 2015</creationDate>
+	<version>2.3.1</version>
+
+	<description>
+		<![CDATA[Module to show the Products from Quick2Cart Component]]>
+	</description>
+
+	<languages folder="lang">
+		<language tag="en-GB">en-GB/en-GB.mod_qtcproductdisplay.ini</language>
+	</languages>
+
+	<files>
+		<filename module="mod_qtcproductdisplay">mod_qtcproductdisplay.php</filename>
+		<filename>index.html</filename>
+		<folder>tmpl</folder>
+	</files>
+
+	<config name="params">
+		<fields name="params">
+			<fieldset name="basic">
+				<field name="moduleclass_sfx" type="text" default="" label="MOD_PRODUCTS_DISPLAY_MOD_SUFIX" description="MOD_PRODUCTS_DISPLAY_MOD_SUFIX_DES" />
+				<field name="limit" type="text"  default="2" label="MOD_PRODUCTS_DISPLAY_LIMIT" description="MOD_PRODUCTS_DISPLAY_LIMIT_DESC" />
+				<field name="module_mode" type="list" default="0" label="MOD_PRODUCTS_DISPLAY_BEHAVIOUR_MODE" description="MOD_PRODUCTS_DISPLAY_BEHAVIOUR_MODE_DES">
+					<option value="qtc_featured">MOD_PRODUCTS_DISPLAY_BEHAVIOUR_FEATURED</option>
+					<option value="qtc_recentlyAdded">MOD_PRODUCTS_DISPLAY_RECENTLY_ADDED</option>
+					<option value="qtc_topSeller">MOD_PRODUCTS_DISPLAY_TOP_SELLER</option>
+					<option value="qtc_recentlyBought">MOD_PRODUCTS_DISPLAY_RECENTLY_BOUGHT</option>
+				</field>
+				<field name="pin_width" type="text" default="170" label="MOD_PRODUCTS_DISPLAY_PIN_WIDTH" description="MOD_PRODUCTS_DISPLAY_PIN_WIDTH_DESC" />
+				<field name="pin_padding" type="text" default="3" label="MOD_PRODUCTS_DISPLAY_PIN_PADDING" description="MOD_PRODUCTS_DISPLAY_PIN_PADDING_DESC" />
+			</fieldset>
+		</fields>
+	</config>
+
+</extension>

@@ -1,74 +1,79 @@
 <?php
 /**
- * @package		EasyBlog
- * @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
- * @license		GNU/GPL, see LICENSE.php
- *  
- * EasyBlog is free software. This version may have been modified pursuant
- * to the GNU General Public License, and as distributed it includes or
- * is derivative of works licensed under the GNU General Public License or
- * other free or open source software licenses.
- * See COPYRIGHT.php for copyright notices and details.
- */
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
+* @license		GNU/GPL, see LICENSE.php
+* EasyBlog is free software. This version may have been modified pursuant
+* to the GNU General Public License, and as distributed it includes or
+* is derivative of works licensed under the GNU General Public License or
+* other free or open source software licenses.
+* See COPYRIGHT.php for copyright notices and details.
+*/
+defined('_JEXEC') or die('Unauthorized Access');
 
-defined('_JEXEC') or die('Restricted access');
+require_once(dirname(__FILE__) . '/controller.php');
 
-require_once( EBLOG_ROOT . DIRECTORY_SEPARATOR . 'controller.php' );
-
-class EasyBlogControllerSubscription extends EasyBlogParentController
+class EasyBlogControllerSubscription extends EasyBlogController
 {
-	var $err	= null;
-
-	function display()
+	/**
+	 * Allows caller to unsubscribe a person given the id of the subscription
+	 *
+	 * @since	5.0
+	 * @access	public
+	 */
+	public function unsubscribe()
 	{
-        parent::display();
-	}
-	
-	function unsubscribe()
-	{
-		$my = JFactory::getUser();
-		
-		$redirectLInk = 'index.php?option=com_easyblog&view=subscription';
-		if( $my->id == 0)
-		    $redirectLInk = 'index.php?option=com_easyblog&view=latest';
-		
-		//type=site - subscription type
-		//sid=1 - subscription id
-		//uid=42 - user id
-		//token=0fd690b25dd9e4d2dc47a252d025dff4 - md5 subid.subdate
-		$data = base64_decode(JRequest::getVar('data', ''));
-		
-		$param = EasyBlogHelper::getRegistry($data);
-		$param->type	= $param->get('type', '');
-		$param->sid 	= $param->get('sid', '');
-		$param->uid 	= $param->get('uid', '');
-		$param->token 	= $param->get('token', '');
-		
-		$subtable = EasyBlogHelper::getTable($param->type, 'Table');
-		$subtable->load($param->sid);
-		
-		$token 		= md5($subtable->id.$subtable->created);
-		$paramToken = md5($param->sid.$subtable->created);
-		
-		if( $subtable->id != 0 )
-		{
-			if($token != $paramToken)
-			{
-				EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_SUBSCRIPTION_UNSUBSCRIBE_FAILED') , 'error');
-				$this->setRedirect(EasyBlogRouter::_($redirectLInk, false));
-				return false;
-			}
+		// Default redirection url
+		$redirect = EBR::_('index.php?option=com_easyblog&view=subscription', false);
 
-			if(!$subtable->delete($param->sid))
-			{
-				EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_SUBSCRIPTION_UNSUBSCRIBE_FAILED_ERROR_DELETING_RECORDS') , 'error');
-				$this->setRedirect(EasyBlogRouter::_($redirectLInk, false));
-				return false;
-			}
+		// Default redirection link should link to the front page if the user isn't logged in
+		if ($this->my->guest) {
+			$redirect = EBR::_('index.php?option=com_easyblog', false);
 		}
 
-		EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_SUBSCRIPTION_UNSUBSCRIBE_SUCCESS') );
-		$this->setRedirect(EasyBlogRouter::_($redirectLInk, false));
-		return true;
+		$return = $this->getReturnURL();
+
+		if ($return) {
+			$redirect = $return;
+		}
+
+		// Get the subscription id
+		$id = $this->input->get('id', 0, 'int');
+		$subscription = EB::table('Subscriptions');
+
+		// Load up the subscription if id is provided
+		if ($id) {
+			$subscription->load($id);
+		} else {
+
+			// Try to get the email and what not from the query
+			$data = $this->input->get('data', '', 'raw');
+			$data = json_decode(base64_decode($data));
+			$data = (array) $data;
+
+			$subscription->load($data);
+		}
+
+		// Verify if the user really has access to unsubscribe for guests
+		if (!$subscription->id) {
+			return JError::raiseError(500, JText::_('COM_EASYBLOG_NOT_ALLOWED_TO_PERFORM_ACTION'));
+		}
+
+		// Ensure that the registered user is allowed to unsubscribe.
+		if ($subscription->user_id && $this->my->id != $subscription->user_id && !EB::isSiteAdmin()) {
+			return JError::raiseError(500, JText::_('COM_EASYBLOG_NOT_ALLOWED_TO_PERFORM_ACTION'));
+		}
+
+		// Try to delete the subscription
+		$state = $subscription->delete();
+
+		// Ensure that the user really owns this item
+		if (!$state) {
+			$this->info->set($subscription->getError());
+			return $this->app->redirect($redirect);
+		}
+
+		$this->info->set('COM_EASYBLOG_UNSUBSCRIBED_SUCCESS', 'success');
+		return $this->app->redirect($redirect);
 	}
 }

@@ -66,19 +66,7 @@ class EasyDiscussModelSearch extends EasyDiscussModel
 	 */
 	public function getTotal($sort, $filter, $category='', $featuredOnly = 'all')
 	{
-		$db		= DiscussHelper::getDBO();
-
-
-		// Lets load the content if it doesn't already exist
-		if (empty($this->_total))
-		{
-			$query = $this->_buildQuery($sort, $filter, $category, true);
-
-			$db->setQuery($query);
-
-			$count = $db->loadResult();
-			$this->_total = ($count) ? $count : '0';
-		}
+		// user must call the getdata before they can call this method or else the total will be empty
 
 		return $this->_total;
 	}
@@ -140,7 +128,7 @@ class EasyDiscussModelSearch extends EasyDiscussModel
 		$pquery	= 'SELECT DATEDIFF('. $db->Quote($date->toMySQL()) . ', a.`created` ) as `noofdays`, ';
 		$pquery	.= ' DATEDIFF(' . $db->Quote($date->toMySQL()) . ', IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) ) as `daydiff`, ';
 		$pquery	.= ' TIMEDIFF(' . $db->Quote($date->toMySQL()). ', IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) ) as `timediff`,';
-		$pquery	.= ' ' . $db->Quote('posts') . ' as `itemtype`,';
+		$pquery	.= ' IF(a.`parent_id` = 0, ' . $db->Quote('posts') . ', ' .  $db->Quote('replies') . ') as `itemtype`,';
 		$pquery .= ' a.`id`, a.`title`, a.`content`, a.`user_id`, a.`category_id`, a.`parent_id`, a.`user_type`, a.`created` AS `created`, a.`poster_name`,';
 		$pquery	.= ' b.`title` AS `category`, a.password, a.`featured` AS `featured`, a.`islock` AS `islock`, a.`isresolve` AS `isresolve`,';
 		$pquery	.= ' IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) as `lastupdate`';
@@ -150,23 +138,21 @@ class EasyDiscussModelSearch extends EasyDiscussModel
 		$pquery .= '	LEFT JOIN ' . $db->nameQuote( '#__discuss_post_types' ) . ' AS pt ON a.`post_type`= pt.`alias`';
 		$pquery	.= $this->_buildQueryWhere('posts', 'a', $category);
 		$pquery	.= $queryExclude;
-		// $pquery .= ' order by a.`replied` desc';
 
 
 		// // Replies
-		$rquery	= 'SELECT DATEDIFF('. $db->Quote($date->toMySQL()) . ', a.`created` ) as `noofdays`, ';
-		$rquery	.= ' DATEDIFF(' . $db->Quote($date->toMySQL()) . ', IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) ) as `daydiff`, ';
-		$rquery	.= ' TIMEDIFF(' . $db->Quote($date->toMySQL()). ', IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) ) as `timediff`,';
-		$rquery	.= ' ' . $db->Quote('replies') . ' as `itemtype`,';
-		$rquery .= ' a.`id`, a.`title`, a.`content`, a.`user_id`, a.`category_id`, a.`parent_id`, a.`user_type`,a.`created` AS `created`, a.`poster_name`,';
-		$rquery	.= ' b.`title` AS `category`, a.password, a.`featured` AS `featured`, a.`islock` AS `islock`, a.`isresolve` AS `isresolve`,';
-		$rquery	.= ' IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) as `lastupdate`';
-		$rquery	.= ' ,a.`legacy`, ' . $db->Quote('') . ' AS `post_type_suffix`, ' . $db->Quote( '' ) . ' AS `post_type_title`';
-		$rquery	.= ' FROM `#__discuss_posts` AS a';
-		$rquery .= '	LEFT JOIN ' . $db->nameQuote( '#__discuss_category' ) . ' AS b ON a.`category_id`=b.`id`';
-		$rquery	.= $this->_buildQueryWhere('replies', 'a', $category);
-		$rquery	.= $queryExclude;
-		// $rquery .= ' order by a.`created` desc';
+		// $rquery	= 'SELECT DATEDIFF('. $db->Quote($date->toMySQL()) . ', a.`created` ) as `noofdays`, ';
+		// $rquery	.= ' DATEDIFF(' . $db->Quote($date->toMySQL()) . ', IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) ) as `daydiff`, ';
+		// $rquery	.= ' TIMEDIFF(' . $db->Quote($date->toMySQL()). ', IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) ) as `timediff`,';
+		// $rquery	.= ' ' . $db->Quote('replies') . ' as `itemtype`,';
+		// $rquery .= ' a.`id`, a.`title`, a.`content`, a.`user_id`, a.`category_id`, a.`parent_id`, a.`user_type`,a.`created` AS `created`, a.`poster_name`,';
+		// $rquery	.= ' b.`title` AS `category`, a.password, a.`featured` AS `featured`, a.`islock` AS `islock`, a.`isresolve` AS `isresolve`,';
+		// $rquery	.= ' IF(a.`replied` = '.$db->Quote('0000-00-00 00:00:00') . ', a.`created`, a.`replied`) as `lastupdate`';
+		// $rquery	.= ' ,a.`legacy`, ' . $db->Quote('') . ' AS `post_type_suffix`, ' . $db->Quote( '' ) . ' AS `post_type_title`';
+		// $rquery	.= ' FROM `#__discuss_posts` AS a';
+		// $rquery .= '	LEFT JOIN ' . $db->nameQuote( '#__discuss_category' ) . ' AS b ON a.`category_id`=b.`id`';
+		// $rquery	.= $this->_buildQueryWhere('replies', 'a', $category);
+		// $rquery	.= $queryExclude;
 
 		// Categories
 		$cquery	= 'SELECT 0 as `noofdays`, ';
@@ -188,17 +174,22 @@ class EasyDiscussModelSearch extends EasyDiscussModel
 		}
 
 
-		if ($isCountOnly) {
-			$query  = 'SELECT count(1) FROM (';
-			$query  .= '(' . $pquery . ') UNION (' . $rquery . ') UNION (' . $cquery . ')';
-			$query  .=  ') as x';
+		// if ($isCountOnly) {
+		// 	$query  = 'SELECT count(1) FROM (';
+		// 	$query  .= '(' . $pquery . ') UNION (' . $rquery . ') UNION (' . $cquery . ')';
+		// 	$query  .=  ') as x';
 
-		} else {
-			$query  = 'SELECT * FROM (';
-			$query  .= '(' . $pquery . ') UNION (' . $rquery . ') UNION (' . $cquery . ')';
-			$query  .=  ') as x';
-			$query .= ' ORDER BY x.`lastupdate` DESC';
-		}
+		// } else {
+		// 	$query  = 'SELECT * FROM (';
+		// 	$query  .= '(' . $pquery . ') UNION (' . $rquery . ') UNION (' . $cquery . ')';
+		// 	$query  .=  ') as x';
+		// 	$query .= ' ORDER BY x.`lastupdate` DESC';
+		// }
+
+		$query  = 'SELECT SQL_CALC_FOUND_ROWS * FROM (';
+		$query  .= '(' . $pquery . ') UNION (' . $cquery . ')';
+		$query  .=  ') as x';
+		$query .= ' ORDER BY x.`lastupdate` DESC';
 
 		return $query;
 	}
@@ -216,15 +207,15 @@ class EasyDiscussModelSearch extends EasyDiscussModel
 
 		$where[] = $tbl.'.`published` = ' . $db->Quote('1');
 
-		if( $type == 'posts' )
-		{
-			$where[] = $tbl.'.`parent_id` = ' . $db->Quote( '0' );
-		}
+		// if( $type == 'posts' )
+		// {
+		// 	$where[] = $tbl.'.`parent_id` = ' . $db->Quote( '0' );
+		// }
 
-		if( $type == 'replies' )
-		{
-			$where[] = $tbl.'.`parent_id` != ' . $db->Quote( '0' );
-		}
+		// if( $type == 'replies' )
+		// {
+		// 	$where[] = $tbl.'.`parent_id` != ' . $db->Quote( '0' );
+		// }
 
 		// Private discussions should not show up
 		$where[]	= $tbl . '.`private`=' . $db->Quote(0);
@@ -290,6 +281,8 @@ class EasyDiscussModelSearch extends EasyDiscussModel
 	 */
 	public function getData( $usePagination = true, $sort = 'latest' , $limitstart = null, $filter = '' , $category = '', $limit = null )
 	{
+		$db			= DiscussHelper::getDBO();
+
 		if (empty($this->_data))
 		{
 
@@ -299,13 +292,21 @@ class EasyDiscussModelSearch extends EasyDiscussModel
 			{
 				$limitstart		= is_null( $limitstart ) ? $this->getState( 'limitstart') : $limitstart;
 				$limit			= is_null( $limit ) ? $this->getState( 'limit') : $limit;
-				$this->_data	= $this->_getList($query, $limitstart , $limit);
-			}
-			else
-			{
+				// $this->_data	= $this->_getList($query, $limitstart , $limit);
+			} else {
+				$limitstart     = 0;
 				$limit			= is_null( $limit ) ? $this->getState( 'limit') : $limit;
-				$this->_data	= $this->_getList($query, 0 , $limit);
 			}
+
+			$query .= ' LIMIT ' . $limitstart . ', ' . $limit;
+
+			$db->setQuery($query);
+			$this->_data	= $db->loadObjectList();
+
+			// now execute found_row() to get the number of records found.
+			$cntQuery = 'select FOUND_ROWS()';
+			$db->setQuery( $cntQuery );
+			$this->_total	= $db->loadResult();
 		}
 
 		return $this->_data;

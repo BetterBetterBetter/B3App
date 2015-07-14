@@ -13,48 +13,40 @@
 
 defined('_JEXEC') or die('Restricted access');
 
-jimport('joomla.application.component.controller');
+require_once(dirname(__FILE__) . '/controller.php');
 
-require_once( EBLOG_ROOT . DIRECTORY_SEPARATOR . 'controller.php' );
-
-class EasyBlogControllerThemes extends EasyBlogParentController
+class EasyBlogControllerThemes extends EasyBlogController
 {
 	public function getAjaxTemplate()
 	{
 		$files	= JRequest::getVar( 'names' , '' );
 
-		if( empty( $files ) )
-		{
+		if (empty($files)) {
 			return false;
 		}
 
 		// Ensure the integrity of each items submitted to be an array.
-		if( !is_array( $files ) )
-		{
+		if (!is_array($files)) {
 			$files	= array( $files );
 		}
 
 		$result		= array();
 
+		$template 	= EB::template();
 
-		foreach( $files as $file )
-		{
+		foreach ($files as $file) {
+
 			$dashboard = explode( '/' , $file );
 
-			if( $dashboard[0]=="dashboard" )
-			{
-				$template 	= new CodeThemes( true );
-				$out		= $template->fetch( $dashboard[1] . '.ejs' );
-			}
-			elseif ( $dashboard[0]=="media" )
-			{
-				$template 	= new CodeThemes( true );
-				$out		= $template->fetch( "media." . $dashboard[1] . '.ejs' );
-			}
-			else
-			{
-				$template 	= new CodeThemes();
-				$out		= $template->fetch( $file . '.ejs' );
+			if ($dashboard[0]=="dashboard") {
+				$out		= $template->output('site/dashboard/'.$dashboard[1] . '.ejs' );
+
+			} elseif ($dashboard[0]=="media") {
+				$out		= $template->output( 'site/media/' . $dashboard[1] . '.ejs' );
+
+			} else {
+				$out		= $template->output( 'site/' . $file . '.ejs' );
+
 			}
 
 			$obj			= new stdClass();
@@ -63,7 +55,6 @@ class EasyBlogControllerThemes extends EasyBlogParentController
 
 			$result[]		= $obj;
 		}
-
 
 		header('Content-type: text/x-json; UTF-8');
 		$json	 		= new Services_JSON();

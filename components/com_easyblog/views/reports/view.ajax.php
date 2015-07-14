@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,28 +9,59 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'string.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'date.php' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewReports extends EasyBlogView
 {
+	/**
+	 * Displays the report form
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function form()
+	{
+		// Get the composite key for the item
+		$id   = $this->input->get('id', 0, 'int');
+		$type = $this->input->get('type', '', 'cmd');
+
+		// Load up the dialog
+		$theme = EB::template();
+
+		$theme->set('id', $id);
+		$theme->set('type', $type);
+
+		$output = $theme->output('site/reports/dialog.form');
+
+		return $this->ajax->resolve($output);
+	}
+
+	/**
+	 * Displays the report dialog
+	 *
+	 * @since	1.3
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function show()
 	{
-		$theme 		= new CodeThemes();
-		$ajax		= EasyBlogHelper::getHelper( 'Ajax' );
+		$ajax = EasyBlogHelper::getHelper( 'Ajax' );
 
-		$type 		= JRequest::getCmd( 'type' );
-		$id 		= JRequest::getInt( 'id' );
+		$type = JRequest::getCmd( 'type' );
+		$id = JRequest::getInt( 'id' );
 
+		$theme = EB::template();
 		$theme->set( 'id' 	, $id );
 		$theme->set( 'type'	, $type );
 
-		$contents 	= $theme->fetch( 'ajax.dialog.report.form.php' );
+		$contents = $theme->output('site/reports/dialog.form');
 
-		$ajax->success( JText::_( 'COM_EASYBLOG_REPORT_THIS_BLOG_POST' ) , $contents );
+		$ajax->success( JText::_( '' ) , $contents );
 		$ajax->send();
 	}
 }

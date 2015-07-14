@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,174 +9,246 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require( EBLOG_ADMIN_ROOT . DIRECTORY_SEPARATOR . 'views.php');
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
 class EasyBlogViewAutoposting extends EasyBlogAdminView
 {
-
-	function display($tpl = null)
+	/**
+	 * Default autoposting display
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function display($tpl = null)
 	{
-		// @rule: Test for user access if on 1.6 and above
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.autoposting' , 'com_easyblog') )
-			{
-				JFactory::getApplication()->redirect( 'index.php' , JText::_( 'JERROR_ALERTNOAUTHOR' ) , 'error' );
-				JFactory::getApplication()->close();
+		// Check for user access
+		$this->checkAccess('easyblog.manage.autoposting');
+
+		$layout		= $this->getLayout();
+		$step		= JRequest::getVar('step', 1);
+
+		$this->set('step', $step);
+
+		if (method_exists($this, $layout)) {
+			return $this->$layout($tpl);
+		}
+
+		JToolBarHelper::title(JText::_('COM_EASYBLOG_AUTOPOSTING'), 'autoposting');
+
+		// Set page details
+		$this->setHeading(JText::_('COM_EASYBLOG_AUTOPOSTING_TITLE'));
+
+		$facebook 	= EB::oauth()->associated('facebook');
+		$twitter 	= EB::oauth()->associated('twitter');
+		$linkedin 	= EB::oauth()->associated('linkedin');
+
+		$this->set('facebook', $facebook);
+		$this->set('twitter', $twitter);
+		$this->set('linkedin', $linkedin);
+
+		parent::display('autoposting/default');
+	}
+
+	/**
+	 * Displays the facebook process to setup auto posting for Facebook
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	
+	 */
+	public function facebook()
+	{
+		// Add the button
+		JToolbarHelper::apply('facebook.save');
+
+		// Determines if facebook has already been associated
+		$associated = EB::oauth()->associated('facebook');
+
+		// Load the oauth table
+		$oauth = EB::table('Oauth');
+		$oauth->load(array('type' => 'facebook', 'system' => true));
+
+		// Set page details
+		JToolbarHelper::title(JText::_('COM_EASYBLOG_AUTOPOSTING_FB_TITLE'));
+		$this->setHeading('COM_EASYBLOG_AUTOPOSTING_FB_TITLE');
+
+		// Default expire values
+		$expire = '';
+
+		if (isset($oauth->expires)) {
+			$expire = $oauth->expires;
+		}
+
+		// Legacy codes will contain an "expires" property in the json object
+		if ($oauth->id && isset($oauth->expires) && !$oauth->expires) {
+
+			$legacyExpires	= $oauth->getAccessTokenValue('expires');
+
+			if ($legacyExpires) {
+				$created = strtotime($oauth->created);
+				$expire = $legacyExpires + $created;
 			}
 		}
 
-		//initialise variables
-		$document	= JFactory::getDocument();
-		$user		= JFactory::getUser();
-
-		JHTML::_('behavior.tooltip');
-		JHTML::_('behavior.modal' , 'a.modal' );
-
-		$config		= EasyBlogHelper::getConfig();
-		$layout		= $this->getLayout();
-
-		if( method_exists( $this , $layout ) )
-		{
-			$this->$layout( $tpl );
-
-			return;
+		// Format the expiry date
+		if ($expire) {
+			$expire = EB::date($expire)->format(JText::_('DATE_FORMAT_LC1'));
 		}
 
-		$isFacebookAssociated	= EasyBlogHelper::getHelper( 'OAuth' )->isAssociated( 'facebook' );
-		$isTwitterAssociated	= EasyBlogHelper::getHelper( 'OAuth' )->isAssociated( 'twitter' );
-		$isLinkedinAssociated	= EasyBlogHelper::getHelper( 'OAuth' )->isAssociated( 'linkedin' );
 
-		$this->assignRef( 'config'	, $config );
-		$this->assignRef( 'isFacebookAssociated', $isFacebookAssociated );
-		$this->assignRef( 'isTwitterAssociated', $isTwitterAssociated );
-		$this->assignRef( 'isLinkedinAssociated', $isLinkedinAssociated );
+		// Get the facebook client
+		$client = EB::oauth()->getClient('Facebook');
 
-		parent::display($tpl);
+		// Get a list of pages		
+		$pages = array();
+
+		if ($associated && $oauth->access_token) {
+			$client->setAccess($oauth->access_token);
+
+			// Get pages that are available
+			try {
+				$pages = $client->getPages();
+			} catch(Exception $e) {
+				$pages = array();
+			}
+		}
+
+		// Get a list of stored pages
+		$storedPages = $this->config->get('integrations_facebook_page_id');
+
+		if ($storedPages) {
+			$storedPages = explode(',', $storedPages);
+		}
+
+		// Get a list of groups
+		$groups = array();
+
+		if ($associated && $oauth->access_token) {
+			$client = EB::oauth()->getClient('Facebook');
+			$client->setAccess($oauth->access_token);
+
+			// Get groups that are available
+			$groups = array();
+
+			try {
+				$groups = $client->getGroups();
+			} catch(Exception $e) {
+				
+			}
+		}
+
+		// Get a list of stored groups
+		$storedGroups = $this->config->get('integrations_facebook_group_id', array());
+
+		if ($storedGroups) {
+			$storedGroups = explode(',', $storedGroups);
+		}
+
+		$this->set('client', $client);
+		$this->set('storedGroups', $storedGroups);
+		$this->set('groups', $groups);
+		$this->set('storedPages', $storedPages);
+		$this->set('pages', $pages);
+		$this->set('expire', $expire);
+		$this->set('associated', $associated);
+
+		parent::display('autoposting/facebook/default');
 	}
 
-	public function form( $tpl = null )
+	/**
+	 * Displays the twitter process to setup auto posting for Facebook
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	
+	 */
+	public function twitter()
 	{
-		JHTML::_('behavior.tooltip');
+		// Add the button
+		JToolbarHelper::title(JText::_('COM_EASYBLOG_AUTOPOSTING_TWITTER_TITLE'));
+		JToolbarHelper::apply('twitter.save');
 
-		$type	= JRequest::getVar( 'type' );
-		$config	= EasyBlogHelper::getConfig();
+		// Set page details
+		$this->setHeading('COM_EASYBLOG_AUTOPOSTING_TWITTER_TITLE');
+			
+		$client = EB::oauth()->getClient('twitter');
+		$associated = EB::oauth()->associated('twitter');
 
-		$isAssociated = EasyBlogHelper::getHelper( 'OAuth' )->isAssociated( $type );
+		$this->set('client', $client);
+		$this->set('associated', $associated);
 
-		$oauth		= EasyBlogHelper::getTable( 'Oauth' );
-		$oauth->loadSystemByType( $type );
+		parent::display('autoposting/twitter/default');
+	}
 
-		if( $type == 'linkedin' && $oauth->access_token )
-		{
-			$linkedin 			= EasyBlogHelper::getHelper( 'OAuth' )->getConsumer( 'linkedin' , $config->get( 'integrations_linkedin_api_key' ) , $config->get( 'integrations_linkedin_secret_key' ) , JURI::root() );
-			$linkedin->setAccess( $oauth->access_token );
-			$data 		= $linkedin->company( '?is-company-admin=true' );
-			$result 	= $data[ 'linkedin' ];
+	/**
+	 * Displays the linkedin process to setup auto posting
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	
+	 */
+	public function linkedin()
+	{
+		// Add the button
+		JToolbarHelper::apply('linkedin.save');
 
-			$parser 	= JFactory::getXML( $result , false );
-			$result 	= $parser->children();
-			$companies 	= array();
+		// Set page details
+		JToolbarHelper::title(JText::_('COM_EASYBLOG_AUTOPOSTING_LINKEDIN_TITLE'));
+		$this->setHeading('COM_EASYBLOG_AUTOPOSTING_LINKEDIN_TITLE');
 
-			if( $result )
-			{
-				foreach( $result as $item )
-				{
-					$company 		= new stdClass();
-					$company->id	= (int) $item->id;
+		$associated = EB::oauth()->associated('linkedin');
+
+		// Initialize the default value
+		$companies = array();
+		
+		$client = EB::oauth()->getClient('linkedin');		
+
+		if ($associated) {
+
+			$oauth = EB::table('oauth');
+			$oauth->load(array('type' => 'linkedin', 'system' => true));
+
+			$client->setAccess($oauth->access_token);
+
+			// Get the company data
+			$data = $client->company('?is-company-admin=true');
+			$result = $data['linkedin'];
+
+			$parser = JFactory::getXML($result, false);
+			$result = $parser->children();
+
+			$companies = array();
+
+			if ($result) {
+
+				foreach ($result as $item) {
+					$company = new stdClass();
+
+					$company->id    = (int) $item->id;
 					$company->title = (string) $item->name;
 
-					$companies[]	= $company;
+					$companies[] = $company;
 				}
 			}
-
-			$storedCompanies	= explode( ',' , $config->get( 'integrations_linkedin_company' ) );
-			
-			$this->assignRef( 'storedCompanies' , $storedCompanies );
-			$this->assignRef( 'companies' , $companies );
-		}
-		else
-		{
-			$companies 	= array();
-			$storedCompanies 	= array();
-
-			$this->assignRef( 'companies' , $companies );
-			$this->assignRef( 'storedCompanies' , $storedCompanies );
 		}
 
+		$storedCompanies = explode(',', $this->config->get('integrations_linkedin_company'));
 
-		$this->assignRef( 'oauth'			, $oauth );
-		$this->assignRef( 'isAssociated' 	, $isAssociated );
-		$this->assignRef( 'config'	, $config );
-		$this->assignRef( 'type'	, $type );
+		$this->set('client', $client);
+		$this->set('storedCompanies', $storedCompanies);
+		$this->set('companies', $companies);
+		$this->set('associated', $associated);
 
-		parent::display($tpl);
+		parent::display('autoposting/linkedin/default');
 	}
 
-	public function facebook( $tpl = null )
+	public function registerToolbar()
 	{
-		$step	= JRequest::getVar( 'step' );
-		$config	= EasyBlogHelper::getConfig();
-
-		$isAssociated	=  EasyBlogHelper::getHelper( 'OAuth' )->isAssociated( __FUNCTION__ );
-
-		$oauth		= EasyBlogHelper::getTable( 'Oauth' );
-		$oauth->loadSystemByType( 'facebook' );
-
-		$expire 	= '';
-
-		if( $oauth->id )
-		{
-			$expires	= $oauth->getAccessTokenValue( 'expires' );
-			$created 	= strtotime( $oauth->created );
-
-			$expire 	= EasyBlogHelper::getDate( $expires + $created )->toFormat( '%A, %d %B %Y' );
-		}
-
-		$this->assignRef( 'expire'		 , $expire );
-		$this->assignRef( 'isAssociated' , $isAssociated );
-		$this->assignRef( 'config'	, $config );
-		$this->assignRef( 'step'	, $step );
-
-		parent::display($tpl);
-	}
-
-	public function twitter( $tpl = null )
-	{
-		$step	= JRequest::getVar( 'step' );
-		$config	= EasyBlogHelper::getConfig();
-
-
-		$isAssociated	=  EasyBlogHelper::getHelper( 'OAuth' )->isAssociated( __FUNCTION__ );
-
-		$this->assignRef( 'isAssociated' , $isAssociated );
-		$this->assignRef( 'config'	, $config );
-		$this->assignRef( 'step'	, $step );
-
-		parent::display($tpl);
-	}
-
-	public function linkedin( $tpl = null )
-	{
-		$step	= JRequest::getVar( 'step' );
-		$config	= EasyBlogHelper::getConfig();
-
-		$isAssociated	=  EasyBlogHelper::getHelper( 'OAuth' )->isAssociated( __FUNCTION__ );
-
-		$this->assignRef( 'isAssociated' , $isAssociated );
-		$this->assignRef( 'config'	, $config );
-		$this->assignRef( 'step'	, $step );
-
-		parent::display($tpl);
-	}
-
-	function registerToolbar()
-	{
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG_AUTOPOSTING' ), 'autoposting' );
-
-		JToolbarHelper::back( JText::_( 'COM_EASYBLOG_TOOLBAR_HOME' ) , 'index.php?option=com_easyblog' );
+		
 		
 		if( $this->getLayout() == 'form' )
 		{

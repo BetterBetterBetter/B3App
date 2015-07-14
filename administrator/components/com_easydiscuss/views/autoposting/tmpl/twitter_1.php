@@ -27,7 +27,7 @@ defined('_JEXEC') or die('Restricted access');
 					<form name="twitter" action="index.php" method="post">
 						<ol class="list-instruction reset-ul pa-15">
 							<li>
-								<?php echo JText::_( 'COM_EASYDISCUSS_TWITTER_AUTOPOST_STEP_1_DESC'); ?> <a href="http://dev.twitter.com" target="_blank">http://dev.twitter.com</a>
+								<?php echo JText::_('COM_EASYDISCUSS_TWITTER_AUTOPOST_STEP_1_DESC'); ?> <a href="https://apps.twitter.com" target="_blank">https://apps.twitter.com</a>
 							</li>
 							<li>
 								<div><?php echo JText::_( 'COM_EASYDISCUSS_TWITTER_AUTOPOST_STEP_1_COPY_APP_ID'); ?></div>

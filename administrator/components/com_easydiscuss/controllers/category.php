@@ -244,6 +244,9 @@ class EasyDiscussControllerCategory extends EasyDiscussController
 				$category->store(); //now update the avatar.
 			}
 
+			// now we need to rerun the category ordering incase admin assign the correct category tree as a child of another category.
+			$category->rebuildOrdering();
+
 			$message	= JText::_( 'COM_EASYDISCUSS_CATEGORIES_SAVED_SUCCESS' );
 		}
 		else

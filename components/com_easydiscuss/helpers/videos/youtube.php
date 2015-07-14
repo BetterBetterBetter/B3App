@@ -50,7 +50,7 @@ class DiscussVideoYoutube
 
 		if( $code )
 		{
-			return '<div class="video-container"><iframe title="YouTube video player" width="' . $width . '" height="' . $height . '" src="http://www.youtube.com/embed/' . $code . '?wmode=transparent" frameborder="0" allowfullscreen></iframe></div>';
+			return '<div class="video-container"><iframe title="YouTube video player" width="' . $width . '" height="' . $height . '" src="//www.youtube.com/embed/' . $code . '?wmode=transparent" frameborder="0" allowfullscreen></iframe></div>';
 		}
 		else
 		{

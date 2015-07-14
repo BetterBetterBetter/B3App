@@ -4,54 +4,82 @@ EasyBlog.module('ratings', function($){
 
 	EasyBlog
 		.require()
-		.library(
-			'ui/stars'
-		)
-		.script(
-			'legacy'
-		)
+		.library('ui/stars')
 		.done(function(){
 
-			/**
-			 * Ratings
-			 **/
-			eblog.ratings = {
-				setup: function( elementId , disabled , ratingType ){
-					$("#" + elementId ).stars({
-						split: 2,
-						disabled: disabled,
-						oneVoteOnly: true,
-						cancelShow: false,
-						callback: function( element ){
-							eblog.loader.loading( elementId + '-command .rating-text' );
-							ejax.load( 'ratings' , 'vote' , element.value() , $( '#' + elementId ).children( 'input:hidden' ).val() , ratingType , elementId );
-						}
-					});
-				},
-				showVoters: function( elementId , elementType ){
-					ejax.load( 'ratings' , 'showvoters' , elementId , elementType );
-				},
-				update: function( elementId , ratingType , value , resultCommand ){
-					$( '#' + elementId ).children( '.ui-stars-star' ).removeClass( 'ui-stars-star-on' );
-					value	= parseInt( value );
-
-					// Hide command
-					$( '#' + elementId + '-command' ).hide();
-
-					$( '#' + elementId ).addClass( 'voted' );
-
-					$( '#' + elementId ).children( '.ui-stars-star' ).each( function( index ){
-						if( index < value )
-						{
-							$( this ).addClass( 'ui-stars-star-on' );
-						}
-						else
-						{
-							$( this ).removeClass( 'ui-stars-star-on' );
-						}
-					});
+			EasyBlog.Controller('Ratings', {
+				defaultOptions: {
+					"{stars}": ".ui-stars-star",
+					"{ratingValue}": "[data-rating-value]",
+					"{ratingText}": "[data-rating-text]",
+					"{showRating}": "[data-rating-voters]",
+					"{totalRating}": "[data-rating-total]",
+					"{starContainer}": ".star-location"
 				}
-			};
+			}, function(self) {
+				return {
+
+					init: function() {
+						self.type = self.element.data('type');
+						self.uid = self.element.data('id');
+						self.locked = self.element.data('locked');
+
+						var options = {
+							'split': 2,
+							'disabled': self.locked,
+							'oneVoteOnly': true,
+							'cancelShow': false,
+							callback: self.onUserVote
+						};
+
+						// Implement star ratings
+						self.starContainer().stars(options);
+					},
+
+					onUserVote: function(el) {
+						var value = el.value();
+
+						EasyBlog.ajax('site/views/ratings/vote', {
+							"value": value,
+							"type": self.type,
+							"id": self.uid
+						})
+						.done(function(total, message, rating) {
+
+							// Disable the selected stars
+							self.stars().removeClass('ui-stars-star-on');
+
+							// Hide the rate this text
+							self.ratingText().html(message);
+
+							// Add voted class
+							self.element.addClass('voted');
+
+							self.totalRating().text(total);
+
+							// Enable specific stars
+							self.stars().each(function(index) {
+								if (index < rating) {
+									$(this).addClass('ui-stars-star-on');
+								} else {
+									$(this).removeClass('ui-stars-star-on');
+								}
+							});
+						});
+					},
+
+					"{showRating} click": function() {
+						var total = parseInt(self.totalRating().text(), 10);
+						if (total <= 0) {
+							return;
+						}
+
+						EasyBlog.dialog({
+							content: EasyBlog.ajax('site/views/ratings/voters', {"uid" : self.uid, "type" : self.type})
+						});
+					}
+				}
+			});
 
 			module.resolve();
 		});

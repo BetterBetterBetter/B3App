@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,17 +9,14 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
-
-jimport('joomla.filesystem.file');
-jimport('joomla.filesystem.folder');
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableTeamBlogGroup extends EasyBlogTable
 {
-	var $team_id	= null;
-	var $group_id	= null;
+	public $team_id	= null;
+	public $group_id	= null;
 
 	/**
 	 * Constructor for this class.
@@ -27,16 +24,16 @@ class EasyBlogTableTeamBlogGroup extends EasyBlogTable
 	 * @return
 	 * @param object $db
 	 */
-	function __construct(& $db )
+	public function __construct(& $db )
 	{
-		parent::__construct( '#__easyblog_team_groups' , 'id' , $db );
+		parent::__construct('#__easyblog_team_groups', 'id', $db);
 	}
 
-	function exists()
+	public function exists()
 	{
 		$db		= EasyBlogHelper::db();
 
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
+		$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( $this->_tbl ) . ' '
 				. 'WHERE `team_id`=' . $db->Quote( $this->team_id ) . ' '
 				. 'AND `group_id`=' . $db->Quote( $this->group_id );
 		$db->setQuery( $query );

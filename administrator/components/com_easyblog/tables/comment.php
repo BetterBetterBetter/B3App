@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,83 +9,57 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
-
-require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'constants.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'string.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableComment extends EasyBlogTable
 {
-	var $id 			= null;
-	var $post_id		= null;
-	var $comment		= null;
-	var $name			= null;
-	var $title			= null;
-	var $email			= null;
-	var $url			= null;
-	var $ip				= null;
-	var $created_by		= null;
-	var $created		= null;
-	var $modified		= null;
-	var $published		= null;
-	var $publish_up		= null;
-	var $publish_down	= null;
-	var $ordering		= null;
-	var $vote			= null;
-	var $hits			= null;
-	var $sent			= null;
-	var $lft			= null;
-	var $rgt			= null;
-	var $parent_id		= null;
+	public $id = null;
+	public $post_id = null;
+	public $comment = null;
+	public $name = null;
+	public $title = null;
+	public $email = null;
+	public $url = null;
+	public $ip = null;
+	public $created_by = null;
+	public $created = null;
+	public $modified = null;
+	public $published = null;
+	public $publish_up = null;
+	public $publish_down = null;
+	public $ordering = null;
+	public $vote = null;
+	public $hits = null;
+	public $sent = null;
+	public $lft = null;
+	public $rgt = null;
+	public $parent_id = null;
 
 	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
+	 * Stores the comment author object. Cached locally and not on static
+	 * @var EasyBlogTableProfile
 	 */
-	function __construct(& $db )
+	public $author = null;
+
+	public function __construct(& $db )
 	{
 		parent::__construct( '#__easyblog_comment' , 'id' , $db );
 	}
 
-	/***
-	 * When executed, remove any 3rd party integration records.
+	/**
+	 * Deletes any stream related to this comment
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
 	public function removeStream()
 	{
-		jimport( 'joomla.filesystem.file' );
-
-		$config 	= EasyBlogHelper::getConfig();
-
-		// @rule: Detect if jomsocial exists.
-		$file 		= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'core.php';
-
-		if( JFile::exists( $file ) && $config->get( 'integrations_jomsocial_comment_new_activity' ) )
-		{
-			// @rule: Test if record exists first.
-			$db 	= EasyBlogHelper::db();
-			$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__community_activities' ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'app' ) . '=' . $db->Quote( 'com_easyblog' ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'cid' ) . '=' . $db->Quote( $this->id ) . ' '
-					. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'comment_type') . '=' . $db->Quote( 'com_easyblog.comments' );
-			$db->setQuery( $query );
-
-			$exists	= $db->loadResult();
-
-			if( $exists )
-			{
-				$query	= 'DELETE FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__community_activities' ) . ' '
-						. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'app' ) . '=' . $db->Quote( 'com_easyblog' ) . ' '
-						. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'cid' ) . '=' . $db->Quote( $this->id ) . ' '
-						. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'comment_type') . '=' . $db->Quote( 'com_easyblog.comments' );
-
-				$db->setQuery( $query );
-				$db->Query();
-			}
-		}
+		// jomsocial
+		EB::jomsocial()->removeCommentStream($this->id);
 	}
 
 	/**
@@ -93,13 +67,13 @@ class EasyBlogTableComment extends EasyBlogTable
 	 **/
 	public function updateOrdering()
 	{
-		$model			= EasyBlogHelper::getModel( 'Comment' );
+		$model			= EB::model( 'Comment' );
 		$latestComment 	= $model->getLatestComment( $this->post_id , $this->parent_id );
 
 		// @rule: Processing child comments
 		if( $this->parent_id != 0 )
 		{
-			$parentComment 	= EasyBlogHelper::getTable( 'Comment' );
+			$parentComment 	= EB::table('Comment');
 			$parentComment->load( $this->parent_id );
 
 			$left 		= $parentComment->lft + 1;
@@ -141,95 +115,47 @@ class EasyBlogTableComment extends EasyBlogTable
 	}
 
 	/**
-	 * Notifies the comment author when someone likes the comment
+	 * Process email notifications
 	 *
-	 * @since	5.0
+	 * @since	4.0
 	 * @access	public
 	 * @param	string
 	 * @return
 	 */
-	public function notifyLikes($likeAuthorId = null)
+	public function processEmails($isModerated = false , $blog )
 	{
-		// Ensure that the comment author is a valid user
-		if (!$this->created_by) {
-			return false;
-		}
+		$config = EB::config();
 
-		// Get the likes author
-		$author = EasyBlogHelper::getTable('Profile');
-		$author->load($likeAuthorId);
-
-		$data = array();
-		$data['authorName'] = $author->getName();
-		$data['authorAvatar'] = $author->getAvatar();
-		// $data['permalink'] = $this
-
-		// Get the post object
-		$post = EasyBlogHelper::getTable('Blog');
-		$post->load($this->post_id);
-
-		require_once(JPATH_ROOT . '/components/com_easyblog/router.php');
-		$permalink = EasyBlogRouter::_('index.php?option=com_easyblog&view=entry&id=' . $post->id . '#comment-' . $this->id);
-
-		$data['permalink'] = $permalink;
-
-		// Get the comment author
-		$commentAuthor = EasyBlogHelper::getTable('Profile');
-		$commentAuthor->load($this->created_by);
-
-		$email = new stdClass();
-		$email->unsubscribe = false;
-		$email->email = $commentAuthor->user->email;
-
-		// Email subject
-		$subject = JText::_('COM_EASYBLOG_EMAIL_SUBJECT_NEW_LIKES');
-
-		// Send notification now
-		$notification = EasyBlogHelper::getHelper('Notification');
-		$notification->send(array($email), $subject, 'email.like.comment' , $data);
-
-		// Add EasySocial notifications as well
-		$easysocial = EasyBlogHelper::getHelper('EasySocial');
-		$easysocial->notifySubscribers($post, 'comment.likes', $this);
-	}
-
-	public function processEmails( $isModerated = false , $blog )
-	{
-		$config 	= EasyBlogHelper::getConfig();
-
-		// @task: Fix contents of comments.
-		$content	= $this->comment;
-		// $content 	= nl2br( $this->comment );
-		// $content 	= EasyBlogCommentHelper::parseBBCode( $content );
+		// Fix contents of comments.
+		$content = $this->comment;
 
 		// Initialize what we need
-		$commentAuthor			= $this->name;
-		$commentAuthorEmail		= $this->email;
-		$commentAuthorAvatar	= JURI::root() . 'components/com_easyblog/assets/images/default_blogger.png';
-		$date					= EasyBlogDateHelper::dateWithOffSet( $this->created );
-		$commentDate			= EasyBlogDateHelper::toFormat( $date , '%A, %B %e, %Y' );
+		$commentAuthor = $this->name;
+		$commentAuthorEmail = $this->email;
+		$commentAuthorAvatar = JURI::root() . 'components/com_easyblog/assets/images/default_blogger.png';
 
-		$teamLink 	= '';
-		$emails 	= array();
+		// Get the date object
+		$date = EB::date();
 
-		if( isset( $blog->team ) )
-		{
-			$teamLink	= '&team=' . $blog->team;
+		// Format the date
+		$commentDate = $date->format(JText::_('DATE_FORMAT_LC3'));
+
+		$teamLink = '';
+
+		if (isset($blog->team)) {
+			$teamLink = '&team=' . $blog->team;
 		}
 
+		// Get the author data
+		if ($this->created_by != 0) {
+			$user = $this->getAuthor();
 
-		if( $this->created_by != 0 )
-		{
-			$user 	= EasyBlogHelper::getTable( 'Profile' );
-			$user->load( $this->created_by );
-
-			$commentAuthor			= $user->getName();
-			$commentAuthorEmail		= $user->user->email;
-			$commentAuthorAvatar	= $user->getAvatar();
+			$commentAuthor = $user->getName();
+			$commentAuthorEmail = $user->user->email;
+			$commentAuthorAvatar = $user->getAvatar();
 		}
 
-		$blogAuthor = EasyBlogHelper::getTable( 'Profile' );
-		$blogAuthor->load( $blog->created_by );
+		$blogAuthor = EB::user($blog->created_by);
 
 		$data 		= array(
 							'blogTitle'			=> $blog->title,
@@ -244,80 +170,76 @@ class EasyBlogTableComment extends EasyBlogTable
 							'commentLink'		=> EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&view=entry'.$teamLink.'&id='. $blog->id, false, true) . '#comment-' . $this->id
 						);
 
-		$emails 		= array();
-		$notification 	= EasyBlogHelper::getHelper( 'Notification' );
 
-		if( $isModerated )
-		{
-			$hashkey		= EasyBlogHelper::getTable( 'HashKeys' );
+		// Get a list of emails
+		$emails = array();
+
+		// Get the notification library
+		$notification = EB::notification();
+
+		if ($isModerated) {
+
+			$hashkey		= EB::table('HashKeys');
 			$hashkey->uid	= $this->id;
 			$hashkey->type	= 'comments';
 			$hashkey->store();
 
-			$data[ 'approveLink' ]	= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&controller=dashboard&task=approvecomment&key=' . $hashkey->key , false , true );
+			// Generate the approval and reject links
+			$data['approveLink'] = EBR::getRoutedURL('index.php?option=com_easyblog&task=comments.approve&key=' . $hashkey->key, false, true);
+			$data['rejectLink'] = EBR::getRoutedURL('index.php?option=com_easyblog&task=comments.reject&key=' . $hashkey->key, false, true);
 
-			// $notification->getCustomEmails( $emails );
-			// $notification->getAdminEmails( $emails );
-			//
+			// Send email notification to admin.
+			if ($config->get('custom_email_as_admin')) {
+				$notification->getCustomEmails( $emails );
+			} else {
+				$notification->getAdminEmails( $emails );
+			}
 
-			if( $config->get( 'custom_email_as_admin' ) )
-				{
-					$notification->getCustomEmails( $emails );
-				}
-				else
-				{
-					$notification->getAdminEmails( $emails );
-				}
+			// @rule: Send email notification to blog authors.
+			if ($config->get('notification_commentmoderationauthor')) {
+				$obj = new stdClass();
+				$obj->unsubscribe = false;
+				$obj->email = $blogAuthor->user->email;
 
-			$notification->send( $emails , JText::_( 'COM_EASYBLOG_NEW_COMMENT_ADDED_MODERATED_TITLE' ) , 'email.comment.moderate' , $data );
+				$emails[$blogAuthor->user->email] = $obj;
+			}
+
+			$notification->send($emails, JText::_('COM_EASYBLOG_NEW_COMMENT_ADDED_MODERATED_TITLE'), 'comment.moderate', $data);
 
 			return true;
 		}
 
-		if( !$isModerated )
-		{
-			if( $config->get( 'notification_commentadmin' ) )
-			{
-				if( $config->get( 'custom_email_as_admin' ) )
-				{
-					$notification->getCustomEmails( $emails );
-				}
-				else
-				{
-					$notification->getAdminEmails( $emails );
-				}
+		if (!$isModerated) {
+
+			// Get a list of admin emails
+			$notification->getAdminNotificationEmails($emails);
+
+			// Send notification to blog authors.
+			if ($config->get('notification_commentauthor')) {
+				
+				$obj = new stdClass();
+				$obj->unsubscribe = false;
+				$obj->email = $blogAuthor->user->email;
+
+				$emails[$blogAuthor->user->email] = $obj;
 			}
 
-			// @rule: Send notification to blog authors.
-			if( $config->get( 'notification_commentauthor' ) )
-			{
-				$obj 				= new stdClass();
-				$obj->unsubscribe	= false;
-				$obj->email 		= $blogAuthor->user->email;
-
-				$emails[ $blogAuthor->user->email ]	= $obj;
+			// Send notifications to blog subscribers
+			if (($config->get('main_subscription') && $blog->subscription == '1') && $config->get('notification_commentsubscriber')) {
+				$notification->getBlogSubscriberEmails($emails, $blog->id);
 			}
 
-			// @rule: Send notifications to blog subscribers
-			if( ($config->get('main_subscription') && $blog->subscription == '1') && $config->get('notification_commentsubscriber') )
-			{
-				$notification->getBlogSubscriberEmails( $emails , $blog->id );
+			// Do not send to the person that commented on the blog post.
+			unset($emails[$commentAuthorEmail]);
+
+			if (!$emails) {
+				return false;
 			}
 
-			// @rule: Do not send to the person that commented on the blog post.
-			unset( $emails[ $commentAuthorEmail ] );
+			// Send the emails now.
+			$subject = JText::sprintf('COM_EASYBLOG_NEW_COMMENT_ADDED_IN_POST', $blog->title);
 
-			// @rule: Send the emails now.
-			if( !empty( $emails ) )
-			{
-				$emailTitle 	= JText::_( 'COM_EASYBLOG_NEW_COMMENT_ADDED' );
-
-				if( $config->get( 'main_comment_email' ) )
-				{
-					$emailTitle	= '[#' . $this->id . ']: ' . $emailTitle;
-				}
-				$notification->send( $emails , $emailTitle , 'email.comment.new' , $data );
-			}
+			$notification->send($emails, $subject, 'comment.new', $data);
 
 			return true;
 		}
@@ -344,253 +266,208 @@ class EasyBlogTableComment extends EasyBlogTable
 		return $subscribers;
 	}
 
-	public function store( $isModerated = false )
+	/**
+	 * Override parent's store behavior
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	bool	Determines if this is moderated
+	 * @return
+	 */
+	public function store($isModerated = false)
 	{
-		$isNew      = ( empty( $this->id ) ) ? true : false;
+		// Determines if this is a new comment
+		$isNew = !$this->id ? true : false;
 
 		// @rule: Update the ordering as long as this is a new comment. Regardless of the publishing status
-		if( $isNew )
-		{
+		if ($isNew) {
 			$this->updateOrdering();
 		}
 
 		// @rule: If this was moderated and it is published, we should notify the other extensions.
-		if( $isModerated && $this->published )
-		{
+		if ($isModerated && $this->published) {
 			$isNew 	= true;
 		}
 
 		// @rule: Store after the ordering is updated
-		$state		= parent::store();
+		$state = parent::store();
 
 		// @rule: Run point integrations here.
-		if( $isNew && $this->published == 1 && $state )
-		{
-			$my 		= JFactory::getUser();
-			$blog		= EasyBlogHelper::getTable( 'Blog' );
-			$blog->load( $this->post_id );
+		if ($isNew && $this->published == 1 && $state) {
 
-			JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-			$config 	= EasyBlogHelper::getConfig();
+			// Get the current logged in user
+			$my = JFactory::getUser();
 
-			$author 			= EasyBlogHelper::getTable( 'Profile' );
-			$author->load( $this->created_by );
+			// Get the blog object
+			$blog = $this->getBlog();
 
-			// @task: Blog external link.
-			$link		= $blog->getExternalBlogLink( 'index.php?option=com_easyblog&view=entry&id='. $blog->id ) . '#comment-' . $this->id;
+			// Load site's language file
+			EB::loadLanguages();
+
+			// Get config
+			$config = EB::config();
+
+			$author = $this->getAuthor();
+
+			// Get the external link of the blog post
+			$link = $blog->getExternalBlogLink('index.php?option=com_easyblog&view=entry&id='. $blog->id) . '#comment-' . $this->id;
 
 			// @rule: Send notifications to the author of the blog for EasyDiscuss
-			if( $blog->created_by != $this->created_by && $this->created_by != 0 )
-			{
-				if( $config->get( 'integrations_easydiscuss_notification_comment' ) )
-				{
-					EasyBlogHelper::getHelper( 'EasyDiscuss' )
-							->addNotification( $blog ,
-										JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_NOTIFICATIONS_NEW_COMMENT_IN_YOUR_BLOG' , $blog->title) ,
-										EBLOG_NOTIFICATIONS_TYPE_COMMENT ,
-										array( $blog->created_by ) ,
-										$this->created_by,
-										$link );
-				}
+			if ($blog->created_by != $this->created_by && $this->created_by != 0) {
 
-				// @rule: Add notifications for jomsocial 2.6
-				if( $config->get( 'integrations_jomsocial_notification_comment' ) )
-				{
-					// Get list of users who subscribed to this blog.
-					EasyBlogHelper::getHelper( 'JomSocial' )->addNotification( JText::sprintf( 'COM_EASYBLOG_JOMSOCIAL_NOTIFICATIONS_NEW_COMMENT_IN_YOUR_BLOG' , $link  , $blog->title ) , 'easyblog_comment_blog' , array( $blog->created_by ) , $author , $link );
-				}
+				EB::easydiscuss()->addNotification($blog, JText::sprintf('COM_EASYBLOG_EASYDISCUSS_NOTIFICATIONS_NEW_COMMENT_IN_YOUR_BLOG' , $blog->title), EBLOG_NOTIFICATIONS_TYPE_COMMENT, array($blog->created_by), $this->created_by, $link);
 
-				$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-
-				if( $config->get( 'integrations_easysocial_notifications_newcomment' ) && $easysocial->exists() )
-				{
-					$easysocial->notifySubscribers( $blog , 'new.comment' , $this );
-				}
+				// Add notifications for EasySocial
+				EB::easysocial()->notifySubscribers($blog, 'new.comment', $this);
 			}
 
-			// @rule: Notify subscribers through notification system.
-			if( $config->get( 'integrations_jomsocial_notification_comment_follower' ) && $this->created_by != 0 )
-			{
-				$target	= $this->getSubscribers( $blog , array( $this->created_by , $blog->created_by ) );
+			// Notify subscribers through notification system.
+			if ($this->created_by != 0) {
 
-				if( !empty( $target ) )
-				{
-					// Get list of users who subscribed to this blog.
-					EasyBlogHelper::getHelper( 'JomSocial' )->addNotification( JText::sprintf( 'COM_EASYBLOG_JOMSOCIAL_NOTIFICATIONS_NEW_COMMENT_POSTED' , $link   , $blog->title ) , 'easyblog_comment_blog_sub' , $target , $author , $link );
+				$targets = $this->getSubscribers($blog, array($this->created_by, $blog->created_by));
+
+				if (!empty($targets)) {
+
+					EB::jomsocial()->addNotification(JText::sprintf('COM_EASYBLOG_JOMSOCIAL_NOTIFICATIONS_NEW_COMMENT_POSTED', $link, $blog->title) , 'easyblog_comment_blog_sub', $targets, $author, $link);
 				}
-			}
 
-			// @rule: Notify subscribers through notification system.
-			if( $config->get( 'integrations_easydiscuss_notification_comment_follower' ) && $this->created_by != 0 )
-			{
-				$target	= $this->getSubscribers( $blog , array( $this->created_by , $blog->created_by ) );
-
-				if( !empty( $target ) )
-				{
-					EasyBlogHelper::getHelper( 'EasyDiscuss' )
-							->addNotification( $blog ,
-										JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_NOTIFICATIONS_NEW_COMMENT_POSTED' , $blog->title) ,
-										EBLOG_NOTIFICATIONS_TYPE_COMMENT ,
-										$target ,
-										$this->created_by,
-										$link );
+				if (!empty($targets) && $config->get('integrations_easydiscuss_notification_comment_follower')) {
+					EB::easydiscuss()->addNotification($blog, JText::sprintf('COM_EASYBLOG_EASYDISCUSS_NOTIFICATIONS_NEW_COMMENT_POSTED', $blog->title), EBLOG_NOTIFICATIONS_TYPE_COMMENT, $target, $this->created_by, $link);
 				}
-			}
 
-			if( $this->created_by != 0 )
-			{
-				// @rule: Integrations with EasyDiscuss
-				EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.new.comment' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_COMMENT' , $blog->title ) );
-				EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.new.comment' , $this->created_by );
-				EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.new.comment' , $this->created_by );
+				// Integrations with EasyDiscuss
+				EB::easydiscuss()->log( 'easyblog.new.comment' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_COMMENT' , $blog->title ) );
+				EB::easydiscuss()->addPoint('easyblog.new.comment' , $this->created_by );
+				EB::easydiscuss()->addBadge('easyblog.new.comment' , $this->created_by );
 
-				EasyBlogHelper::getHelper( 'EasySocial' )->assignPoints( 'comment.create' , $this->created_by );
-				EasyBlogHelper::getHelper( 'EasySocial' )->assignPoints( 'comment.create.author' , $blog->created_by );
+				// Integrations with EasySocial
+				EB::easysocial()->assignPoints('comment.create', $this->created_by);
+				EB::easysocial()->assignPoints('comment.create.author', $blog->created_by);
+				EB::easysocial()->assignBadge('comment.create', JText::_('COM_EASYBLOG_EASYSOCIAL_BADGE_CREATE_COMMENT'));
 
-				EasyBlogHelper::getHelper( 'EasySocial' )->assignBadge( 'comment.create' , JText::_( 'COM_EASYBLOG_EASYSOCIAL_BADGE_CREATE_COMMENT' ) );
-			}
+				// Alpha user points
+				$url = EBR::_( 'index.php?option=com_easyblog&view=entry&id=' . $this->post_id);
 
-			// AlphaUserPoints
-			// since 1.2
-			if ( EasyBlogHelper::isAUPEnabled() && $this->created_by != 0 )
-			{
-				$url 		= EasyBlogRouter::_( 'index.php?option=com_easyblog&view=entry&id=' . $this->post_id );
-				AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_add_comment', AlphaUserPointsHelper::getAnyUserReferreID( $this->created_by ) , '', JText::sprintf('COM_EASYBLOG_AUP_NEW_COMMENT_SUBMITTED', $url, $blog->title) );
+				EB::aup()->assignPoints('plgaup_easyblog_add_comment', $this->created_by, JText::sprintf('COM_EASYBLOG_AUP_NEW_COMMENT_SUBMITTED', $url, $blog->title));
 
 				// @rule: Add comment for blog author
-				if( $blog->created_by != $this->created_by )
-				{
-					AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_add_comment_blogger', AlphaUserPointsHelper::getAnyUserReferreID( $blog->created_by ) , '', JText::sprintf('COM_EASYBLOG_AUP_NEW_COMMENT_SUBMITTED', $url, $blog->title) );
+				if ($blog->created_by != $this->created_by) {
+					EB::aup()->assignPoints('plgaup_easyblog_add_comment_blogger', $blog->created_by, JText::sprintf('COM_EASYBLOG_AUP_NEW_COMMENT_SUBMITTED', $url, $blog->title));
 				}
 			}
 
 			// Determine whether or not to push this as a normal activity
-			$external	= $blog->getBlogContribution();
+			$external = $blog->getBlogContribution();
 
 			// @rule: Add activity integrations for group integrations.
-			if( $external )
-			{
-				if( $external instanceof TableExternal )
-				{
-					EasyBlogHelper::getHelper( 'Event' )->addCommentStream( $blog , $this , $external );
+			if ($external && $external->type != EASYBLOG_POST_SOURCE_TEAM) {
+
+				if ($external->type == EASYBLOG_POST_SOURCE_JOMSOCIAL_GROUP) {
+					EB::groups()->addCommentStream($blog, $this, $external);
+
+				} else if ($external->type == EASYBLOG_POST_SOURCE_JOMSOCIAL_EVENT) {
+					EB::event()->addCommentStream($blog, $this, $external);
+
 				}
-				else
-				{
-					// @task: Legacy support prior to 3.5
-					EasyBlogHelper::getHelper( 'Groups' )->addCommentStream( $blog , $this , $external );
-				}
-			}
-			else
-			{
-				EasyBlogHelper::addJomSocialActivityComment( $this , $blog->title);
+			} else {
+
+				// Add jomsocial stream
+				EB::jomsocial()->insetCommentActivity($this, $blog);
 
 				// Add EasySocial stream
-				$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-				$easysocial->createCommentStream( $this , $blog );
+				EB::easysocial()->createCommentStream($this, $blog);
 
 				// Assign EasySocial points
-				$easysocial->assignPoints( 'comments.create' );
+				EB::easysocial()->assignPoints('comments.create');
 
-
-				// @rule: Give points to the comment author
-				EasyBlogHelper::addJomsocialPoint( 'com_easyblog.comments.add' );
+				// Give points to the comment author
+				EB::jomsocial()->assignPoints('com_easyblog.comments.add');
 
 				// @rule: Give points to the blog author
-				if( $my->id != $blog->created_by && $this->created_by != 0 )
-				{
-					// Assign EasySocial points
-					$easysocial->assignPoints( 'comments.create.author' , $blog->created_by );
+				if ($my->id != $blog->created_by && $this->created_by != 0) {
 
-					EasyBlogHelper::addJomsocialPoint( 'com_easyblog.comments.addblogger' , $blog->created_by );
+					// Assign EasySocial points
+					EB::easysocial()->assignPoints('comments.create.author', $blog->created_by);
+
+					// Assign Jomsocial points
+					EB::jomsocial()->assignPoints('com_easyblog.comments.addblogger', $blog->created_by);
 				}
 			}
 
-		}
-
-		if( $isNew && $state )
-		{
-			$blog 			= EasyBlogHelper::getTable( 'Blog' );
-			$blog->load( $this->post_id );
-
-			$blogauthor   = EasyBlogHelper::getTable('Profile');
-			$blogauthor->load( $blog->created_by );
-
-
-			$obj    			= new stdClass();
-			$obj->comment		= $this->comment;
-			$obj->commentauthor	= $this->name;
-			if ($this->created_by) {
-				$author = EasyBlogHelper::getTable( 'Profile' );
-				$author->load( $this->created_by );
-				$obj->commentauthor = $author->getName();
-			}
-
-
-			$obj->blogtitle		= $blog->title;
-			$obj->blogautor		= $blogauthor->getName();
-
-			$activity   = new stdClass();
-			$activity->actor_id		= ( empty( $this->created_by ) ) ? '0' : $this->created_by;
-			$activity->target_id	= $blog->created_by;
-			$activity->context_type	= 'comment';
-			$activity->context_id	= $this->id;
-			$activity->verb         = 'add';
-			$activity->source_id    = $this->post_id;
-			$activity->uuid         = serialize( $obj );
-			EasyBlogHelper::activityLog( $activity );
 		}
 
 		return $state;
 	}
 
-	public function delete( $cid = null )
+	/**
+	 * Retrieves the blog object associated with this comment
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getBlog()
 	{
-		$state 	= parent::delete( $cid );
-		$my 	= JFactory::getUser();
+		$post = EB::post($this->post_id);
 
-		// @rule: Remove comment's stream
+		return $post;
+	}
+
+	/**
+	 * Overrides the parent's delete method
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function delete($pk = null)
+	{
+		// Try to delete the comment item first
+		$state = parent::delete($pk);
+
+		// Get the current logged in user
+		$my = JFactory::getUser();
+
+		// Remove comment's stream
 		$this->removeStream();
 
-		if( $this->created_by != 0 && $this->published == '1' )
-		{
-			$blog		= EasyBlogHelper::getTable( 'Blog' );
-			$blog->load( $this->post_id );
+		if ($this->created_by != 0 && $this->published == '1') {
 
-			JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-			$config 	= EasyBlogHelper::getConfig();
+			// Get the blog post
+			$post = $this->getBlog();
 
-			// @rule: Integrations with EasyDiscuss
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.delete.comment' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_DELETE_COMMENT' , $blog->title ) );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.delete.comment' , $this->created_by );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.delete.comment' , $this->created_by );
+			// Load language
+			EB::loadLanguages();
 
-			// @since 1.2
+			$config = EB::config();
+
+			// Integrations with EasyDiscuss
+			EB::easydiscuss()->log('easyblog.delete.comment' , $this->created_by , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_DELETE_COMMENT' , $post->title));
+			EB::easydiscuss()->addPoint('easyblog.delete.comment' , $this->created_by );
+			EB::easydiscuss()->addBadge('easyblog.delete.comment' , $this->created_by );
+
 			// AlphaUserPoints
-			if ( EasyBlogHelper::isAUPEnabled() )
-			{
-				AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_delete_comment', AlphaUserPointsHelper::getAnyUserReferreID( $this->created_by ) , '', JText::_('COM_EASYBLOG_AUP_COMMENT_DELETED') );
-
-				// @rule: Add comment for blog author
-				if( $blog->created_by != $this->created_by )
-				{
-					AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_delete_comment_blogger', AlphaUserPointsHelper::getAnyUserReferreID( $blog->created_by ) , '', JText::sprintf('COM_EASYBLOG_AUP_COMMENT_DELETED_BLOGGER', $url, $blog->title) );
-				}
-			}
+			EB::aup()->assign('plgaup_easyblog_delete_comment', $this->created_by, JText::_('COM_EASYBLOG_AUP_COMMENT_DELETED'));
 
 			// Assign EasySocial points
-			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-			$easysocial->assignPoints( 'comments.remove' , $this->created_by );
+			EB::easysocial()->assignPoints('comments.remove', $this->created_by);
 
-			// @rule: Deduct points from the comment author
-			EasyBlogHelper::addJomsocialPoint( 'com_easyblog.comments.remove' , $this->created_by );
+			// Deduct points from the comment author
+			EB::jomsocial()->assignPoints('com_easyblog.comments.remove', $this->created_by);
 
-			// @rule: Give points to the blog author
-			if( $my->id != $blog->created_by )
-			{
-				// Assign EasySocial points
-				$easysocial->assignPoints( 'comments.remove.author' , $blog->created_by );
+			// Deduct points from the blog post author
+			if ($my->id != $post->created_by) {
 
-				EasyBlogHelper::addJomsocialPoint( 'com_easyblog.comments.removeblogger' , $blog->created_by );
+				// Deduct EasySocial points
+				EB::easysocial()->assignPoints('comments.remove.author', $post->created_by);
+
+				// JomSocial
+				EB::jomsocial()->assignPoints('com_easyblog.comments.removeblogger', $post->created_by);
+
+				// AUP
+				EB::aup()->assignPoints('plgaup_easyblog_delete_comment_blogger', $post->created_by, JText::sprintf('COM_EASYBLOG_AUP_COMMENT_DELETED_BLOGGER', $url, $post->title));
 			}
 		}
 
@@ -603,16 +480,17 @@ class EasyBlogTableComment extends EasyBlogTable
 	 * @access	public
 	 * @param 	Array 	$post	An array of posted values.
 	 */
-	function bindPost($post)
+	public function bindPost($post)
 	{
-		$config 		= EasyBlogHelper::getConfig();
+		$config = EB::config();
 
-		if(! empty($post['commentId']))
-		{
+		// Could be edited
+		if (!empty($post['commentId'])) {
 			$this->id	= $post['commentId'];
 		}
 
-		$this->post_id	= $post['id'];
+		// Set the post id
+		$this->post_id  = $post['post_id'];
 
 		//replace a url to link
 		$comment        = $post['comment'];
@@ -643,9 +521,214 @@ class EasyBlogTableComment extends EasyBlogTable
 		}
 	}
 
-	function updateSent()
+	/**
+	 * Retrieves the comment author name
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAuthorName()
 	{
-		$db = EasyBlogHelper::db();
+		// If the comments was posted as a guest, we want to display the appropriate name
+		if (!$this->created_by) {
+			return $this->name;
+		}
+
+		// Get the author object
+		$author 	= $this->getAuthor();
+
+		return $author->getName();
+	}
+
+	/**
+	 * Retrieves the comment author avatar
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAuthorAvatar()
+	{
+		// Get the author object
+		$author 	= $this->getAuthor();
+
+		return $author->getAvatar();
+	}
+
+	/**
+	 * Retrieves the created date object
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getCreated()
+	{
+		$date 	= EB::date($this->created);
+
+		return $date;
+	}
+
+	/**
+	 * Determines if the comment is published
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isPublished()
+	{
+		return $this->published == 1;
+	}
+
+	/**
+	 * Determines if the comment is moderated
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function isModerated()
+	{
+		return $this->published === EBLOG_COMMENT_STATUS_MODERATED || $this->published === '2';
+	}
+
+	/**
+	 * Allows caller to unpublish a comment
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	bool
+	 */
+	public function unpublish()
+	{
+		// Determines if the comment was previously moderated
+		$pending = $this->published == EBLOG_COMMENT_STATUS_MODERATED;
+
+		// Set the publish status
+		$this->published = false;
+
+		// Store the item
+		$state = $this->store($pending);
+
+		return $state;
+	}
+
+	/**
+	 * Publishes a comment
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function publish($pks = null, $state = 1, $userId = 0)
+	{
+		// Determines if the comment was previously moderated
+		$pending = $this->published == EBLOG_COMMENT_STATUS_MODERATED;
+
+		// Set the publish status
+		$this->published 	= true;
+
+		// Store the item
+		$state = $this->store($pending);
+
+		// Send notifications if necessary
+		if ($this->published && !$this->sent && $pending) {
+
+			$this->comment = EB::comment()->parseBBCode($this->comment);
+			$this->comment = nl2br($this->comment);
+
+			// Process emails
+			$this->processEmails();
+
+			// Update the sent flag
+			$this->updateSent();
+		}
+
+		return $state;
+	}
+
+
+	/**
+	 * Determines if the comment is unpublished
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isUnpublished()
+	{
+		return $this->published != 1;
+	}
+
+	/**
+	 * Retrieve the permalink to the comment
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getPermalink($xhtml = false)
+	{
+		$post = EB::post($this->post_id);
+		$url = $post->getPermalink();
+
+		// Append the fragments
+		$url 	.= '#comment-' . $this->id;
+
+		return $url;
+	}
+
+	/**
+	 * Retrieves the formatted comment
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return	string
+	 */
+	public function getContent($truncate = true)
+	{
+		if ($truncate) {
+			$text = JString::strlen($this->comment) > 150 ? JString::substr($this->comment, 0, 150) . JText::_('COM_EASYBLOG_ELLIPSES') : $this->comment;
+		} else {
+			$text = EB::comment()->parseBBCode($this->comment);
+		}
+
+		$text = strip_tags($text, '<img>');
+
+		return $text;
+	}
+
+	/**
+	 * Retrieves the comment author
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAuthor()
+	{
+		if (is_null($this->author)) {
+			$this->author 	= EB::user($this->created_by);
+		}
+
+		return $this->author;
+	}
+
+	public function updateSent()
+	{
+		$db = EB::db();
 
 		if(! empty($this->id))
 		{
@@ -669,9 +752,50 @@ class EasyBlogTableComment extends EasyBlogTable
 		return $this->created_by == $id;
 	}
 
-	public function validate( $type )
+	/**
+	 * Validates the comment posted
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function validateData()
 	{
-		$config		= EasyBlogHelper::getConfig();
+		if (!$this->validate('title')) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_TITLE_IS_EMPTY'));
+			return false;
+		}
+
+		if (!$this->validate('name')) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_NAME_IS_EMPTY'));
+			return false;
+		}
+
+		if (!$this->validate('email')) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_EMAIL_IS_EMPTY'));
+			return false;
+		}
+
+		if (!$this->validate('comment')) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_IS_EMPTY'));
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validates the comment
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function validate($type)
+	{
+		$config		= EB::getConfig();
 
 
 		if( $config->get( 'comment_requiretitle' ) && $type == 'title' )
@@ -692,6 +816,133 @@ class EasyBlogTableComment extends EasyBlogTable
 		if( $type == 'comment' )
 		{
 			return JString::strlen( $this->comment ) != 0;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Determines if this comment is a spam
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isSpam()
+	{
+		$config = EB::config();
+
+		if (!$config->get('comment_akismet')) {
+			return false;
+		}
+
+		$data = array(
+				'author'    => $this->name,
+				'email'     => $this->email,
+				'website'   => JURI::root(),
+				'body'      => $this->comment,
+				'permalink' => EBR::_('index.php?option=com_easyblog&view=entry&id=' . $this->post_id)
+			);
+
+		if (EB::akismet()->isSpam($data)) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Validates posted data
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function validatePost($post)
+	{
+		$config = EB::config();
+		$my     = JFactory::getUser();
+
+		$comment = isset($post['comment']) ? $post['comment'] : '';
+		$title   = isset($post['title']) ? $post['title'] : '';
+		$register = isset($post['register']) ? $post['register'] : false;
+		$username = isset($post['username']) ? $post['username'] : '';
+		$subscribe = isset($post['subscribe']) ? $post['subscribe'] : false;
+		$name = isset($post['name']) ? $post['name'] : '';
+		$email = isset($post['email']) ? $post['email'] : '';
+		$website = isset($post['website']) ? $post['website'] : '';
+		$terms = isset($post['terms']) ? $post['terms'] : '';
+
+		// If name is empty, it could be that the user is logged in
+		if (!$my->guest) {
+			$user = EB::user($my->id);
+
+			// Override the name
+			$name = $user->getName();
+
+			// Override the email
+			$email = $my->email;
+
+			// Override the website
+			$website = $user->getWebsite();
+		}
+
+
+		if (!$comment || JString::strlen($comment) == 0) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENTS_PLEASE_ENTER_SOME_COMMENTS'));
+			return false;
+		}
+
+		if ($config->get('comment_requiretitle') && JString::strlen($title) == 0) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_TITLE_IS_EMPTY'));
+			return false;
+		}
+
+		if ($register && (!$username || JString::strlen($username) == 0)) {
+			$this->setError(JText::_('COM_EASYBLOG_SUBSCRIPTION_USERNAME_IS_EMPTY'));
+			return false;
+		}
+
+		if (!$name || JString::strlen($name) == 0) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_NAME_IS_EMPTY'));
+			return false;
+		}
+
+		if ($config->get('comment_require_email') && (!$email || JString::strlen($email) == 0)) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_EMAIL_IS_EMPTY'));
+
+			return false;
+		}
+
+		if ($my->guest && ($config->get('comment_require_website') && (!$website || JString::strlen($website) == 0))) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_WEBSITE_IS_EMPTY'));
+
+			return false;
+		}
+
+		// If user is subscribed to the blog, ensure that email exists
+		if ($subscribe && !$email) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_EMAIL_IS_EMPTY'));
+
+			return false;
+		}
+
+		// Check for valid email
+		$validEmail = EB::string()->isValidEmail($email);
+
+		if ($config->get('comment_require_email') && !$validEmail) {
+			$this->setError(JText::_('COM_EASYBLOG_COMMENT_EMAIL_INVALID'));
+
+			return false;
+		}
+
+		// Ensure that the user checked the terms and condition box.
+		if ($config->get('comment_tnc') && !$terms && (($config->get('comment_tnc_users') == 0 && $my->guest) || ($config->get('comment_tnc_users') == 1 && !$my->guest) || ($config->get('comment_tnc_users') == 2))) {
+			$this->setError(JText::_('COM_EASYBLOG_YOU_MUST_ACCEPT_TNC'));
+
+			return false;
 		}
 
 		return true;

@@ -86,7 +86,7 @@ defined( '_JEXEC' ) or die( 'Restricted access' ); ?>
 
 					<div class="kmt-form-respond">
 						<div class="col-cell cell-tight pr-5">
-                            Share:
+                            <?php echo JText::_('COM_KOMENTO_FORM_SHARE'); ?>
                         </div>
 
 						<!-- START: Pro Version Only -->
@@ -97,7 +97,7 @@ defined( '_JEXEC' ) or die( 'Restricted access' ); ?>
 							?>
 							
 							<div class="col-cell">
-								<a href="javascript:void(0)" class="locationButton"><?php echo JText::_( 'Location' ); ?></a>
+								<a href="javascript:void(0)" class="locationButton"><?php echo JText::_('COM_KOMENTO_FORM_LOCATION'); ?></a>
 							</div>
 						</div>
 						<!-- END: Pro Version Only -->

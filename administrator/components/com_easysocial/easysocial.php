@@ -21,9 +21,9 @@ $input = $app->input;
 // Check if there's a file initiated for installation
 $file = JPATH_ROOT . '/tmp/easysocial.installation';
 
-$update = $input->get('update', false, 'bool');
+$launchInstaller = $input->get('launchInstaller', false, 'bool');
 
-if ($update) {
+if ($launchInstaller) {
 	// Determines if the installation is a new installation or old installation.
 	$obj = new stdClass();
 	$obj->new = false;

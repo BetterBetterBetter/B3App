@@ -1,95 +1,82 @@
 <?php
 /**
-* @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
-* @license		GNU/GPL, see LICENSE.php
+* @package      EasyBlog
+* @copyright    Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
+* @license      GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport( 'joomla.application.component.view');
-jimport( 'joomla.html.toolbar' );
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'image.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'date.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'router.php' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewMyblog extends EasyBlogView
 {
-	function display( $tmpl = null )
+	/**
+	 * Default display method for my blog listings
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tmpl = null)
 	{
-		$my   		= JFactory::getUser();
+		// Require user to be logged in to access this page
+		EB::requireLogin();
 
-		if( $my->id < 1 )
-		{
-			EasyBlogHelper::showLogin();
-			return;
-		}
+		// Get the default sorting behavior
+		$sort = $this->input->get('sort', $this->config->get('layout_postorder'), 'cmd');
 
-		JPluginHelper::importPlugin( 'easyblog' );
-		$dispatcher = JDispatcher::getInstance();
-		$mainframe	= JFactory::getApplication();
-        $document	= JFactory::getDocument();
-		$acl 		= EasyBlogACLHelper::getRuleSet();
-		$config 	= EasyBlogHelper::getConfig();
-        $sort		= JRequest::getCmd('sort', $config->get( 'layout_postorder' ) );
-		$blogger	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-		$blogger->load( $my->id );
+		// Load up the author profile
+		$author = EB::user($this->my->id);
 
-		// set meta tags for blogger
-		EasyBlogHelper::setMeta( $my->id, META_ID_BLOGGERS );
+		// Set meta tags for blogger
+		EB::setMeta($this->my->id, META_ID_BLOGGERS);
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'myblog', $my->id ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_BLOGGERS_BREADCRUMB') , EasyBlogRouter::_('index.php?option=com_easyblog&view=blogger') );
-			$this->setPathway( $blogger->getName() );
-		}
+		// Set the breadcrumbs
+		$this->setPathway(JText::_('COM_EASYBLOG_BLOGGERS_BREADCRUMB'), EB::_('index.php?option=com_easyblog&view=blogger'));
+		$this->setPathway($author->getName());
 
-        $model		= $this->getModel( 'Blog' );
-		$data		= $model->getBlogsBy('blogger', $blogger->id, $sort);
+		$model = EB::model('Blog');
+		$posts = $model->getBlogsBy('blogger', $author->id, $sort);
+
+
+		// Get the pagination
 		$pagination	= $model->getPagination();
 
-		$pageNumber	= $pagination->get( 'pages.current' );
-		$pageText	= ($pageNumber == 1) ? '' : ' - ' . JText::sprintf( 'COM_EASYBLOG_PAGE_NUMBER', $pageNumber );
-		$document->setTitle( $blogger->getName() . $pageText . EasyBlogHelper::getPageTitle( JText::_( 'COM_EASYBLOG_MY_BLOG_PAGE_TITLE' ) ) );
+        // Set the page title
+        $title = $author->getName() . ' - ' . EB::getPageTitle(JText::_('COM_EASYBLOG_MY_BLOG_PAGE_TITLE'));
+        $this->setPageTitle($title, $pagination, $this->config->get('main_pagetitle_autoappend'));
 
-		$data		= EasyBlogHelper::formatBlog($data , false , true , true , true );
+        // Format the posts
+        $posts = EB::formatter('list', $posts);
 
-		if($config->get('layout_showcomment', false))
-		{
-		    for($i = 0; $i < count($data); $i++)
-		    {
-		        $row   =& $data[$i];
+		// Add the RSS headers on the page
+		EB::feeds()->addHeaders('index.php?option=com_easyblog&view=myblog');
 
-				$maxComment = $config->get('layout_showcommentcount', 3);
-				$comments	= EasyBlogHelper::getHelper( 'Comment' )->getBlogComment( $row->id, $maxComment , 'desc' );
-                $comments   = EasyBlogHelper::formatBlogCommentsLite($comments);
-	    		$row->comments = $comments;
-		    }
+		// Determines if the viewer already subscribed to the author
+		$subscribed = false;
+
+		$bloggerModel = EB::model('Blogger');
+
+		if ($bloggerModel->isBloggerSubscribedUser($author->id, $this->my->id, $this->my->email)) {
+			$subscribed = true;
 		}
 
-		$rssURL		= EasyBlogRouter::_('index.php?option=com_easyblog&view=blogger&task=rss');
+		// Get the current url
+		$return = EBR::_('index.php?option=com_easyblog', false);
 
-		//twitter follow me link
-		$twitterFollowMelink= EasyBlogSocialShareHelper::getLink('twitter', $blogger->id);
+		$this->set('return', $return);
+		$this->set('subscribed', $subscribed);
+		$this->set('author', $author);
+		$this->set('posts', $posts);
+		$this->set('sort', $sort);
+		$this->set('pagination', $pagination);
 
-		$theme	= new CodeThemes();
-
-		$theme->set('rssURL'	, $rssURL );
-		$theme->set('blogger', $blogger );
-		$theme->set('sort', $sort );
-		$theme->set('blogs', $data );
-		$theme->set( 'currentURL' , 'index.php?option=com_easyblog&view=latest' );
-		$theme->set('pagination', $pagination->getPagesLinks());
-        $theme->set('twitterFollowMelink', $twitterFollowMelink);
-        $theme->set('my', $my );
-		$theme->set('acl', $acl );
-
-		echo $theme->fetch( 'blog.blogger.php' );
+		parent::display('blogs/myblog/default');
 	}
 }

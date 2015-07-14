@@ -12,6 +12,6 @@
  */
 defined( '_JEXEC' ) or die( 'Restricted access' ); ?>
 <div class="kmt-form-editor">
-	<textarea id="commentInput" class="commentInput input textarea" cols="50" rows="10" tabindex="44" placeholder="Write your comment here..."></textarea>
+	<textarea id="commentInput" class="commentInput input textarea" cols="50" rows="10" tabindex="44" placeholder="<?php echo JText::_('COM_KOMENTO_FORM_WRITE_YOUR_COMMENTS'); ?>"></textarea>
 	<?php // echo $editor->display('commentInput', '', '100%', '150', '10', '10', false); ?>
 </div>

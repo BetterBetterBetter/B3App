@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,11 +9,11 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'parent.php' );
+require_once(dirname(__FILE__) . '/model.php');
 
-class EasyBlogModelSpools extends EasyBlogModelParent
+class EasyBlogModelSpools extends EasyBlogAdminModel
 {
 	/**
 	 * Category total
@@ -56,7 +56,7 @@ class EasyBlogModelSpools extends EasyBlogModelParent
 	 * @access public
 	 * @return integer
 	 */
-	function getTotal()
+	public function getTotal()
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_total))
@@ -100,7 +100,7 @@ class EasyBlogModelSpools extends EasyBlogModelParent
 		$db			= EasyBlogHelper::db();
 				
 		$query	= 'SELECT * ';
-		$query	.= 'FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_mailq' );
+		$query	.= 'FROM ' . $db->nameQuote( '#__easyblog_mailq' );
 		$query	.= $where;
 		
 		$query	.= $orderby;
@@ -123,11 +123,11 @@ class EasyBlogModelSpools extends EasyBlogModelParent
 		{
 			if ( $filter_state == 'P' )
 			{
-				$where[] = EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'status' ) . '=' . $db->Quote( '1' );
+				$where[] = $db->nameQuote( 'status' ) . '=' . $db->Quote( '1' );
 			}
 			else if ($filter_state == 'U' )
 			{
-				$where[] = EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'status' ) . '=' . $db->Quote( '0' );
+				$where[] = $db->nameQuote( 'status' ) . '=' . $db->Quote( '0' );
 			}
 		}
 
@@ -173,5 +173,28 @@ class EasyBlogModelSpools extends EasyBlogModelParent
 		}
 
 		return $this->_data;
+	}
+
+	/**
+	 * Purges all emails from the system
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	
+	 */
+	public function purge($type = '')
+	{
+		$db = EB::db();
+		$query = array();
+		$query[] = 'DELETE FROM ' . $db->qn('#__easyblog_mailq');
+		
+		if ($type == 'sent') {
+			$query[] = 'WHERE ' . $db->qn('status') . '=' . $db->Quote(1);
+		}
+
+		$query = implode(' ', $query);
+
+		$db->setQuery($query);
+		return $db->Query();
 	}
 }

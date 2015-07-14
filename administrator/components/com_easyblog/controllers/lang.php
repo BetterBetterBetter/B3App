@@ -19,7 +19,7 @@ class EasyBlogControllerLang extends EasyBlogController
 {
 	public function getLanguage()
 	{
-		JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
+		EB::loadLanguages();
 
 		$languages		= JRequest::getVar( 'languages' );
 		$result 		= array();

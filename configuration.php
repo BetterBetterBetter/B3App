@@ -4,7 +4,7 @@ class JConfig {
 	public $offline_message = 'This site is down for maintenance.<br /> Please check back again soon.';
 	public $display_offline_message = '1';
 	public $offline_image = '';
-	public $sitename = 'Better Better Better';
+	public $sitename = 'Better Better Better eXchange';
 	public $editor = 'tinymce';
 	public $captcha = '0';
 	public $list_limit = '20';
@@ -18,7 +18,7 @@ class JConfig {
 	public $db = 'b3joomla';
 	public $dbprefix = 'b3j_';
 	public $live_site = '';
-	public $secret = 'ZiKMptvlt6XcUjXH';
+	public $secret = 'neaJtrJsPWYxJV2o';
 	public $gzip = '0';
 	public $error_reporting = 'default';
 	public $helpurl = 'https://help.joomla.org/proxy/index.php?option=com_help&keyref=Help{major}{minor}:{keyref}';
@@ -30,9 +30,9 @@ class JConfig {
 	public $ftp_enable = '0';
 	public $offset = 'UTC';
 	public $mailonline = '1';
-	public $mailer = 'smtp';
+	public $mailer = 'mail';
 	public $mailfrom = 'jeremy@betterbetterbetter.org';
-	public $fromname = 'Better Better Better';
+	public $fromname = 'Better Better Better eXchange';
 	public $sendmail = '/usr/sbin/sendmail';
 	public $smtpauth = '0';
 	public $smtpuser = '';
@@ -43,7 +43,7 @@ class JConfig {
 	public $caching = '0';
 	public $cache_handler = 'file';
 	public $cachetime = '15';
-	public $MetaDesc = 'An entrepreneurial hub for individuals and small businesses who want to put their face behind their business.';
+	public $MetaDesc = 'A site for trading goods, services, and reputation. Better yourself, your neighbor, and our world in one fell swoop!';
 	public $MetaKeys = '';
 	public $MetaTitle = '1';
 	public $MetaAuthor = '1';
@@ -56,7 +56,7 @@ class JConfig {
 	public $feed_limit = '10';
 	public $log_path = '/var/www/html/logs';
 	public $tmp_path = '/var/www/html/tmp';
-	public $lifetime = '60';
+	public $lifetime = '66';
 	public $session_handler = 'database';
 	public $memcache_persist = '1';
 	public $memcache_compress = '0';

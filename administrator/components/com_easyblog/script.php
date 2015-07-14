@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,297 +9,212 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-ini_set("display_errors", 1);
-
-/**
- * This file and method will automatically get called by Joomla
- * during the installation process
- **/
-
-if(!defined('DS')) {
-	define('DS',DIRECTORY_SEPARATOR);
-}
+jimport('joomla.filesystem.file');
 
 class com_EasyBlogInstallerScript
 {
-	var $version;
-	var $message;
-	var $status;
-	var	$sourcePath;
-
-	function execute()
+	/**
+	 * Triggered after the installation is completed
+	 *
+	 * @since	1.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function postflight()
 	{
-		$message	= $this->message;
-		$status		= $this->status;
-		$sourcePath	= $this->sourcePath;
-
-		//create default easy blog config
-		if( !configExist() )
-		{
-			if(!createConfig())
-			{
-				$message[] = 'Warning : The system encounter an error when it tries to create default config. Please kindly configure your Easy Blog manually.';
-			}
-		}
-
-		//update Db columns first before proceed.
-		updateEasyBlogDBColumns();
-
-		//check if need to create default category
-		if( !blogCategoryExist() )
-		{
-			if(!createBlogCategory())
-			{
-				$message[] = 'Warning : The system encounter an error when it tries to create default blog categories. Please kindly create the categories manually.';
-			}
-		}
-
-		//check if need to create sample post
-		if( !postExist() )
-		{
-			if(!createSamplePost())
-			{
-				$message[] = 'Warning : The system encounter an error when it tries to create some sample post.';
-			}
-		}
-
-		//check if twitter table exist.
-		if( twitterTableExist() )
-		{
-			//migrate twitter data if the table exist
-			if(!twitterTableMigrate())
-			{
-				$message[] = 'Warning : The system encounter an error when it tries to migrate your social share data to a new table. Please kindly migrate the data manually.';
-			}
-			else
-			{
-				if(!twitterTableRemove())
-				{
-					$message[] = 'Warning : The system encounter an error when it tries to remove the unused twitter table. Please kindly remove the table manually.';
-				}
-			}
-		}
-
-		//truncate the table before recreating the default acl rules.
-		if(!truncateACLTable())
-		{
-			$message[] = 'Fatal Error : The system encounter an error when it tries to truncate the acl rules table. Please kindly check your database permission and try again.';
-			$status = false;
-		}
-
-		//update acl rules
-		if(!updateACLRules())
-		{
-			$message[] = 'Fatal Error : The system encounter an error when it tries to create the ACL rules. Please kindly check your database permission and try again.';
-			$status = false;
-		}
-		else
-		{
-			//update user group acl rules
-			if(!updateGroupACLRules())
-			{
-				$message[] = 'Fatal Error : The system encounter an error when it tries to create the user groups ACL rules. Please kindly check your database permission and try again.';
-				$status = false;
-			}
-		}
-
-		//install default plugin.
-		if(! installDefaultPlugin($sourcePath))
-		{
-			$message[] = 'Warning : The system encounter an error when it tries to install the user plugin. Please kindly install the plugin manually.';
-		}
-
-
-		if( ! copyMediaFiles( $sourcePath ) )
-		{
-			$message[] = 'Warning: The system could not copy files to Media folder. Please kindly check the media folder permission.';
-			$status		= false;
-		}
-
-		// migrating stream records from old JS to JS 2.8
-		migrateJomSocialStreamNameSpace();
-
-		if($status)
-		{
-			$message[] = 'Success : Installation Completed. Thank you for choosing Easy Blog.';
-		}
-
-		$this->message	= $message;
-		$this->status	= $status;
-
-		return $status;
-	}
-
-	function install($parent)
-	{
-		return $this->execute();
-	}
-
-	function uninstall($parent)
-	{
-
-	}
-
-	function update($parent)
-	{
-		return $this->execute();
-	}
-
-	public static function getJoomlaVersion()
-	{
-		$jVerArr	= explode('.', JVERSION);
-		$jVersion	= $jVerArr[0] . '.' . $jVerArr[1];
-
-
-		return $jVersion;
-	}
-
-	function preflight($type, $parent)
-    {
-		//check if php version is supported before proceed with installation.
-    	$phpVersion = floatval(phpversion());
-    	if($phpVersion < 5 )
-    	{
-			$mainframe = JFactory::getApplication();
-			$mainframe->enqueueMessage('Installation was unsuccessful because you are using an unsupported version of PHP. EasyBlog supports only PHP5 and above. Please kindly upgrade your PHP version and try again.', 'error');
-
-			return false;
-		}
-
-    	//get source path and version number from manifest file.
-		$installer	= JInstaller::getInstance();
-		$manifest	= $installer->getManifest();
-
-		$sourcePath	= $installer->getPath('source');
-
-		if( self::getJoomlaVersion() >= '3.0' )
-		{
-			$this->version = (string) $manifest->attributes()->version;
-		}
-		else
-		{
-			$this->version		= $manifest->getAttribute('version');
-		}
-
-		$this->message		= array();
-		$this->status		= true;
-		$this->sourcePath	= $sourcePath;
-
-
-		// if this is a uninstallation process, do not execute anything, just return true.
-		if( $type == 'install' || $type == 'update' || $type == 'discover_install')
-		{
-			require_once( $this->sourcePath . DS . 'admin' . DS . 'install.defaultvalue.php' );
-
-			//this is needed as joomla failed to remove it themselve during uninstallation or failed attempt of installation
-			removeAdminMenu();
-		}
-
-		return true;
-    }
-
-    function postflight($type, $parent)
-    {
-    	$version	= $this->version;
-		$message	= $this->message;
-		$status		= $this->status;
-
-		// fix invalid admin menu id with Joomla 1.7
-		fixMenuIds();
-
-    	//update or create menu item.
-		if( menuExist() )
-		{
-			if(!updateMenuItems())
-			{
-				$message[] = 'Warning : The system encounter an error when it tries to update the menu item. Please kindly update the menu item manually.';
-			}
-		}
-		else
-		{
-			if(!createMenuItems())
-			{
-				$message[] = 'Warning : The system encounter an error when it tries to create a menu item. Please kindly create the menu item manually.';
-			}
-		}
-
 		ob_start();
 		?>
+<style type="text/css">
+#j-main-container > .adminform > tbody > tr:first-child {
+	display: none !important;
+}
+</style>
 
-		<style type="text/css">
-		/**
-		 * Messages
-		 */
+<table border="0" cellpadding="0" cellspacing="0" style="
+	background: #fff;
+	background: #25384b;
+	font: 12px/1.5 Arial, sans-serif;
+	color: rgba(255,255,255,.5);
+	width: 100%;
+	max-width: 100%;
+	border-radius: 4px;
+	overflow: hidden;
+	box-shadow: 0 1px 1px rgba(0,0,0,.08);
+	text-align: left;
+	margin: 0 auto 20px;
+	">
+	<tbody>
+		<tr>
+			<td style="padding: 40px; font-size: 12px;">
+				<div style="margin-bottom: 20px;">
+					<div style="display: table-cell; vertical-align: middle; padding-right: 15px">
+						<img src="<?php echo JURI::root();?>/administrator/components/com_easyblog/setup/assets/images/logo.png" height="48" style="height:48px !important;">
+					</div>
+					<div style="display: table-cell; vertical-align: middle;">
+						<b style="font-size: 26px; color: #fff; font-weight: normal; line-height: 1; margin: 5px 0;">EasyBlog</b>
+					</div>
+				</div>
 
-		#eblog-message {
-			color: red;
-			font-size:13px;
-			margin-bottom: 15px;
-			padding: 5px 10px 5px 35px;
-		}
+				<p style="font-size: 14px; color: rgba(255,255,255,.8);">
+					Thank you for your recent purchase of EasyBlog, the best blogging component for Joomla! This is a confirmation message that the necessary setup files are already loaded on the site.</p>
+				<p style="font-size: 14px; color: rgba(255,255,255,.8);">You will need to proceed with the installation process by clicking on the button below.</p>
 
-		#eblog-message.error {
-			border-top: solid 2px #900;
-			border-bottom: solid 2px #900;
-			color: #900;
-		}
+				<br />
 
-		#eblog-message.info {
-			border-top: solid 2px #06c;
-			border-bottom: solid 2px #06c;
-			color: #06c;
-		}
-
-		#eblog-message.warning {
-			border-top: solid 2px #f90;
-			border-bottom: solid 2px #f90;
-			color: #c30;
-		}
-		</style>
-
-		<table width="100%" border="0">
-			<tr>
-				<td>
-					<div><img src="http://stackideas.com/images/eblog/install_success35.png" /></div>
-				</td>
-			</tr>
-			<?php
-				foreach($message as $msgString)
-				{
-					$msg = explode(":", $msgString);
-					switch(trim($msg[0]))
-					{
-						case 'Fatal Error':
-							$classname = 'error';
-							break;
-						case 'Warning':
-							$classname = 'warning';
-							break;
-						case 'Success':
-						default:
-							$classname = 'info';
-							break;
-					}
-					?>
-					<tr>
-						<td><div id="eblog-message" class="<?php echo $classname; ?>"><?php echo $msg[0] . ' : ' . $msg[1]; ?></div></td>
-					</tr>
-					<?php
-				}
-			?>
-			<tr>
-				<td><h3>Need help in starting up? Check out our <a href="http://stackideas.com/docs/easyblog/how-tos.html" target="_blank">How To</a> documentation.</h3></td>
-			</tr>
-
-		</table>
+				<a href="<?php echo JURI::root();?>administrator/index.php?option=com_easyblog&amp;install=true" style="
+						background-color: #6c5;
+						border-radius: 4px;
+						color: #fff;
+						display: inline-block;
+						font-weight: bold;
+						font-size: 16px;
+						padding: 10px 15px;
+						text-decoration: none !important;
+				">
+					Proceed With Installation &rarr;
+				</a>
+			</td>
+		</tr>
+	</tbody>
+</table>
 		<?php
-		$html = ob_get_contents();
-		@ob_end_clean();
+		$contents 	= ob_get_contents();
+		ob_end_clean();
 
-		echo $html;
+		echo $contents;
+	}
 
-		return $status;
-    }
+	/**
+	 * Triggered before the installation is complete
+	 *
+	 * @since	1.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function preflight()
+	{
+		// During the preflight, we need to create a new installer file in the temporary folder
+		$file = JPATH_ROOT . '/tmp/easyblog.installation';
+
+		// Determines if the installation is a new installation or old installation.
+		$obj = new stdClass();
+		$obj->new = false;
+		$obj->step = 1;
+		$obj->status = 'installing';
+
+		$contents = json_encode($obj);
+
+		if (!JFile::exists($file)) {
+			JFile::write($file, $contents);
+		}
+
+		// remove old constant.php if exits.
+		$this->removeConstantFile();
+
+		// now let check the eb config
+		$this->checkEBVersionConfig();
+	}
+
+	/**
+	 * Responsible to remove old constant.php file to avoid redefine of same constant error
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param
+	 * @return
+	 */
+	public function removeConstantFile()
+	{
+		$file = JPATH_ROOT. '/components/com_easyblog/constants.php';
+		if (JFile::exists($file)) {
+			JFile::delete($file);
+		}
+	}
+
+
+	/**
+	 * Responsible to check eb configs db version
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param
+	 * @return
+	 */
+	public function checkEBVersionConfig()
+	{
+		$db = JFactory::getDBO();
+
+		$query = "SHOW TABLES LIKE '%_easyblog_configs'";
+		$db->setQuery($query);
+
+		$result = $db->loadResult();
+
+		// If eb configuration table exists, we know for sure that this was an upgrade from prior version
+		if ($result) {
+
+			$query = 'SELECT ' . $db->quoteName('params') . ' FROM ' . $db->quoteName('#__easyblog_configs') . ' WHERE ' . $db->quoteName('name') . '=' . $db->Quote('dbversion');
+			$db->setQuery($query);
+
+			$exists = $db->loadResult();
+
+			// if there is the config table but no dbversion, we know this upgrade is coming from pior 5.0. lets add on dbversion into config table.
+			if (!$exists) {
+
+				// get current installed eb version.
+				$xmlfile = JPATH_ROOT. '/administrator/components/com_easyblog/easyblog.xml';
+
+				// set this to version prior 3.9.0 so that it will execute the db script from 3.9.0 as well incase
+				// this upgrade is from very old version.
+				$version = '3.8.0';
+
+				if (JFile::exists($xmlfile)) {
+					$contents = JFile::read($xmlfile);
+					$parser = simplexml_load_string($contents);
+					$version = $parser->xpath('version');
+					$version = (string) $version[0];
+				}
+
+				// ok, now we got the version. lets add this version into dbversion.
+				$query = 'INSERT INTO ' . $db->quoteName('#__easyblog_configs') . ' VALUES';
+				$query .= ' (' . $db->Quote('dbversion') . ',' . $db->Quote($version) . '),';
+				$query .= ' (' . $db->Quote('scriptversion') . ',' . $db->Quote($version) . ')';
+
+				$db->setQuery($query);
+				$db->query();
+			}
+		}
+
+	}
+
+	/**
+	 * Responsible to perform the uninstallation
+	 *
+	 * @since	1.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function uninstall()
+	{
+		// @TODO: Disable modules
+
+		// @TODO: Disable plugins
+	}
+
+	/**
+	 * Responsible to perform component updates
+	 *
+	 * @since	1.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function update()
+	{
+
+	}
 }

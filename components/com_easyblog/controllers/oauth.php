@@ -1,245 +1,238 @@
 <?php
 /**
- * @package		EasyBlog
- * @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
- * @license		GNU/GPL, see LICENSE.php
- *
- * EasyBlog is free software. This version may have been modified pursuant
- * to the GNU General Public License, and as distributed it includes or
- * is derivative of works licensed under the GNU General Public License or
- * other free or open source software licenses.
- * See COPYRIGHT.php for copyright notices and details.
- */
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 - 2015 Stack Ideas Sdn Bhd. All rights reserved.
+* @license		GNU/GPL, see LICENSE.php
+* EasyBlog is free software. This version may have been modified pursuant
+* to the GNU General Public License, and as distributed it includes or
+* is derivative of works licensed under the GNU General Public License or
+* other free or open source software licenses.
+* See COPYRIGHT.php for copyright notices and details.
+*/
+defined('_JEXEC') or die('Unauthorized Access');
 
-defined('_JEXEC') or die('Restricted access');
+require_once(dirname(__FILE__) . '/controller.php');
 
-jimport('joomla.application.component.controller');
-
-require_once( EBLOG_ROOT . DIRECTORY_SEPARATOR . 'controller.php' );
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'oauth.php' );
-
-class EasyBlogControllerOauth extends EasyBlogParentController
+class EasyBlogControllerOAuth extends EasyBlogController
 {
-	function __construct()
+	public function __construct($options = array())
 	{
-		// Include the tables in path
-		JTable::addIncludePath( EBLOG_TABLES );
-
-		parent::__construct();
-	}
-
-	function request()
-	{
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_YOU_MUST_LOGIN_FIRST') , 'error' );
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog' , false ) );
-			return;
-		}
-
-		$redirect	= JRequest::getVar( 'redirect' , '' );
-
-		if( !empty( $redirect ) )
-		{
-			$redirect 	= '&redirect=' . $redirect;
-		}
-
-		$call 		= JRequest::getWord( 'call' );
-		$callUri 	= !empty( $call ) ? '&call=' . $call : '';
-
-		$type		= JRequest::getCmd( 'type' );
-		$config		= EasyBlogHelper::getConfig();
-		$key		= $config->get( 'integrations_' . $type . '_api_key' );
-		$secret		= $config->get( 'integrations_' . $type . '_secret_key' );
-		$callback	= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&controller=oauth&task=grant&type=' . $type . $redirect . $callUri , false , true );
-		$consumer	= EasyBlogOauthHelper::getConsumer( $type , $key , $secret , $callback );
-		$request	= $consumer->getRequestToken();
-
-		if( empty( $request->token ) || empty( $request->secret ) )
-		{
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_OAUTH_KEY_INVALID') , 'error');
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard&layout=profile' , false ) );
-			return;
-		}
-
-		$oauth				= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
-		$oauth->user_id		= JFactory::getUser()->id;
-		$oauth->type		= $type;
-		$oauth->created		= EasyBlogHelper::getDate()->toMySQL();
-
-		// Bind the request tokens
-		$param				= EasyBlogHelper::getRegistry('');
-		$param->set( 'token' , $request->token );
-		$param->set( 'secret' , $request->secret );
-
-		$oauth->request_token	= $param->toString();
-
-		$oauth->store();
-
-		$this->setRedirect( $consumer->getAuthorizationURL( $request->token , false , 'popup') );
+		parent::__construct($options);
 	}
 
 	/**
-	 * This will be a callback from the oauth client.
-	 * @param	null
-	 * @return	null
-	 **/
+	 * Requests a token from the respective oauth client
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function request()
+	{
+		// Ensure that the user needs to be logged in
+		EB::requireLogin();
+
+		// Default redirect url
+		$url = EBR::_('index.php?option=com_easyblog&view=dashboard&layout=profile', false);
+
+		// Get the redirection url
+		$redirect = $this->input->get('redirect', '', 'default');
+
+		if ($redirect) {
+			$redirect = '&redirect=' . $redirect;
+		}
+
+		// Get the client type
+		$client = $this->input->get('client', '', 'cmd');
+
+		// Get the callback url
+		$callback = EBR::getRoutedURL('index.php?option=com_easyblog&task=oauth.grant&client=' . $client . $redirect, false, true);
+
+		// Get the consumer
+		$consumer = EB::oauth()->getClient($client);
+		$consumer->setCallback($callback);
+
+		// Generate a request token
+		$request = $consumer->getRequestToken();
+
+		// Ensure that we are getting the request tokens and secret
+		if (!$request->token || !$request->secret) {
+			$this->info->set(JText::_('COM_EASYBLOG_OAUTH_KEY_INVALID'), 'error');
+
+			return $this->app->redirect($url, false);
+		}
+
+		$table = EB::table('OAuth');
+		$table->user_id = $this->my->id;
+		$table->type = $client;
+		$table->created = EB::date()->toSql();
+		$table->request_token = json_encode($request);
+
+		// Store the tokens now
+		$table->store();
+
+		// Get the request permissions dialog url
+		$url = $consumer->getAuthorizeURL($request->token, false, 'popup');
+
+		return $this->app->redirect($url, false);
+	}
+
+	/**
+	 * Responsible to receive the incoming redirection from the respective oauth sites
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
 	public function grant()
 	{
-		$type		= JRequest::getCmd( 'type' );
-		$mainframe	= JFactory::getApplication();
-		$config		= EasyBlogHelper::getConfig();
-		$key		= $config->get( 'integrations_' . $type . '_api_key' );
-		$secret		= $config->get( 'integrations_' . $type . '_secret_key' );
-		$my			= JFactory::getUser();
+		// Ensure that the user is logged in
+		EB::requireLogin();
 
-		$redirect		= JRequest::getVar( 'redirect' , '' );
-		$redirectUri 	= !empty( $redirect ) ? '&redirect=' . $redirect : '';
+		// Default redirect url
+		$return = EBR::_('index.php?option=com_easyblog&view=dashboard&layout=profile', false);
 
-		// @task: Let's see if caller wants us to go to any specific location or not.
-		if( !empty( $redirect ) )
-		{
-			$redirect	= base64_decode( $redirect );
+		// Get the client
+		$client = $this->input->get('client', '', 'cmd');
+
+		// Get the redirection url
+		$redirect = $this->input->get('redirect', '', 'default');
+
+		// Get the redirection url 
+		$redirectUri = !empty( $redirect ) ? '&redirect=' . $redirect : '';
+
+		// Let's see if caller wants us to go to any specific location or not.
+		if ($redirect) {
+			$redirect = base64_decode($redirect);
 		}
 
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_YOU_MUST_LOGIN_FIRST') , 'error' );
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog' , false ) );
-			return;
+		// Load the oauth object
+		$table = EB::table('OAuth');
+		$table->loadByUser($this->my->id, $client);
+
+		if (!$table->id) {
+			$this->info->set('COM_EASYBLOG_OAUTH_UNABLE_TO_LOCATE_RECORD', 'error');
+
+			return $this->app->redirect($return);
 		}
 
-		$oauth		= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
-		$loaded		= $oauth->loadByUser( $my->id , $type );
+		// Detect if there's any errors
+		$denied = $this->input->get('denied', '', 'default');
 
-		$denied     = JRequest::getVar( 'denied' , '' );
+		// When there's an error, delete the oauth data
+		if ($denied) {
+			$table->delete();
 
-		$call 		= JRequest::getWord( 'call' );
-		$callUri 	= !empty( $call ) ? '&call=' . $call : '';
-
-		if( !empty( $denied ) )
-		{
-		    $oauth->delete();
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_OAUTH_DENIED_ERROR') , 'error' );
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard&layout=profile' , false ) );
-			return;
+			$this->info->set('COM_EASYBLOG_OAUTH_DENIED_ERROR', 'error');
+			return $this->app->redirect($return);
 		}
 
-		if( !$loaded )
-		{
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_OAUTH_UNABLE_TO_LOCATE_RECORD') , 'error' );
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard&layout=profile' , false ) );
-			return;
+		// Get the request token
+		$request = json_decode($table->request_token);
+
+		// Get the callback url
+		$callback = EBR::getRoutedURL('index.php?option=com_easyblog&task=oauth.grant&client=' . $client . $redirect, false, true);
+
+		// Get the client
+		$consumer = EB::oauth()->getClient($client);
+		$consumer->setCallback($callback);
+
+		// Get the verifier
+		$verifier = $consumer->getVerifier();
+
+		if (!$verifier) {
+			$table->delete();
+
+			return $this->app->redirect($return);
 		}
 
-		$request	= EasyBlogHelper::getRegistry( $oauth->request_token );
-		$callback	= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&controller=oauth&task=grant&type=' . $type . $redirectUri . $callUri , false , true );
-		$consumer	= EasyBlogOauthHelper::getConsumer( $type , $key , $secret , $callback );
-		$verifier	= $consumer->getVerifier();
+		// Get the access token
+		$consumer->setRequestToken($request->token, $request->secret);
+		$access = $consumer->getAccess($verifier);
 
-		if( empty( $verifier ) )
-		{
-			// Since there is a problem with the oauth authentication, we need to delete the existing record.
-			$oauth->delete();
+		// Since there is a problem with the oauth authentication, we need to delete the existing record.
+		if (!$access || !$access->token || !$access->secret) {
+			
+			$table->delete();
 
-			JError::raiseError( 500 , JText::_( 'COM_EASYBLOG_INVALID_VERIFIER_CODE' ) );
+			$this->info->set('COM_EASYBLOG_OAUTH_ACCESS_TOKEN_ERROR', 'error');
+	
+			return $this->app->redirect($return);
 		}
 
-		$access		= $consumer->getAccess( $request->get( 'token' ) , $request->get( 'secret' ) , $verifier );
+		// Once we have the token, we need to map it back
+		$params = EB::registry();
+		$params->set('token', $access->token);
+		$params->set('secret', $access->secret);
 
-		if( !$access || empty( $access->token ) || empty( $access->secret ) )
-		{
-			// Since there is a problem with the oauth authentication, we need to delete the existing record.
-			$oauth->delete();
-
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_OAUTH_ACCESS_TOKEN_ERROR') , 'error');
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard&layout=profile' , false ) );
-			return;
+		// Set the expiration date
+		if (isset($access->expires)) {
+			$table->expires = $access->expires;
 		}
 
-		$param		= EasyBlogHelper::getRegistry('');
-		$param->set( 'token' 	, $access->token );
-		$param->set( 'secret'	, $access->secret );
+		$table->access_token = $params->toString();
+		$table->params = $access->params;
 
-		if( isset( $access->expires ) )
-		{
-			$param->set( 'expires' , $access->expires );
-		}
+		// Store the oauth table now
+		$table->store();
 
-		$oauth->access_token	= $param->toString();
-		$oauth->params			= $access->params;
+		$this->info->set(JText::sprintf('COM_EASYBLOG_OAUTH_SUCCESS_' . strtoupper($client)), 'success');
 
-		$oauth->store();
-
-		EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_OAUTH_SUCCESS') );
-
-		$url 		=  EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard&layout=profile' , false );
-
-		if( !empty( $redirect ) )
-		{
-			$url 	= $redirect;
-		}
-
-		// @task: Let's see if the oauth client
-		if( !empty( $call ) )
-		{
-			$consumer->$call();
-		}
-		else
-		{
-			$this->setRedirect( $url );
-		}
+		echo '<script type="text/javascript">window.opener.doneLogin();window.close();</script>';
+		exit;
 	}
 
 	/**
-	 * Responsible to revoke access for the specific oauth client
+	 * Revokes the user's oauth access
 	 *
-	 * @param	null
-	 * @return	null
-	 **/
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
 	public function revoke()
 	{
-		$mainframe	= JFactory::getApplication();
-		$my			= JFactory::getUser();
-		$url		= EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard&layout=profile' , false );
-		$redirect	= JRequest::getVar( 'redirect' , '' );
-		$type		= JRequest::getWord( 'type' );
-		$config		= EasyBlogHelper::getConfig();
+		// Require the user to be logged in
+		EB::requireLogin();
 
-		if( !empty( $redirect ) )
-		{
-			$url	= base64_decode( $redirect );
+		// The default url
+		$url = EBR::_('index.php?option=com_easyblog&view=dashboard&layout=profile', false);
+
+		// Get any redirection url
+		$redirect = $this->input->get('redirect', '', 'default');
+
+		// Get the oauth client
+		$type = $this->input->get('client', '', 'cmd');
+
+		// If redirect url is provided, we know for sure where to redirect the user to
+		if ($redirect) {
+			$url = base64_decode($redirect);
 		}
 
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_YOU_MUST_LOGIN_FIRST') , 'error' );
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog' , false ) );
-			return;
-		}
+		// Load up the oauth object
+		$table = EB::table('OAuth');
+		$table->loadByUser($this->my->id, $type);
 
-		$oauth		= EasyBlogHelper::getTable( 'OAuth' , 'Table' );
-		$oauth->loadByUser( $my->id , $type );
+		// Load up the oauth client and set the access
+		$client = EB::oauth()->getClient($type);
+		$client->setAccess($table->access_token);
 
-		// Revoke the access through the respective client first.
-		$callback	= EasyBlogRouter::getRoutedURL( 'index.php?option=com_easyblog&controller=oauth&task=grant&type=' . $type , false , true );
-		$key		= $config->get( 'integrations_' . $type . '_api_key' );
-		$secret		= $config->get( 'integrations_' . $type . '_secret_key' );
-		$consumer	= EasyBlogOauthHelper::getConsumer( $type , $key , $secret , $callback );
-		$consumer->setAccess( $oauth->access_token );
+		// Get the callback url
+		$callback = EBR::getRoutedURL('index.php?option=com_easyblog&task=oauth.grant&client=' . $type, false, true);
 
-		// @task: Only show errors when the user is really authenticated with the respective provider.
-		if( !$consumer->revokeApp() && !empty( $oauth->access_token) )
-		{
-			EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_APPLICATION_REVOKED_ERROR') , 'error');
-			$this->setRedirect( EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard&layout=profile' , false ) );
-			return;
-		}
-		$oauth->delete();
+		// Get the consumer and secret key
+		$key = $this->config->get('integrations_' . $type . '_api_key');
+		$secret = $this->config->get('integrations_' . $type . '_secret_key');
 
-		EasyBlogHelper::setMessageQueue( JText::_('COM_EASYBLOG_APPLICATION_REVOKED_SUCCESSFULLY') );
-		$this->setRedirect( $url );
+		// Try to revoke the app
+		$state = $client->revoke();
+
+		// After revoking the access, delete the oauth record
+		$table->delete();
+
+		$this->info->set(JText::_('COM_EASYBLOG_APPLICATION_REVOKED_SUCCESSFULLY'), 'success');
+		return $this->app->redirect($url, false);
 	}
 }

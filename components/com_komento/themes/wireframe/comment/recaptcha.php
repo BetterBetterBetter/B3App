@@ -16,7 +16,6 @@ defined('_JEXEC') or die('Restricted access');
 <script type="text/javascript">
 	Komento.ready(function($) {
 			Komento.Recaptcha = true;
-		}
 	});
  </script>
 <div class="g-recaptcha" data-theme="<?php echo $theme; ?>" data-sitekey="<?php echo $publicKey; ?>"></div>

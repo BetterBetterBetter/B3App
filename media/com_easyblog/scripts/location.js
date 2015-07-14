@@ -7,38 +7,28 @@ EasyBlog.require()
 	.library(
 		"ui/autocomplete"
 	)
+	.script('ratings')
 	.done(function(){
 
 // controller: start
 
 EasyBlog.Controller(
 
-	"Location.Form",
-
-	{
+	"Location.Form", {
 		defaultOptions: {
 
 			language: 'en',
-
 			initialLocation: null,
-
-			mapType			: "ROADMAP",
-
+			mapType: "ROADMAP",
 			"{locationInput}": ".locationInput",
-
 			"{locationLatitude}": ".locationLatitude",
-
 			"{locationLongitude}": ".locationLongitude",
-
 			"{locationMap}": ".locationMap",
-
 			"{autoDetectButton}": ".autoDetectButton"
-
 		}
 	},
 
 	function(self) { return {
-
 
 		init: function() {
 
@@ -578,12 +568,17 @@ EasyBlog.Controller(
 			// custom hack for postmap module
 			if(info.ratingid) {
 				google.maps.event.addListener(infoWindow, 'domready', function() {
-					$.each(info.ratingid, function(i, rid) {
-						eblog.ratings.setup( 'ebpostmap_' + rid + '-ratings' , true , 'entry' );
-						$('#ebpostmap_' + rid + '-ratings').removeClass('ui-state-disabled');
-						$('#ebpostmap_' + rid + '-ratings-form').find('.blog-rating-text').hide();
-						$('#ebpostmap_' + rid + '-ratings .ratings-value').hide();
-					})
+					 $('[data-eb-module-postmap] [data-rating-form]').implement(EasyBlog.Controller.Ratings);
+                    // $.each(info.ratingid, function(i, rid) {
+                    //  // eblog.ratings.setup( 'ebpostmap_' + rid + '-ratings' , true , 'entry' );
+
+                    //  // 
+                    //     $('#ebpostmap_' + rid + '-ratings').implement(EasyBlog.Controller.Ratings, {});
+
+                    //  $('#ebpostmap_' + rid + '-ratings').removeClass('ui-state-disabled');
+                    //  $('#ebpostmap_' + rid + '-ratings-form').find('.blog-rating-text').hide();
+                    //  $('#ebpostmap_' + rid + '-ratings .ratings-value').hide();
+                    // })
 				});
 			}
 		}

@@ -13,9 +13,7 @@ defined('_JEXEC') or die('Restricted access');
 
 jimport('joomla.application.component.model');
 
-require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'helpers' . DIRECTORY_SEPARATOR . 'helper.php' );
-
-$version 	= EasyBlogHelper::getJoomlaVersion();
+$version 	= EB::getJoomlaVersion();
 
 if( $version >= '3.0' )
 {

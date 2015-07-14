@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,34 +9,23 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'parent.php' );
+require_once(dirname(__FILE__) . '/model.php');
 
-class EasyBlogModelComments extends EasyBlogModelParent
+class EasyBlogModelComments extends EasyBlogAdminModel
 {
-	/**
-	 * Category total
-	 *
-	 * @var integer
-	 */
-	var $_total = null;
-
-	/**
-	 * Pagination object
-	 *
-	 * @var object
-	 */
-	var $_pagination = null;
+	public $_total = null;
+	public $_pagination = null;
 
 	/**
 	 * Category data array
 	 *
-	 * @var array
+	 * @public array
 	 */
-	var $_data = null;
+	public $_data = null;
 
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
@@ -56,7 +45,7 @@ class EasyBlogModelComments extends EasyBlogModelParent
 	 * @access public
 	 * @return integer
 	 */
-	function getTotal()
+	public function getTotal()
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_total))
@@ -74,7 +63,7 @@ class EasyBlogModelComments extends EasyBlogModelParent
 	 * @access public
 	 * @return integer
 	 */
-	function getPagination()
+	public function getPagination()
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_pagination))
@@ -92,7 +81,7 @@ class EasyBlogModelComments extends EasyBlogModelParent
 	 * @access private
 	 * @return string
 	 */
-	function _buildQuery()
+	public function _buildQuery()
 	{
 		// Get the WHERE and ORDER BY clauses for the query
 		$where		= $this->_buildQueryWhere();
@@ -108,7 +97,7 @@ class EasyBlogModelComments extends EasyBlogModelParent
 		return $query;
 	}
 
-	function _buildQueryWhere()
+	public function _buildQueryWhere()
 	{
 		$mainframe			= JFactory::getApplication();
 		$db					= EasyBlogHelper::db();
@@ -146,7 +135,7 @@ class EasyBlogModelComments extends EasyBlogModelParent
 		return $where;
 	}
 
-	function _buildQueryOrderBy()
+	public function _buildQueryOrderBy()
 	{
 		$mainframe			= JFactory::getApplication();
 
@@ -168,7 +157,7 @@ class EasyBlogModelComments extends EasyBlogModelParent
 	 * @access public
 	 * @return array
 	 */
-	function getData()
+	public function getData()
 	{
 		// Lets load the content if it doesn't already exist
 		if (empty($this->_data))
@@ -195,9 +184,9 @@ class EasyBlogModelComments extends EasyBlogModelParent
 
 			$tags	= implode( ',' , $pks );
 
-			$query	= 'UPDATE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_comment' ) . ' '
-					. 'SET ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( $publish ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . ' IN (' . $tags . ')';
+			$query	= 'UPDATE ' . $db->nameQuote( '#__easyblog_comment' ) . ' '
+					. 'SET ' . $db->nameQuote( 'published' ) . '=' . $db->Quote( $publish ) . ' '
+					. 'WHERE ' . $db->nameQuote( 'id' ) . ' IN (' . $tags . ')';
 			$db->setQuery( $query );
 
 			if( !$db->query() )
@@ -216,11 +205,148 @@ class EasyBlogModelComments extends EasyBlogModelParent
 	public function getTotalPending()
 	{
 		$db 	= EasyBlogHelper::db();
-		$query 	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_comment' );
-		$query	.= ' WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( EBLOG_COMMENT_MODERATE );
+		$query 	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__easyblog_comment' );
+		$query	.= ' WHERE ' . $db->nameQuote( 'published' ) . '=' . $db->Quote( EBLOG_COMMENT_MODERATE );
 		$db->setQuery( $query );
 		$total	= $db->loadResult();
 
 		return $total;
+	}
+
+	/**
+	 * Retrieve a list of top commenters for author's posts
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getTopCommentersForAuthorsPost($authorId = null, $limit = 5)
+	{
+		$db = EB::db();
+		$user = JFactory::getUser($authorId);
+
+		$query = array();
+
+		$query[] = 'SELECT a.' . $db->quoteName('created_by') . ', COUNT(a.' . $db->quoteName('id') . ') AS ' . $db->quoteName('total') . ' FROM ' . $db->quoteName('#__easyblog_comment') . ' AS a';
+		$query[] = 'INNER JOIN ' . $db->quoteName('#__easyblog_post') . ' AS b';
+		$query[] = 'ON a.' . $db->quoteName('post_id') . ' = b.' . $db->quoteName('id');
+		$query[] = 'WHERE b.' . $db->quoteName('created_by') . '=' . $db->Quote($user->id);
+		$query[] = 'AND a.' . $db->quoteName('created_by') . '!=' . $db->Quote($user->id);
+		$query[] = 'AND a.' . $db->quoteName('created_by') . '!=' . $db->Quote(0);
+		$query[] = 'AND a.' . $db->quoteName('published') . '=' . $db->Quote(1);
+
+		$query[] = 'AND b.' . $db->quoteName('published') . '=' . $db->Quote(EASYBLOG_POST_PUBLISHED);
+		$query[] = 'AND b.' . $db->quoteName('state') . '=' . $db->Quote(EASYBLOG_POST_NORMAL);
+
+		$query[] = 'GROUP BY a.' . $db->quoteName('created_by');
+		$query[] = 'ORDER BY ' . $db->quoteName('total') . ' DESC';
+		$query[] = 'LIMIT 0,' . (int) $limit;
+
+		$query = implode(' ', $query);
+
+		// echo str_ireplace('#__', 'jos_', $query);
+		// exit;
+
+		$db->setQuery($query);
+		$result = $db->loadObjectList();
+
+		if (!$result) {
+			return $result;
+		}
+
+		//preload users
+		$ids = array();
+		foreach ($result as $item) {
+			$ids[] = $item->created_by;
+		}
+
+		EB::user($ids);
+
+		foreach ($result as &$row) {
+			$row->author = EB::user($row->created_by);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Get a list of recent comments posted on the author's post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getRecentCommentsOnAuthor($authorId = null, $limit = 5)
+	{
+		$db = EB::db();
+		$user = JFactory::getUser($authorId);
+
+		$query = array();
+
+		$query[] = 'SELECT b.* FROM ' . $db->quoteName('#__easyblog_post') . ' AS a';
+		$query[] = 'INNER JOIN ' . $db->quoteName('#__easyblog_comment') . ' AS b';
+		$query[] = 'ON a.' . $db->quoteName('id') . ' = b.' . $db->quoteName('post_id');
+		$query[] = 'WHERE a.' . $db->quoteName('created_by') . '=' . $db->Quote($user->id);
+		$query[] = 'AND a.' . $db->quoteName('published') . '=' . $db->Quote(EASYBLOG_POST_PUBLISHED);
+		$query[] = 'AND a.' . $db->quoteName('state') . '=' . $db->Quote(EASYBLOG_POST_NORMAL);
+		$query[] = 'AND b.' . $db->quoteName('published') . '=' . $db->Quote(1);
+		$query[] = 'LIMIT 0,' . (int) $limit;
+
+		$query = implode(' ', $query);
+		$db->setQuery($query);
+		$result = $db->loadObjectList();
+
+		if (!$result) {
+			return $result;
+		}
+
+		$comments = array();
+
+		foreach ($result as $row) {
+
+			$comment = EB::table('Comment');
+			$comment->bind($row);
+
+			$comments[] = $comment;
+		}
+
+		return $comments;
+	}
+
+	/**
+	 * Delete comments from particular post
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function deletePostComments($postId)
+	{
+		$db = EB::db();
+		$config	= EB::getConfig();
+		
+		// if komento exist and check the integration option
+		$komentoEngine = JPATH_ROOT . '/components/com_komento/helpers/helper.php';
+
+		if (JFile::exists($komentoEngine) && $config->get('comment_komento') == true) {
+
+			require_once($komentoEngine);
+			$model = Komento::getModel('comments');
+
+			// delete comment based on the article id
+			$model->deleteArticleComments('com_easyblog', $postId);
+		}
+
+		$query = array();
+		$query[] = 'DELETE FROM ' . $db->quoteName('#__easyblog_comment');
+		$query[] = 'WHERE ' . $db->quoteName('post_id') . '=' . $db->Quote($postId);
+
+		$query = implode(' ', $query);
+
+		$db->setQuery($query);
+		return $db->Query();
 	}
 }

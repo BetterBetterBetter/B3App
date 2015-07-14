@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,297 +9,278 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport('joomla.application.component.controller');
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerTeamBlogs extends EasyBlogController
-{	
-	function __construct()
+{
+	public function __construct()
 	{
 		parent::__construct();
-		
+
 		$this->registerTask( 'add' , 'edit' );
-		$this->registerTask( 'apply' , 'save' );
 
-		$this->registerTask( 'publish'	 ,'publish' );
-		$this->registerTask( 'unpublish' , 'unpublish' );
+		// Saving
+		$this->registerTask('savenew', 'save');
+		$this->registerTask('apply', 'save');
+
+		$this->registerTask('approve', 'respond');
+		$this->registerTask('reject', 'respond');
+
+		$this->registerTask('publish','togglePublish');
+		$this->registerTask('unpublish', 'togglePublish');
 	}
-	
-	function save()
+
+	/**
+	 * Allows caller to save the blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function save()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'teamblog' );
+		$this->checkAccess('teamblog');
 
-		$post	= JRequest::get('post');
-		
-		$team_desc	= JRequest::getVar('write_description', '', 'post', 'string', JREQUEST_ALLOWRAW );
-		$post['description']    = $team_desc;
-		
-		if(!empty($post['title']))
-		{
-			$team	= EasyBlogHelper::getTable( 'TeamBlog' , 'Table' );
-			
-			$date	= EasyBlogHelper::getDate();
-			$team->created	= $date->toMySQL();
-			$team->bind( $post );
-				
-			$team->title = JString::trim($team->title);
-			$team->alias = JString::trim($team->alias);
-			
-			$msgStatus 	= 'message';
-			$message	= JText::_('COM_EASYBLOG_TEAM_BLOG_ADDED');
-			
-			if( $team->id != 0 )
-				$message = JText::_('COM_EASYBLOG_TEAMBLOG_SAVED_SUCCESSFULLY');
-				
-			if($team->store())
-			{
-			
-				//meta post info
-				$metapost	= array();
-				$metapost['keywords']		= JRequest::getVar('keywords', '');
-				$metapost['description']	= JRequest::getVar('description', '');
-				$metapost['content_id']		= $team->id;
-				$metapost['type']			= META_TYPE_TEAM;
+		// Get the posted data
+		$post = $this->input->getArray('post');
 
-				$metaId		= JRequest::getVar( 'metaid' , '' );
+		// Get the team id if this is being edited
+		$id = $this->input->get('id', 0, 'int');
 
-				$meta		= EasyBlogHelper::getTable( 'Meta', 'Table' );
-				$meta->load($metaId);
-				$meta->bind($metapost);
-				$meta->store();
+		// Allow form to submit html codes
+		$desc = $this->input->get('write_description', '', 'raw');
+		$post['description'] = $desc;
 
-				// @rule: Process groups
-				if( isset( $post[ 'groups' ] ) )
-				{
-					foreach( $post[ 'groups' ] as $id )
-					{
-						$group			= EasyBlogHelper::getTable( 'TeamBlogGroup' , 'Table' );
-						$group->team_id	= $team->id;
-						$group->group_id	= $id;
+		// Prepare the redirection url
+		$task = $this->getTask();
 
-						if( !$group->exists() )
-						{
-							$group->store();
-						}
-					}
-				}
+		// Set the initial default redirection url
+		$redirect = 'index.php?option=com_easyblog&view=teamblogs&layout=form';
 
-				if( isset( $post['deletegroups'] ) )
-				{
-					$delGroups	= explode(',', $post['deletegroups']);
-					
-					if(count($delGroups) > 0)
-					{
-					    foreach($delGroups as $id)
-					    {
-					        if( !empty($id) )
-							{
-								$team->deleteGroup( $id );
-							}
-					    }
-					}
-				}
-				
-				if( isset( $post['deletemembers'] ) )
-				{
-					$delMember	= explode(',', $post['deletemembers']);
-					
-					if(count($delMember) > 0)
-					{
-					    foreach($delMember as $id)
-					    {
-					        if( !empty($id) )
-								$team->deleteMembers($id);
-					    }
-					}
-				}
-				
-				// @rule: Process members
-				if( isset( $post['members']) )
-				{
-					foreach( $post['members'] as $id )
-					{
-						$member				= EasyBlogHelper::getTable( 'TeamBlogUsers' , 'Table' );
-						$member->team_id	= $team->id;
-						$member->user_id	= $id;
+		if ($task == 'apply') {
+			$redirect .= '&id=' . $id;
+		}
 
-						if( !$member->exists() )
-						{
-							$member->addMember();
-						}
-					}
-				}
-				
-				$file = JRequest::getVar( 'Filedata', '', 'files', 'array' );
-				if(! empty($file['name']))
-				{
-					$newAvatar  		= EasyBlogHelper::uploadTeamAvatar($team, true);
-					$team->avatar   	= $newAvatar;
-					$team->store(); //now update the avatar.
-				}
-				
+		// If the title is not set, we need to prevent users from saving the team blog
+		if (!isset($post['title'])) {
+			$this->info->set(JText::_('COM_EASYBLOG_INVALID_TEAM_BLOG_TITLE'), 'error');
+
+			return $this->app->redirect($redirect);
+		}
+
+		// If creation date wasn't set, define our own date
+		if (!isset($post['created'])) {
+			$post['created'] = EB::date()->toSql();
+		}
+
+		// Load up the team object.
+		$team = EB::table('TeamBlog');
+		$team->load($id);
+
+		// Bind the posted data
+		$team->bind($post);
+
+		// Ensure that the data is correct
+		$team->title = JString::trim($team->title);
+		$team->alias = JString::trim($team->alias);
+
+
+		// Try to save the team
+		$state = $team->store();
+
+		if (!$state) {
+			$this->info->set($team->getError(), 'error');
+
+			return $this->app->redirect($redirect);
+		}
+
+		// Upload avatar
+
+		// Process team avatars
+		$file = $this->input->files->get('avatar', '');
+
+		if (isset($file['name']) && !empty($file['name'])) {
+			$team->uploadAvatar($file);
+		}
+
+		// Bind the meta data
+		$meta = array();
+		$meta['keywords'] = $this->input->get('keywords', '', 'raw');
+		$meta['description'] = $this->input->get('description', '', 'raw');
+		$meta['type'] = META_TYPE_TEAM;
+		$meta['content_id'] = $team->id;
+
+		// Try to load the meta for the team
+		$metaTable = EB::table('Meta');
+		$metaTable->load(array('type' => META_TYPE_TEAM, 'content_id' => $team->id));
+		$metaTable->bind($meta);
+
+		// Save the meta data
+		$metaTable->store();
+
+		// Get the team model
+		$model = EB::model('TeamBlogs');
+
+		// Delete groups first before adding new
+		if ($team->id) {
+			$model->deleteGroupRelations($team->id);
+		}
+
+		// Try to set the groups
+		if (isset($post['groups'])) {
+			foreach ($post['groups'] as $gid) {
+
+				$group = EB::table('TeamBlogGroup');
+				$group->team_id = $team->id;
+				$group->group_id = $gid;
+
+				$group->store();
 			}
 		}
-		else
-		{
-			$msgStatus 	= 'error';
-			$message	= JText::_('COM_EASYBLOG_INVALID_TEAM_BLOG_TITLE');
-		}
 
-		if( JRequest::getVar( 'task' ) == 'apply' )
-		{
-			$this->setRedirect( 'index.php?option=com_easyblog&c=teamblogs&task=edit&id=' . $team->id , $message , $msgStatus );
-			return;
-		}
-		
-		$this->setRedirect(  'index.php?option=com_easyblog&view=teamblogs' , $message , $msgStatus );
-		return;		
-	}
+		// Delete team members here
+		if (isset($post['deletemembers'])) {
+			$items = explode(',', $post['deletemembers']);
 
-	function cancel()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'teamblog' );
-
-		$this->setRedirect( 'index.php?option=com_easyblog&view=teamblogs' );
-		
-		return;
-	}
-
-	function edit()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'teamblog' );
-
-		JRequest::setVar( 'view', 'teamblog' );
-		JRequest::setVar( 'id' , JRequest::getVar( 'id' , '' , 'REQUEST' ) );
-		
-		parent::display();
-	}
-
-	function remove()
-	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
-
-		// @task: Check for acl rules.
-		$this->checkAccess( 'teamblog' );
-
-		$teams	= JRequest::getVar( 'cid' , '' , 'POST' );
-		
-		$message	= '';
-		$type		= 'message';
-		
-		if( empty( $teams ) )
-		{
-			$message	= JText::_('Invalid Team id');
-			$type		= 'error';
-		}
-		else
-		{
-			$table		= EasyBlogHelper::getTable( 'TeamBlog' , 'Table' );
-			foreach( $teams as $id )
-			{
-				$table->load( $id );
-				
-				if( !$table->delete() )
-				{
-					$message	= JText::_( 'Error removing Team.' );
-					$type		= 'error';
-					$this->setRedirect( 'index.php?option=com_easyblog&view=teamblogs' , $message , $type );
-					return;
+			if (count($items) > 0) {
+				foreach ($items as $id) {
+					$team->deleteMembers($id);
 				}
 			}
-			
-			$message	= JText::_('Team(s) deleted');
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=teamblogs' , $message , $type );
+		// Store new members items
+		if (isset($post['members'])) {
+			foreach ($post['members'] as $id) {
+
+				$member = EB::table('TeamBlogUsers');
+				$member->load(array('team_id' => $team->id, 'user_id' => $id));
+
+				$member->team_id = $team->id;
+				$member->user_id = $id;
+
+				$member->store();
+			}
+		}
+
+		// Set the info
+		$this->info->set('COM_EASYBLOG_TEAMBLOG_SAVED_SUCCESSFULLY', 'success');
+
+		if ($task == 'apply') {
+			return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs&layout=form&id=' . $team->id);
+		}
+
+		if ($task == 'savenew') {
+			return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs&layout=form');
+		}
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs');
 	}
 
-	function publish()
+	/**
+	 * Remove team blogs from the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function remove()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'teamblog' );
+		// Check for acl rules.
+		$this->checkAccess('teamblog');
 
-		$teams	= JRequest::getVar( 'cid' , array(0) , 'POST' );
-		$message	= '';
-		$type		= 'message';
-		
-		if( count( $teams ) <= 0 )
-		{
-			$message	= JText::_('Invalid team id');
-			$type		= 'error';
-		}
-		else
-		{
-			$team	= EasyBlogHelper::getTable( 'TeamBlog' , 'Table' );
-			$team->publish( $teams );
+		// Get the id's
+		$ids = $this->input->get('cid', array(), 'array');
 
-			$message	= JText::_('Team(s) published');
+
+		if (!$ids) {
+			$this->info->set('COM_EASYBLOG_TEAMBLOGS_INVALID_ID_PROVIDED', 'error');
+
+			return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs');
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=teamblogs' , $message , $type );
+		foreach ($ids as $id) {
+
+			$team = EB::table('TeamBlog');
+			$team->load((int) $id);
+
+			$team->delete();
+		}
+
+		$this->info->set('COM_EASYBLOG_TEAMBLOGS_DELETED_SUCCESSFULLY', 'success');
+		return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs');
 	}
 
-	function unpublish()
+	/**
+	 * Toggles publishing
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function togglePublish()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'teamblog' );
+		$this->checkAccess('teamblog');
 
-		$teams	= JRequest::getVar( 'cid' , array(0) , 'POST' );
-		$message	= '';
-		$type		= 'message';
-		
-		if( count( $teams ) <= 0 )
-		{
-			$message	= JText::_('Invalid team id');
-			$type		= 'error';
-		}
-		else
-		{
-			$team	= EasyBlogHelper::getTable( 'TeamBlog' , 'Table' );
-			$team->publish( $teams , 0 );
+		// Get the team ids to be published
+		$ids 	= $this->input->get('cid', '', 'array');
 
-			$message	= JText::_('Team(s) unpublished');
+
+		if (!$ids) {
+			EB::info()->set(JText::_('COM_EASYBLOG_TEAMBLOGS_INVALID_ID_PROVIDED'), 'error');
+
+			return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs');
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=teamblogs' , $message , $type );
+
+		$team 	= EB::table('TeamBlog');
+		$task	= $this->getTask();
+		$team->$task($ids);
+
+		$message 	= $task == 'publish' ? JText::_('COM_EASYBLOG_TEAMBLOGS_PUBLISHED_SUCCESS') : JText::_('COM_EASYBLOG_TEAMBLOGS_UNPUBLISHED_SUCCESS');
+
+		EB::info()->set($message, 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs');
 	}
-	
+
 	function markAdmin()
 	{
+		EB::checkToken();
+
 		// @task: Check for acl rules.
 		$this->checkAccess( 'teamblog' );
 
 	    $teamId	= JRequest::getVar( 'teamid', '' );
 	    $userId	= JRequest::getVar( 'userid', '' );
-	    
+
 	    if(empty($teamId) || empty($userId))
 	    {
 	        $this->setRedirect( 'index.php?option=com_easyblog&view=teamblogs');
 	    }
-	    
+
 		$this->setAsAdmin($teamId, $userId, true);
-	    
+
 	    $this->setRedirect( 'index.php?option=com_easyblog&c=teamblogs&task=edit&id=' . $teamId);
 	}
-	
+
 	function removeAdmin()
 	{
 		// Check for request forgeries
-		JRequest::checkToken( 'GET' ) or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
 		$this->checkAccess( 'teamblog' );
@@ -316,11 +297,11 @@ class EasyBlogControllerTeamBlogs extends EasyBlogController
 
 	    $this->setRedirect( 'index.php?option=com_easyblog&c=teamblogs&task=edit&id=' . $teamId);
 	}
-	
+
 	function setAsAdmin($teamId, $userId, $isAdmin)
 	{
 		// Check for request forgeries
-		JRequest::checkToken( 'GET' ) or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
 		$this->checkAccess( 'teamblog' );
@@ -337,82 +318,47 @@ class EasyBlogControllerTeamBlogs extends EasyBlogController
 
 	    $db->setQuery($query);
 	    $db->query();
-	    
+
 	    return true;
 	}
-	
-	function teamApproval()
+
+	/**
+	 * Respond to a team request
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function respond()
 	{
 		// Check for request forgeries
-		JRequest::checkToken( 'GET' ) or jexit( 'Invalid Token' );
+		EB::checkToken();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'teamblog' );
-		
-		$mainframe	= JFactory::getApplication();
-		$acl		= EasyBlogACLHelper::getRuleSet();
-		$config 	= EasyBlogHelper::getConfig();
-		$document	= JFactory::getDocument();
-		$my			= JFactory::getUser();
+		// Check for acl rules.
+		$this->checkAccess('teamblog');
 
-		$teamId 	= JRequest::getInt('team', 0);
-		$approval	= JRequest::getInt('approve');
-		$requestId	= JRequest::getInt('id', 0);
+		$ids 	= $this->input->get('cid', '', 'array');
 
-		$ok 		= true;
-		$message    = '';
-		$type       = 'info';
-		
-	    $teamRequest    = EasyBlogHelper::getTable( 'TeamBlogRequest','Table' );
-	    $teamRequest->load($requestId);
+		if (!$ids) {
+			EB::info()->set(JText::_('COM_EASYBLOG_TEAMBLOGS_INVALID_ID_PROVIDED'), 'error');
 
-		if($approval)
-		{
-		    $teamUsers    = EasyBlogHelper::getTable( 'TeamBlogUsers','Table' );
-
-		    $teamUsers->user_id    = $teamRequest->user_id;
-		    $teamUsers->team_id    = $teamRequest->team_id;
-
-		    if($teamUsers->store())
-			{
-		        $message    = JText::_('COM_EASYBLOG_TEAMBLOGS_APPROVAL_APPROVED');
-		    }
-		    else
-		    {
-		        $ok 		= false;
-		        $message    = JText::_('COM_EASYBLOG_TEAMBLOGS_APPROVAL_FAILED');
-		        $type       = 'error';
-			}
-		}
-		else
-		{
-		    $message    = JText::_('COM_EASYBLOG_TEAMBLOGS_APPROVAL_REJECTED');
+			return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs&layout=requests');
 		}
 
-		if($ok)
-		{
-			$teamRequest->ispending = 0;
-			$teamRequest->store();
+		// Get the task
+		$task = $this->getTask();
 
-			$teamBlog = EasyBlogHelper::getTable( 'TeamBlog','Table' );
-			$teamBlog->load($teamRequest->team_id);
+		foreach ($ids as $id) {
+			// Load the request
+			$request = EB::table('TeamBlogRequest');
+			$request->load($id);
 
-			//now we send notification to requestor
-			$requestor  = JFactory::getUser($teamRequest->user_id);
-			$template   = ($approval) ? 'email.teamblog.approved' : 'email.teamblog.rejected';
-
-			$toNotifyEmails 	= array();
-			$obj 				= new StdClass();
-			$obj->unsubscribe	= false;
-			$obj->email 		= $requestor->email;
-			$toNotifyEmails[]   = $obj;
-
-			$notify	= EasyBlogHelper::getHelper( 'Notification' );
-			$emailData  = array();
-			$emailData['team']  	= $teamBlog->title;
-			$notify->send($toNotifyEmails, JText::_('COM_EASYBLOG_TEAMBLOGS_JOIN_REQUEST'), $template, $emailData);
+			$request->$task();
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=teamrequest' , $message , $type );
+		$message = $task == 'approve' ? JText::_('COM_EASYBLOG_TEAMBLOGS_APPROVED_REQUESTS_SUCCESS') : JText::_('COM_EASYBLOG_TEAMBLOGS_REJECT_REQUESTS_SUCCESS');
+
+		EB::info()->set($message, 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=teamblogs&layout=requests');
 	}
 }

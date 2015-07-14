@@ -1,9 +1,9 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
@@ -11,128 +11,97 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-jimport( 'joomla.application.component.view');
-jimport( 'joomla.html.toolbar' );
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'date.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'string.php' );
-require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'adsense.php' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewCategories extends EasyBlogView
 {
-	function display( $tmpl = null )
+	/**
+	 * Proxy to the default layout
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function listings()
 	{
-		$config		= EasyBlogHelper::getConfig();
-		$jConfig	= EasyBlogHelper::getJConfig();
+		return $this->display();
+	}
 
-		if( !$config->get( 'main_rss') )
-		{
-			return;
+	/**
+	 * Default feed display method
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function display($tmpl = null)
+	{
+		// Ensure that rss is enabled
+		if (!$this->config->get('main_rss')) {
+			return JError::raiseError(404, JText::_('COM_EASYBLOG_FEEDS_DISABLED'));
 		}
 
-        $id			= JRequest::getCmd('id','0');
-	    $category 	= EasyBlogHelper::getTable( 'Category', 'Table' );
+		$id = $this->input->get('id', '', 'cmd');
+	    $category = EB::table('Category');
 	    $category->load($id);
 
-	    // private category shouldn't allow to access.
-		$privacy	= $category->checkPrivacy();
-	    if(! $privacy->allowed )
-	    {
-	        return;
+	    // Private category shouldn't allow to access.
+		$privacy = $category->checkPrivacy();
+
+	    if (!$privacy->allowed) {
+	        return JError::raiseError(500, JText::_('COM_EASYBLOG_NOT_ALLOWED_HERE'));
 	    }
 
-
-	    if($category->id == 0)
-	    {
-	        $category->title    = JText::_('COM_EASYBLOG_UNCATEGORIZED');
-	    }
-
-		//get the nested categories
+		// Get the nested categories
 		$category->childs = null;
 
-		EasyBlogHelper::buildNestedCategories($category->id, $category);
+		EB::buildNestedCategories($category->id, $category);
 
-		$linkage   = '';
-		EasyBlogHelper::accessNestedCategories($category, $linkage, '0', '', 'link', ', ');
+		$linkage = '';
+		EB::accessNestedCategories($category, $linkage, '0', '', 'link', ', ');
 
-		$catIds     = array();
-		$catIds[]   = $category->id;
-		EasyBlogHelper::accessNestedCategoriesId($category, $catIds);
+		$catIds = array();
+		$catIds[] = $category->id;
+		EB::accessNestedCategoriesId($category, $catIds);
 
 		$category->nestedLink    = $linkage;
 
+		$model = EB::model('Blog');
+        $sort = $this->input->get('sort', $this->config->get( 'layout_postorder' ), 'cmd');
 
-        $model		= $this->getModel( 'Blog' );
-        $sort		= JRequest::getCmd('sort', $config->get( 'layout_postorder' ) );
-		$data		= $model->getBlogsBy('category', $catIds, $sort );
+		$posts = $model->getBlogsBy('category', $catIds, $sort);
+		$posts = EB::formatter('list', $posts);
 
-		$document	= JFactory::getDocument();
-		$document->link	= EasyBlogRouter::_('index.php?option=com_easyblog&view=categories&id=' . $id . '&layout=listings');
-		$document->setTitle( $this->escape($category->title) );
-		$document->setDescription( JText::sprintf( 'COM_EASYBLOG_FEEDS_CATEGORY_DESC' , $this->escape($category->title) ) );
+		$this->doc->link = EBR::_('index.php?option=com_easyblog&view=categories&id=' . $id . '&layout=listings');
+		$this->doc->setTitle($this->escape($category->getTitle()));
+		$this->doc->setDescription(JText::sprintf('COM_EASYBLOG_FEEDS_CATEGORY_DESC', $this->escape($category->getTitle())));
 
-		if( empty($data))
-		{
+		if (!$posts) {
 			return;
 		}
-		for( $i = 0; $i < count( $data ); $i++ )
-		{
-			$row	=& $data[ $i ];
 
-			$blog 	= EasyBlogHelper::getTable( 'Blog' );
-			$blog->load( $row->id );
+		foreach ($posts as $post) {
 
-			$user   = JFactory::getUser($row->created_by);
-			$profile = EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$profile->load( $user->id );
+			$image = '';
 
-			$created 			= EasyBlogHelper::getDate( $row->created );
-			$formatDate         = true;
-			if(EasyBlogHelper::getJoomlaVersion() >= '1.6')
-			{
-			    $langCode   = EasyBlogStringHelper::getLangCode();
-			    if($langCode != 'en-GB' || $langCode != 'en-US')
-					$formatDate = false;
-			}
-			//$row->created       = ( $formatDate ) ? $created->toFormat( $config->get('layout_dateformat', '%A, %d %B %Y') ) : $created->toFormat();
-			$row->created       = $created->toMySQL();
-			if( $config->get( 'main_rss_content' ) == 'introtext' )
-			{
-				$row->text			= ( !empty( $row->intro ) ) ? $row->intro : $row->content;
-			}
-			else
-			{
-			    $row->text			= $row->intro . $row->content;
-			}
-			$row->text          = EasyBlogHelper::getHelper( 'Videos' )->strip( $row->text );
-			$row->text			= EasyBlogGoogleAdsense::stripAdsenseCode( $row->text );
-
-			$image 				= '';
-			if( $blog->getImage() )
-			{
-				$image 			= '<img src="' . $blog->getImage()->getSource( 'frontpage' ) . '" />';
+			if ($post->getImage('medium', true, true)) {
+				$image = '<img src="' . $post->getImage('medium', true, true) . '" width="250" align="left" />';
 			}
 
-			// load individual item creator class
-			$item				= new JFeedItem();
-			$item->title 		= html_entity_decode( $this->escape( $row->title ) );
-			$item->link 		= EasyBlogRouter::_('index.php?option=com_easyblog&view=entry&id=' . $row->id );
-			$item->description 	= $image . $row->text;
-			$item->date			= $row->created;
-			$item->category   	= $category->title;
-			$item->author		= $profile->getName();
+			$item = new JFeedItem();
+			$item->title = $this->escape($post->title);
+			$item->link = $post->getPermalink();
+			$item->description = $image . $post->getContent();
+			$item->date = $post->getCreationDate()->toSql();
+			$item->category = $post->getPrimaryCategory()->getTitle();
+			$item->author = $post->author->getName();
+			$item->authorEmail = $this->getRssEmail($post->author);
 
-			if( $jConfig->get( 'feed_email' ) == 'author' )
-			{
-				$item->authorEmail	= $profile->user->email;
-			}
-			else
-			{
-				$item->authorEmail	= $jConfig->get( 'mailfrom' );
-			}
-
-			$document->addItem( $item );
+			$this->doc->addItem($item);
 		}
+
+		// exit;
 	}
 }

@@ -7,19 +7,19 @@
             "media/editor"
         ],
         "view": [
-            "media/recent.item",
-            "media/browser",
-            "media/browser.item-group",
-            "media/browser.item",
-            "media/browser.tree-item-group",
-            "media/browser.tree-item",
-            "media/browser.pagination-page",
-            "media/browser.uploader",
-            "media/browser.uploader.item",
-            "media/editor",
-            "media/editor.viewport",
-            "media/navigation.item",
-            "media/navigation.itemgroup"
+            "site/media/recent.item",
+            "site/media/browser",
+            "site/media/browser.item-group",
+            "site/media/browser.item",
+            "site/media/browser.tree-item-group",
+            "site/media/browser.tree-item",
+            "site/media/browser.pagination-page",
+            "site/media/browser.uploader",
+            "site/media/browser.uploader.item",
+            "site/media/editor",
+            "site/media/editor.viewport",
+            "site/media/navigation.item",
+            "site/media/navigation.itemgroup"
         ],
         "language": [
             "COM_EASYBLOG_MM_UNABLE_TO_FIND_EXPORTER",

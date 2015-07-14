@@ -212,6 +212,7 @@ class DMailQueue
 			$post->set( 'content' 	, $html );
 			$post->set( 'content_type', $contentType);
 			$post->set( 'title'		, $subject );
+			$post->set('alias', DiscussHelper::getAlias($title, 'post'));
 			$post->set( 'published'	, DISCUSS_ID_PUBLISHED );
 			$post->set( 'created'	, DiscussHelper::getDate()->toMySQL() );
 			$post->set( 'replied'	, DiscussHelper::getDate()->toMySQL() );

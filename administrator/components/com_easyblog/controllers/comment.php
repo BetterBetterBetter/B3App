@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,234 +9,173 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport('joomla.application.component.controller');
-
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'string.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'comment.php' );
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerComment extends EasyBlogController
 {
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
-		$this->registerTask( 'add' , 'edit' );
-		$this->registerTask( 'unpublish' , 'unpublish' );
+		// Save
+		$this->registerTask('apply', 'save');
+
+		// Publish / Unpublish
+		$this->registerTask('publish', 'togglePublish');
+		$this->registerTask('unpublish', 'togglePublish');
 	}
 
-	function cancel()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'comment' );
-
-		$this->setRedirect( 'index.php?option=com_easyblog&view=comments' );
-
-		return;
-	}
-
-	function edit()
-	{
-		// @task: Check for acl rules.
-		$this->checkAccess( 'comment' );
-
-		JRequest::setVar( 'view', 'comment' );
-		JRequest::setVar( 'commentid' , JRequest::getVar( 'commentid' , '' , 'REQUEST' ) );
-
-		parent::display();
-	}
-
-	function remove()
+	/**
+	 * Allows caller to delete comments from the site
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function delete()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'comment' );
+		$this->checkAccess('comment');
 
-		$comments	= JRequest::getVar( 'cid' , '' , 'POST' );
-		$message	= '';
-		$type		= 'message';
+		// Get the list of comments to be deleted
+		$ids = $this->input->get('cid', array(), 'array');
 
-		if( empty( $comments ) )
-		{
-			$message	= JText::_('Invalid comment id');
-			$type		= 'error';
-		}
-		else
-		{
-			$table		= EasyBlogHelper::getTable( 'Comment' , 'Table' );
-			foreach( $comments as $comment )
-			{
-				$table->load( $comment );
+		if (!$ids) {
+			$this->info->set('COM_EASYBLOG_COMMENTS_INVALID_ID_PROVIDED', 'error');
 
-				// AlphaUserPoints
-				// since 1.2
-				if ( !empty($table->created_by) && EasyBlogHelper::isAUPEnabled() )
-				{
-					$aupid = AlphaUserPointsHelper::getAnyUserReferreID( $table->created_by );
-					AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_delete_comment', $aupid, '', JText::_('COM_EASYBLOG_AUP_COMMENT_DELETED') );
-				}
-
-				if( !$table->delete() )
-				{
-					$message	= JText::_( 'COM_EASYBLOG_COMMENTS_COMMENT_REMOVE_ERROR' );
-					$type		= 'error';
-					$this->setRedirect( 'index.php?option=com_easyblog&view=comments' , $message , $type );
-					return;
-				}
-
-				$message	= JText::_('COM_EASYBLOG_COMMENTS_COMMENT_REMOVED');
-			}
+			return $this->app->redirect('index.php?option=com_easyblog&view=comments');
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=comments' , $message , $type );
+		foreach ($ids as $id) {
+
+			// Load the comment object
+			$comment = EB::table('Comment');
+			$comment->load((int) $id);
+
+			// Try to delete the comment
+			$comment->delete();
+		}
+
+		$this->info->set('COM_EASYBLOG_COMMENTS_COMMENT_REMOVED', 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=comments');
 	}
 
-	function save()
+	/**
+	 * Saves a comment item
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
+	public function save()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'comment' );
+		// Check for acl rules.
+		$this->checkAccess('comment');
 
-		$mainframe	= JFactory::getApplication();
+		// Get the comment id
+		$id = $this->input->get('id', 0, 'int');
 
-		$message	= '';
-		$type		= 'message';
+		// Get the comment object
+		$comment = EB::table('Comment');
+		$comment->load($id);
 
-		if( JRequest::getMethod() == 'POST' )
-		{
-			$post				= JRequest::get( 'post' );
-			$user				= JFactory::getUser();
-			$post['created_by']	= $user->id;
-			$commentId				= JRequest::getVar( 'commentid' , '' );
-			$comment				= EasyBlogHelper::getTable( 'Comment', 'Table' );
+		// Get the posted data
+		$post = $this->input->getArray('post');
 
-			if( !empty( $commentId ) )
-			{
-				$comment->load( $commentId );
-				$post['created_by']	= $comment->created_by;
-			}
-
-			$comment->bind( $post );
-			//$comment->comment	= EasyBlogStringHelper::url2link( $comment->comment );
-
-			if (!$comment->store())
-			{
-	        	JError::raiseError(500, $comment->getError() );
-			}
-			else
-			{
-			    if($comment->published && !$comment->sent)
-			    {
-					$comment->comment   = EasyBlogCommentHelper::parseBBCode($comment->comment);
-					$comment->comment   = nl2br($comment->comment);
-
-		    		$blog 		= EasyBlogHelper::getTable( 'Blog' );
-		    		$blog->load( $comment->post_id );
-
-		    		$comment->processEmails( false , $blog );
-
-					//update the sent flag to sent
-					$comment->updateSent();
-				}
+		// Bind the post data
+		$comment->bind($post);
 
 
-				$message	= JText::_( 'COM_EASYBLOG_COMMENTS_SAVED' );
-			}
-		}
-		else
-		{
-			$message	= JText::_('Invalid request method. This form needs to be submitted through a "POST" request.');
-			$type		= 'error';
+		// Try to save the comment
+		$state = $comment->store();
+
+		if (!$state) {
+			$this->info->set($comment->getError(), 'error');
+			return $this->app->redirect('index.php?option=com_easyblog&view=comments&layout=form&id=' . $comment->id);
 		}
 
-		$mainframe->redirect( 'index.php?option=com_easyblog&view=comments' , $message , $type );
+		// If the comment is published and no notifications sent yet, we need to send it out
+		if ($comment->published && !$comment->sent) {
+
+			$comment->comment = EB::comment()->parseBBCode($comment->comment);
+			$comment->comment = nl2br($comment->comment);
+
+			// Get the blog object associated with the comment
+			$post = $comment->getBlog();
+
+			// Process the emails now
+			$comment->processEmails(false, $post);
+
+			// Update the sent flag to sent, so we will never notify more than once
+			$comment->updateSent();
+		}
+
+		$this->info->set('COM_EASYBLOG_COMMENTS_SAVED', 'success');
+
+		$task = $this->getTask();
+		$redirect = 'index.php?option=com_easyblog&view=comments';
+
+		if ($task == 'apply') {
+			$redirect .= '&layout=form&id=' . $comment->id;
+		}
+
+		return $this->app->redirect($redirect);
 	}
 
-	function publish()
+	/**
+	 * Toggles publishing of a comment item
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function togglePublish()
 	{
 		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		EB::checkToken();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'comment' );
+		// Check for acl rules.
+		$this->checkAccess('comment');
 
-		$comments	= JRequest::getVar( 'cid' , array(0) , 'POST' );
+		// Get the id's
+		$ids = $this->input->get('cid', array(), 'array');
 
-		$message	= '';
-		$type		= 'message';
+		if (!$ids) {
+			$this->info->set('COM_EASYBLOG_COMMENTS_INVALID_ID_PROVIDED', 'error');
 
-		if( count( $comments ) <= 0 )
-		{
-			$message	= JText::_('Invalid comment id');
-			$type		= 'error';
-		}
-		else
-		{
-			$model		= $this->getModel( 'Comments' );
-
-			foreach( $comments as $id )
-			{
-				$comment 		= EasyBlogHelper::getTable( 'Comment' );
-				$comment->load( $id );
-				$isModerated	= $comment->published == EBLOG_COMMENT_MODERATE;
-
-				$comment->set( 'published' , EBLOG_COMMENT_PUBLISHED );
-
-				$comment->store( $isModerated );
-
-				$blog 		= EasyBlogHelper::getTable( 'Blog' );
-				$blog->load( $comment->post_id );
-
-				$comment->processEmails( false , $blog );
-
-				//update the sent flag to sent
-				$comment->updateSent();
-			}
-			$message	= JText::_('COM_EASYBLOG_COMMENTS_COMMENT_PUBLISHED');
+			return $this->app->redirect('index.php?option=com_easyblog&view=comments');
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=comments' , $message , $type );
-	}
+		// Get the comments model
+		$model = EB::model('Comments');
 
-	function unpublish()
-	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		// Get the current task
+		$task = $this->getTask();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'comment' );
+		foreach ($ids as $id) {
 
-		$comments	= JRequest::getVar( 'cid' , array(0) , 'POST' );
+			$comment = EB::table('Comment');
+			$comment->load((int) $id);
 
-		$message	= '';
-		$type		= 'message';
-
-		if( count( $comments ) <= 0 )
-		{
-			$message	= JText::_('Invalid comment id');
-			$type		= 'error';
-		}
-		else
-		{
-			$model		= $this->getModel( 'Comments' );
-
-			if( $model->publish( $comments , 0 ) )
-			{
-				$message	= JText::_('COM_EASYBLOG_COMMENTS_COMMENT_UNPUBLISHED');
-			}
-			else
-			{
-				$message	= JText::_('COM_EASYBLOG_COMMENTS_COMMENT_UNPUBLISH_ERROR');
-				$type		= 'error';
-			}
-
+			// Publish the comment
+			$comment->$task();
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=comments' , $message , $type );
+		$message = 'COM_EASYBLOG_COMMENTS_COMMENT_PUBLISHED';
+
+		if ($task == 'unpublish') {
+			$message = 'COM_EASYBLOG_COMMENTS_COMMENT_UNPUBLISHED';
+		}
+
+		$this->info->set($message, 'success');
+		return $this->app->redirect('index.php?option=com_easyblog&view=comments');
 	}
 }

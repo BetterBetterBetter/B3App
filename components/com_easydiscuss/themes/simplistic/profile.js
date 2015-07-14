@@ -16,9 +16,8 @@ EasyDiscuss
 .done(function($){
 
 	$('.discussProfilePage').implement(
-		'EasyDiscuss.Controller.Profile',
-		{
-			defaultTab: '<?php echo ucfirst( $viewType );?>'
+		'EasyDiscuss.Controller.Profile', {
+			defaultTab: '<?php echo ucfirst($viewType);?>'
 		}
 	);
 });

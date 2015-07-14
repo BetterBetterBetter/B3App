@@ -1,83 +1,51 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* EasyBlog is free software. This version may have been modified pursuant
+* EasySocial is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
-require_once( JPATH_ROOT.DIRECTORY_SEPARATOR.'components'.DIRECTORY_SEPARATOR.'com_easyblog'.DIRECTORY_SEPARATOR.'constants.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'router.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'privacy.php' );
+require_once(dirname(__FILE__) . '/table.php');
 
 class EasyBlogTableCategory extends EasyBlogTable
 {
-	var $id 						= null;
-	var $created_by		= null;
-	var $title					= null;
-
-	var $alias					= null;
-	var $avatar					= null;
-
-	var $parent_id				= null;
-
-	var $private				= null;
-	var $created				= null;
-	var $status			= null;
-	var $published		= null;
-
-	var $ordering		= null;
-
-	var $description	= null;
-
-	var $level			= null;
-	var $lft			= null;
-	var $rgt			= null;
-	var $default		= null;
+	public $id = null;
+	public $created_by = null;
+	public $title = null;
+	public $alias = null;
+	public $avatar = null;
+	public $parent_id = null;
+	public $private = null;
+	public $created = null;
+	public $status = null;
+	public $published = null;
+	public $autopost = null;
+	public $ordering = null;
+	public $description = null;
+	public $level = null;
+	public $lft = null;
+	public $rgt = null;
+	public $default = null;
+	public $language = null;
+	public $params = null;
 
 	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
+	 * The theme this category is assigned to.
+	 * @var string
 	 */
-	function __construct(& $db )
+	public $theme 	= null;
+
+	public function __construct(& $db )
 	{
-		parent::__construct( '#__easyblog_category' , 'id' , $db );
+		parent::__construct('#__easyblog_category' , 'id' , $db );
 	}
 
-	function load( $key = null, $permalink = false )
-	{
-		if( !$permalink )
-		{
-			return parent::load( $key );
-		}
-
-		$db		= $this->getDBO();
-
-		$query	= 'SELECT id FROM ' . $this->_tbl . ' '
-				. 'WHERE alias=' . $db->Quote( $key );
-		$db->setQuery( $query );
-
-		$id		= $db->loadResult();
-
-		// Try replacing ':' to '-' since Joomla replaces it
-		if( !$id )
-		{
-			$query	= 'SELECT id FROM ' . $this->_tbl . ' '
-					. 'WHERE alias=' . $db->Quote( JString::str_ireplace( ':' , '-' , $key ) );
-			$db->setQuery( $query );
-
-			$id		= $db->loadResult();
-		}
-		return parent::load( $id );
-	}
 
 	/**
 	 * Overrides parent's delete method to add our own logic.
@@ -85,312 +53,450 @@ class EasyBlogTableCategory extends EasyBlogTable
 	 * @return boolean
 	 * @param object $db
 	 */
-	function delete($pk = null)
+	public function delete($pk = null)
 	{
-		$db		= $this->getDBO();
-		$config = EasyBlogHelper::getConfig();
+		EB::loadLanguages(JPATH_ADMINISTRATOR);
 
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'category_id' ) . '=' . $db->Quote( $this->id );
-		$db->setQuery( $query );
+		$config = EB::config();
 
-		$count	= $db->loadResult();
-
-		if( $count > 0 )
-		{
+		// If the table contains posts, do not allow them to delete the category.
+		if ($this->getCount()) {
+			$this->setError(JText::sprintf('COM_EASYBLOG_CATEGORIES_DELETE_ERROR_POST_NOT_EMPTY', $this->title));
 			return false;
 		}
 
-		$my 	= JFactory::getUser();
-
-		if( $this->created_by != 0 && $this->created_by == $my->id )
-		{
-	    	JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-	    	$config 	= EasyBlogHelper::getConfig();
-
-			// @rule: Integrations with EasyDiscuss
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.delete.category' , $my->id , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_DELETE_CATEGORY' , $this->title ) );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.delete.category' , $my->id );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.delete.category' , $my->id );
-
-			// Assign EasySocial points
-			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-			$easysocial->assignPoints( 'category.remove' , $this->created_by );
-
-			if( $config->get( 'main_jomsocial_userpoint' ) )
-			{
-				$path	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'userpoints.php';
-				if( JFile::exists( $path ) )
-				{
-					require_once( $path );
-					CUserPoints::assignPoint( 'com_easyblog.category.remove' , $this->created_by );
-				}
-			}
-
-			// @since 1.2
-			// AlphaUserPoints
-			if( EasyBlogHelper::isAUPEnabled() )
-			{
-				AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_delete_category', AlphaUserPointsHelper::getAnyUserReferreID( $this->created_by ) , '', JText::sprintf('COM_EASYBLOG_AUP_CATEGORY_DELETED', $this->title) );
-			}
+		// If the table contains subcategories, do not allow them to delete the parent.
+		if ($this->getChildCount()) {
+			$this->setError(JText::sprintf('COM_EASYBLOG_CATEGORIES_DELETE_ERROR_CHILD_NOT_EMPTY', $this->title));
+			return false;
 		}
 
-		/* TODO */
-		//remove avatar if previously already uploaded.
-		$avatar = $this->avatar;
+		// If the current user deleting this is the creator of the category, remove the points too.
+		$my = JFactory::getUser();
 
-		if( $avatar != 'cdefault.png' && !empty($avatar))
-		{
+		if ($this->created_by == $my->id) {
+			EB::loadLanguages(JPATH_ROOT);
 
-			$avatar_config_path = $config->get('main_categoryavatarpath');
-			$avatar_config_path = rtrim($avatar_config_path, '/');
-			$avatar_config_path = JString::str_ireplace('/', DIRECTORY_SEPARATOR, $avatar_config_path);
+			// Integrations with EasyDiscuss.
+			EB::easydiscuss()->log('easyblog.delete.category', $my->id, JText::sprintf('COM_EASYBLOG_EASYDISCUSS_HISTORY_DELETE_CATEGORY', $this->title));
+			EB::easydiscuss()->addPoint('easyblog.delete.category', $my->id);
+			EB::easydiscuss()->addBadge('easyblog.delete.category', $my->id);
 
-			$upload_path		= JPATH_ROOT.DIRECTORY_SEPARATOR.$avatar_config_path;
+			// Integrations with EasySocial
+			EB::easysocial()->assignPoints('category.remove', $this->created_by);
 
-			$target_file_path		= $upload_path;
-			$target_file 			= JPath::clean($target_file_path . DIRECTORY_SEPARATOR. $avatar);
+			// Integrations with JomSocial
+			EB::jomsocial()->assignPoints('com_easyblog.category.remove', $this->created_by);
 
-			if(JFile::exists( $target_file ))
-			{
-				JFile::delete( $target_file );
-			}
+			// Integrations with AUP
+			EB::aup()->assignPoints('plgaup_easyblog_delete_category', $this->created_by, JText::sprintf('COM_EASYBLOG_AUP_CATEGORY_DELETED', $this->title));
 		}
 
-		//activity logging.
-		$activity   = new stdClass();
-		$activity->actor_id		= $my->id;
-		$activity->target_id	= '0';
-		$activity->context_type	= 'category';
-		$activity->context_id	= $this->id;
-		$activity->verb         = 'delete';
-		$activity->uuid         = $this->title;
+		// Remove avatar if previously already uploaded.
+		$this->removeAvatar();
 
-		$return = parent::delete();
+		$state = parent::delete();
 
-		if( $return )
-			EasyBlogHelper::activityLog( $activity );
-
-		return $return;
-	}
-
-	function aliasExists()
-	{
-		$db		= $this->getDBO();
-
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_category' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'alias' ) . '=' . $db->Quote( $this->alias );
-
-		if( $this->id != 0 )
-		{
-			$query	.= ' AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
-		}
-		$db->setQuery( $query );
-
-		return $db->loadResult() > 0 ? true : false;
+		return $state;
 	}
 
 	/**
-	 * Overrides parent's bind method to add our own logic.
+	 * Removes a category avatar
 	 *
-	 * @param Array $data
-	 **/
-	function bind( $data, $ignore = array() )
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function removeAvatar()
+	{
+		if (empty($this->avatar)) {
+			return false;
+		}
+
+		$config = EB::config();
+
+		$path = $config->get('main_categoryavatarpath');
+		$path = rtrim($path, '/');
+		$path = JPATH_ROOT . '/' . $path;
+
+		// Get the absolute path to the file.
+		$file = $path . '/' . $this->avatar;
+		$file = JPath::clean($file);
+
+		if (JFile::exists($file)) {
+			JFile::delete($file);
+		}
+	}
+
+	/**
+	 * Determines if this category is the primary category for the blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isPrimary()
+	{
+		if (!isset($this->primary)) {
+			return false;
+		}
+
+		return $this->primary;
+	}
+
+	/**
+	 * Determines if this category is the default category
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isDefault()
+	{
+		return $this->default;
+	}
+
+	/**
+	 * Determines if this category is the public category
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function isNotAssigned() 
+	{
+		return $this->private == '0' || $this->private == '1';
+	}
+
+	/**
+	 * Sets this category as the default category
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function setDefault()
+	{
+		// Get the  model
+		$model = EB::model('Category');
+
+		// Remove all default categories
+		$model->resetDefault();
+
+		$this->default = true;
+
+		return $this->store();
+	}
+
+	public function aliasExists()
+	{
+		static $_cache = array();
+		$key = $this->alias . $this->id;
+
+
+		$db		= $this->getDBO();
+
+		if (! isset($_cache[$key])) {
+
+			$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__easyblog_category' ) . ' '
+					. 'WHERE ' . $db->nameQuote( 'alias' ) . '=' . $db->Quote( $this->alias );
+
+			if( $this->id != 0 )
+			{
+				$query	.= ' AND ' . $db->nameQuote( 'id' ) . '!=' . $db->Quote( $this->id );
+			}
+			$db->setQuery( $query );
+
+			$_cache[$key] = $db->loadResult() > 0 ? true : false;
+
+		}
+
+		return $_cache[$key];
+	}
+
+	/**
+	 * Overrides parent's bind method
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function bind( $data, $ignore = array() )
 	{
 		parent::bind( $data, $ignore );
 
-		if( empty( $this->created ) )
-		{
-			$this->created	= EasyBlogHelper::getDate()->toMySQL();
+		if (!$this->created) {
+			$this->created = EB::date()->toSql();
 		}
 
-		jimport( 'joomla.filesystem.filter.filteroutput');
+		// we check the alias only when the category is a new category or the alias is empty
+		if (empty($this->id) || empty($this->alias)) {
+			jimport( 'joomla.filesystem.filter.filteroutput');
 
-		$i	= 1;
-		while( $this->aliasExists() || empty($this->alias) )
-		{
-			$this->alias	= empty($this->alias) ? $this->title : $this->alias . '-' . $i;
-			$i++;
+			$i = 1;
+			while ($this->aliasExists() || empty($this->alias)) {
+
+				$this->alias = empty($this->alias) ? $this->title : $this->alias . '-' . $i;
+				$this->alias = EBR::normalizePermalink($this->alias);
+				$i++;
+			}
 		}
-
-		//$this->alias 	= JFilterOutput::stringURLSafe( $this->alias );
-		$this->alias 	= EasyBlogRouter::generatePermalink( $this->alias );
 	}
 
-	function getRSS()
+	/**
+	 * Retrieves rss link for the category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getRssLink()
 	{
-		return EasyBlogHelper::getHelper( 'Feeds' )->getFeedURL( 'index.php?option=com_easyblog&view=categories&id=' . $this->id, false, 'category' );
+		return EB::feeds()->getFeedURL('index.php?option=com_easyblog&view=categories&id=' . $this->id, false, 'category');
 	}
 
-	function getAtom()
+	/**
+	 * Retrieve a list of tags that is associated with this category
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getDefaultTags()
+	{
+		$params = new JRegistry($this->params);
+
+		$tags = $params->get('tags');
+
+		if (empty($tags)) {
+			return array();
+		}
+
+		$tags = explode(',', $tags);
+
+		return $tags;
+	}
+
+	/**
+	 * Retrieve rss link for the category
+	 *
+	 * @deprecated	4.0
+	 */
+	public function getRSS()
+	{
+		return $this->getRssLink();
+	}
+
+	public function getAtom()
 	{
 		return EasyBlogHelper::getHelper( 'Feeds' )->getFeedURL( 'index.php?option=com_easyblog&view=categories&id=' . $this->id , true, 'category' );
 	}
 
-	function getAvatar()
-	{
-		$avatar_link    = '';
-
-		if($this->avatar == 'cdefault.png' || $this->avatar == 'default_category.png' || $this->avatar == 'components/com_easyblog/assets/images/default_category.png' || $this->avatar == 'components/com_easyblog/assets/images/cdefault.png' || empty($this->avatar))
-		{
-			$avatar_link   = 'components/com_easyblog/assets/images/default_category.png';
-		}
-		else
-		{
-			require_once( EBLOG_HELPERS . '/image.php' );
-			$avatar_link   = EasyImageHelper::getAvatarRelativePath('category') . '/' . $this->avatar;
-		}
-
-		return rtrim(JURI::root(), '/') . '/' . $avatar_link;
-	}
-
-	function getPostCount()
-	{
-		$db = EasyBlogHelper::db();
-
-		$query  = 'SELECT count(1) FROM `#__easyblog_post` WHERE `category_id` = ' . $db->Quote($this->id);
-		$db->setQuery($query);
-
-		return $db->loadResult();
-	}
-
-	function getChildCount()
-	{
-		$db = EasyBlogHelper::db();
-
-		$query	= 'SELECT COUNT(1) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_category' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'parent_id' ) . '=' . $db->Quote( $this->id ) . ' '
-				. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'published' ) . '=' . $db->Quote( 1 );
-
-		$db->setQuery($query);
-
-		return $db->loadResult();
-	}
-
-	/*
-	 * Retrieves a list of active bloggers that contributed in this category.
+	/**
+	 * Retrieve categories avatar
 	 *
-	 * @param	null
-	 * @return	Array	An array of TableProfile objects.
+	 * @since	4.0
+	 * @access	public
+	 * @return	string	The location to the avatar
+	 */
+	public function getAvatar()
+	{
+		$defaults 	= array('cdefault.png', 'default_category.png', 'components/com_easyblog/assets/images/default_category.png', 'components/com_easyblog/assets/images/cdefault.png');
+		$link 		= 'components/com_easyblog/assets/images/default_category.png';
+
+		if (!in_array($this->avatar, $defaults) && !empty($this->avatar)) {
+
+			$link 	= EB::image()->getAvatarRelativePath('category') . '/' . $this->avatar;
+		}
+
+		return rtrim(JURI::root(), '/') . '/' . $link;
+	}
+
+	/**
+	 * Retrieves the total number of posts in this category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return	int
+	 */
+	public function getCount($bloggerId = '')
+	{
+		static $counts = array();
+
+		$options = array();
+
+		if ($bloggerId) {
+			$options['bloggerId'] = $bloggerId;
+		}
+
+		if (!isset($counts[$this->id])) {
+			$model = EB::model('Category');
+			$counts[$this->id] = $model->getTotalPostCount($this->id, $options);
+		}
+
+		return $counts[$this->id];
+	}
+
+	/**
+	 * Use getCount instead
+	 *
+	 * @deprecated	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getPostCount()
+	{
+		return $this->getCount();
+	}
+
+	/**
+	 * Retrieves the total number of subcategories this category has.
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getChildCount()
+	{
+		$db = EB::db();
+
+		$query	= 'SELECT COUNT(1) FROM ' . $db->nameQuote( '#__easyblog_category' ) . ' '
+				. 'WHERE ' . $db->nameQuote( 'parent_id' ) . '=' . $db->Quote( $this->id ) . ' '
+				. 'AND ' . $db->nameQuote( 'published' ) . '=' . $db->Quote( 1 );
+
+		$db->setQuery($query);
+
+		return $db->loadResult();
+	}
+
+	/**
+	 * Retrieve a list of active authors for this category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getActiveAuthors()
+	{
+		static $result = array();
+
+		if (!isset($result[$this->id])) {
+
+			//check if the active author already cached or not. if yes,
+			//let retrieve those
+			if (EB::cache()->exists($this->id, 'cats')) {
+				$data = EB::cache()->get($this->id, 'cats');
+
+				if (isset($data['author'])) {
+					$result[$this->id] = $data['author'];
+				} else {
+					$result[$this->id] = array();
+				}
+			} else {
+				$model = EB::model('Category');
+				$result[$this->id] = $model->getActiveAuthors($this->id);
+			}
+		}
+
+		return $result[$this->id];
+	}
+
+	/**
+	 * Deprecated. Use @getActiveAuthors() instead
+	 *
+	 * @deprecated 4.0
 	 */
 	public function getActiveBloggers()
 	{
-		$db		= EasyBlogHelper::db();
-		$query	= 'SELECT DISTINCT(`created_by`) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_post' ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'category_id' ) . '=' . $db->Quote( $this->id );
-		$db->setQuery( $query );
-
-		$rows		= $db->loadObjectList();
-
-		if( !$rows )
-		{
-			return false;
-		}
-
-		$bloggers	= array();
-		foreach( $rows as $row )
-		{
-			$profile	= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-			$profile->load( $row->created_by );
-
-			$bloggers[]	= $profile;
-		}
-
-		return $bloggers;
+		return $this->getActiveAuthors();
 	}
 
+	/**
+	 * Override parent's implementation of store
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
 	public function store($updateNulls = false)
 	{
-		if( !empty( $this->created ))
-		{
-			$offset     	= EasyBlogDateHelper::getOffSet();
-			$newDate		= EasyBlogHelper::getDate( $this->created, $offset );
-			$this->created  = $newDate->toMySQL();
-		}
-		else
-		{
-			$newDate		= EasyBlogHelper::getDate();
-			$this->created  = $newDate->toMySQL();
+		if (!$this->created) {
+			$this->created = EB::date()->toSql();
 		}
 
-	    $my 		= JFactory::getUser();
+		// Generate an alias if alias is empty
+		if (!$this->alias) {
+			$this->alias = EBR::normalizePermalink($this->title);
+		}
+
+	    $my = JFactory::getUser();
 
 	    // Add point integrations for new categories
-	    if( $this->id == 0 && $my->id > 0 )
-	    {
-	    	JFactory::getLanguage()->load( 'com_easyblog' , JPATH_ROOT );
-	    	$config 	= EasyBlogHelper::getConfig();
+	    if ($this->id == 0 && $my->id > 0) {
 
-			// @rule: Integrations with EasyDiscuss
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->log( 'easyblog.new.category' , $my->id , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_CATEGORY' , $this->title ) );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addPoint( 'easyblog.new.category' , $my->id );
-			EasyBlogHelper::getHelper( 'EasyDiscuss' )->addBadge( 'easyblog.new.category' , $my->id );
+	    	EB::loadLanguages();
 
-			// @since 1.2
+			// Integrations with EasyDiscuss
+			EB::easydiscuss()->log( 'easyblog.new.category' , $my->id , JText::sprintf( 'COM_EASYBLOG_EASYDISCUSS_HISTORY_NEW_CATEGORY' , $this->title ) );
+			EB::easydiscuss()->addPoint( 'easyblog.new.category' , $my->id );
+			EB::easydiscuss()->addBadge( 'easyblog.new.category' , $my->id );
+
 			// AlphaUserPoints
-			if( EasyBlogHelper::isAUPEnabled() )
-			{
-				AlphaUserPointsHelper::newpoints( 'plgaup_easyblog_add_category', '', 'easyblog_add_category_' . $this->id, JText::sprintf('COM_EASYBLOG_AUP_NEW_CATEGORY_CREATED', $this->title) );
-			}
+			EB::aup()->assign('plgaup_easyblog_add_category', '', 'easyblog_add_category_' . $this->id, JText::sprintf('COM_EASYBLOG_AUP_NEW_CATEGORY_CREATED', $this->title));
 
-			if( $config->get('main_jomsocial_userpoint') )
-			{
-				$path	= JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_community' . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR . 'userpoints.php';
-				if( JFile::exists( $path ) )
-				{
-					require_once( $path );
-					CUserPoints::assignPoint( 'com_easyblog.category.add' , $my->id );
-				}
-			}
+			// JomSocial integrations
+			EB::jomsocial()->assignPoints('com_easyblog.category.add', $my->id);
 
 			// Assign EasySocial points
-			$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
-			$easysocial->assignPoints( 'category.create' , $my->id );
+			EB::easysocial()->assignPoints('category.create', $my->id);
 	    }
 
 		// Figure out the proper nested set model
-		if( $this->id == 0 && $this->lft == 0 )
-		{
+		if ($this->id == 0 && $this->lft == 0) {
+
 			// No parent id, we use the current lft,rgt
-			if( $this->parent_id )
-			{
-				$left           = $this->getLeft( $this->parent_id );
-				$this->lft      = $left;
-				$this->rgt      = $this->lft + 1;
+			if ($this->parent_id) {
+				$left = $this->getLeft( $this->parent_id );
+				$this->lft = $left;
+				$this->rgt = $this->lft + 1;
 
 				// Update parent's right
-				$this->updateRight( $left );
-				$this->updateLeft( $left );
-			}
-			else
-			{
-				$this->lft      = $this->getLeft() + 1;
-				$this->rgt      = $this->lft + 1;
+				$this->updateRight($left);
+				$this->updateLeft($left);
+			} else {
+				$this->lft = $this->getLeft() + 1;
+				$this->rgt = $this->lft + 1;
 			}
 		}
 
-		$isNew  	= ( empty( $this->id ) ) ? true : false;
+		if ($this->id == 0) {
+			// new cats. we need to store the ordering.
+			$this->ordering = $this->getOrdering($this->parent_id) + 1;
+		}
 
-		$return = parent::store();
+		$isNew 	= !$this->id ? true : false;
+		$state 	= parent::store();
 
-		//activity logging.
-		$activity   = new stdClass();
-		$activity->actor_id		= $my->id;
-		$activity->target_id	= '0';
-		$activity->context_type	= 'category';
-		$activity->context_id	= $this->id;
-		$activity->verb         = ( $isNew ) ? 'add' : 'update';
-		$activity->uuid         = $this->title;
-
-		EasyBlogHelper::activityLog( $activity );
-
-	    return $return;
+	    return $state;
 	}
 
 	public function saveACL( $post )
 	{
 
-		$catRuleItems	= EasyBlogHelper::getTable( 'CategoryAclItem' , 'Table' );
+		$catRuleItems	= EB::table('CategoryAclItem');
 		$categoryRules  = $catRuleItems->getAllRuleItems();
 
 		foreach( $categoryRules as $rule)
@@ -403,7 +509,7 @@ class EasyBlogTableCategory extends EasyBlogTable
 					foreach( $post[ $key ] as $joomla)
 					{
 						//now we reinsert again.
-						$catRule	= EasyBlogHelper::getTable( 'CategoryAcl' , 'Table' );
+						$catRule	= EB::table('CategoryAcl');
 						$catRule->category_id	= $this->id;
 						$catRule->acl_id 		= $rule->id;
 						$catRule->type 			= 'group';
@@ -542,15 +648,16 @@ class EasyBlogTableCategory extends EasyBlogTable
 
 	public function checkPrivacy()
 	{
-		$obj			= new EasyBlogPrivacyError();
-		$obj->allowed	= true;
+		$obj 			= new stdClass();
+		$obj->allowed 	= true;
+		$obj->message 	= '';
 
 		$my 			= JFactory::getUser();
 
 		if( $this->private == '1' && $my->id == 0)
 		{
 			$obj->allowed	= false;
-			$obj->error		= EasyBlogPrivacyHelper::getErrorHTML();
+			$obj->error		= EB::privacy()->getErrorHTML();
 		}
 		else
 		{
@@ -561,7 +668,7 @@ class EasyBlogTableCategory extends EasyBlogTable
 				if( in_array($this->id, $cats) )
 				{
 					$obj->allowed	= false;
-					$obj->error		= JText::_( 'COM_EASYBLOG_PRIVACY_JOMSOCIAL_NOT_AUTHORIZED_ERROR' );
+					$obj->error		= JText::_( 'COM_EASYBLOG_PRIVACY_NOT_AUTHORIZED_ERROR' );
 				}
 
 			}
@@ -574,9 +681,9 @@ class EasyBlogTableCategory extends EasyBlogTable
 	public function updateLeft( $left, $limit = 0 )
 	{
 		$db     = EasyBlogHelper::db();
-		$query  = 'UPDATE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
-				. 'SET ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'lft' ) . '=' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'lft' ) . ' + 2 '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'lft' ) . '>=' . $db->Quote( $left );
+		$query  = 'UPDATE ' . $db->nameQuote( $this->_tbl ) . ' '
+				. 'SET ' . $db->nameQuote( 'lft' ) . '=' . $db->nameQuote( 'lft' ) . ' + 2 '
+				. 'WHERE ' . $db->nameQuote( 'lft' ) . '>=' . $db->Quote( $left );
 
 		if( !empty( $limit ) )
 			$query  .= ' and `lft`  < ' . $db->Quote( $limit );
@@ -588,9 +695,9 @@ class EasyBlogTableCategory extends EasyBlogTable
 	public function updateRight( $right, $limit = 0 )
 	{
 		$db     = EasyBlogHelper::db();
-		$query  = 'UPDATE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
-				. 'SET ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'rgt' ) . '=' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'rgt' ) . ' + 2 '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'rgt' ) . '>=' . $db->Quote( $right );
+		$query  = 'UPDATE ' . $db->nameQuote( $this->_tbl ) . ' '
+				. 'SET ' . $db->nameQuote( 'rgt' ) . '=' . $db->nameQuote( 'rgt' ) . ' + 2 '
+				. 'WHERE ' . $db->nameQuote( 'rgt' ) . '>=' . $db->Quote( $right );
 
 		if( !empty( $limit ) )
 			$query  .= ' and `rgt`  < ' . $db->Quote( $limit );
@@ -606,13 +713,13 @@ class EasyBlogTableCategory extends EasyBlogTable
 		if( $parent != 0 )
 		{
 			$query  = 'SELECT `rgt`' . ' '
-					. 'FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
-					. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'id' ) . '=' . $db->Quote( $parent );
+					. 'FROM ' . $db->nameQuote( $this->_tbl ) . ' '
+					. 'WHERE ' . $db->nameQuote( 'id' ) . '=' . $db->Quote( $parent );
 		}
 		else
 		{
-			$query  = 'SELECT MAX(' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'rgt' ) . ') '
-					. 'FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl );
+			$query  = 'SELECT MAX(' . $db->nameQuote( 'rgt' ) . ') '
+					. 'FROM ' . $db->nameQuote( $this->_tbl );
 		}
 		$db->setQuery( $query );
 
@@ -620,6 +727,22 @@ class EasyBlogTableCategory extends EasyBlogTable
 
 		return $left;
 	}
+
+	public function getOrdering($parent = 0)
+	{
+		$db     = EB::db();
+		$query = "select max(ordering)";
+		$query .= " from `#__easyblog_category`";
+		if ($parent) {
+			$query .= " where (`id` = " . $db->Quote($parent) . " or `parent_id` = " . $db->Quote($parent) . ")";
+		}
+
+		$db->setQuery( $query );
+		$maxordering   = (int) $db->loadResult();
+
+		return $maxordering;
+	}
+
 
 	function move( $direction, $where = '' )
 	{
@@ -877,6 +1000,237 @@ class EasyBlogTableCategory extends EasyBlogTable
 		return true;
 	}
 
+	/**
+	 * Determines if there are any fields binded to the category
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function hasCustomFields()
+	{
+		$fields = $this->getCustomFields();
+
+		if ($fields === false) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Retrieves custom fields for this category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getCustomFields()
+	{
+		static $loaded = array();
+
+		if (!isset($loaded[$this->id])) {
+
+			$group = null;
+			$fields = null;
+
+			if (EB::cache()->exists($this->id, 'categories')) {
+				$cachedCategory = EB::cache()->get($this->id, 'categories');
+
+				$group = $cachedCategory['group'];
+				$fields = $cachedCategory['field'];
+
+			} else {
+				$model = EB::model('Categories');
+
+				$group = $model->getCustomFieldGroup($this->id);
+				$fields = $model->getCustomFields($this->id);
+			}
+
+			if (!$group->id && !$fields) {
+				$obj = false;
+			} else {
+				$obj = new stdClass();
+				$obj->group  = $group;
+				$obj->fields = $fields;
+			}
+
+			$loaded[$this->id] = $obj;
+		}
+
+		return $loaded[$this->id];
+	}
+
+	/**
+	 * Retrieves the custom field group for this category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @return	mixed 	false if category is not associated with the group
+	 */
+	public function getCustomFieldGroup()
+	{
+		static $loaded = false;
+
+		if (!isset($loaded[$this->id])) {
+			$table 	= EB::table('CategoryFieldGroup');
+			$state 	= $table->load(array('category_id' => $this->id));
+
+			$loaded[$this->id] = $table;
+		}
+
+
+		return $loaded[$this->id];
+	}
+
+	/**
+	 * Bind custom field group to the category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function removeFieldGroup()
+	{
+		// Delete existing mapping first
+		$model = EB::model('Category');
+		$state = $model->deleteExistingFieldMapping($this->id);
+
+		return $state;
+	}
+
+	/**
+	 * Bind custom field group to the category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function bindCustomFieldGroup($groupId = '')
+	{
+		if (!$groupId) {
+			return false;
+		}
+
+		// Delete existing mapping first
+		$model = EB::model('Category');
+		$model->deleteExistingFieldMapping($this->id);
+
+		// Create a new mapping
+		$table 	= EB::table('CategoryFieldGroup');
+		$table->category_id = $this->id;
+		$table->group_id = $groupId;
+		$state = $table->store();
+
+		if (!$state) {
+			$this->setError($table->getError());
+		}
+
+		return $state;
+	}
+
+	/**
+	 * Retrieves the parameters for the menu
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getMenuParams()
+	{
+
+	}
+
+	/**
+	 * Retrieve a specific parameter value
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getParam($key, $default = null)
+	{
+		static $params = array();
+
+		if (!isset($params[$this->id])) {
+			$params[$this->id] = $this->getParams();
+		}
+
+		$val = $params[$this->id]->get($key);
+
+		$prefix = 'layout_';
+
+		if ($val == '-1') {
+			$config = EB::config();
+			$val = $config->get($prefix . $key, $default);
+		}
+
+		// If the value is still null, probably not set in the category
+		if ($val === null) {
+			$val = $default;
+		}
+		
+		return $val;
+	}
+
+	/**
+	 * Retrieves the external permalink for this blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getExternalPermalink($format = null)
+	{
+		$link = EBR::getRoutedURL('index.php?option=com_easyblog&view=categories&layout=listings&id=' . $this->id, false, true, true);
+
+		$link = EBR::appendFormatToQueryString($link, $format);
+
+		return $link;
+	}
+
+	/**
+	 * Retrieves alias for the category
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getAlias()
+	{
+		$config = EB::config();
+		$alias = $this->alias;
+
+		if ($config->get('main_sef_unicode') || !EBR::isSefEnabled()) {
+			$alias = $this->id . ':' . $this->alias;
+		}
+
+		return $alias;
+	}
+
+	/**
+	 * Retrieves the permalink for this category
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function getPermalink($xhtml = true)
+	{
+		$url = EB::_('index.php?option=com_easyblog&view=categories&layout=listings&id=' . $this->id, $xhtml);
+
+		return $url;
+	}
+
 	public function getMetaId()
 	{
 		$db = $this->_db;
@@ -896,7 +1250,7 @@ class EasyBlogTableCategory extends EasyBlogTable
 		$id		= $this->getMetaId();
 
 		// @rule: Save meta tags for this entry.
-		$meta		= EasyBlogHelper::getTable( 'Meta' );
+		$meta		= EB::table('Meta');
 		$meta->load( $id );
 
 		$meta->set( 'keywords'		, '' );

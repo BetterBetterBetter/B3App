@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,42 +9,22 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'parent.php' );
+require_once(dirname(__FILE__) . '/model.php');
 
-class EasyBlogModelReports extends EasyBlogModelParent
+class EasyBlogModelReports extends EasyBlogAdminModel
 {
-	/**
-	 * Category total
-	 *
-	 * @var integer
-	 */
-	var $_total = null;
+	public $total = null;
+	public $pagination = null;
+	public $data = null;
 
-	/**
-	 * Pagination object
-	 *
-	 * @var object
-	 */
-	var $_pagination = null;
-
-	/**
-	 * Category data array
-	 *
-	 * @var array
-	 */
-	var $_data = null;
-	
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
-		
-		$mainframe	= JFactory::getApplication();
-
-		$limit		= $mainframe->getUserStateFromRequest( 'com_easyblog.reports.limit', 'limit', $mainframe->getCfg('list_limit'), 'int');
-		$limitstart	= JRequest::getVar('limitstart', 0, '', 'int');
+		$limit = $this->app->getUserStateFromRequest('com_easyblog.reports.limit', 'limit', $this->app->getCfg('list_limit'), 'int');
+		$limitstart = $this->input->get('limitstart', 0, 'int');
 
 		$this->setState('limit', $limit);
 		$this->setState('limitstart', $limitstart);
@@ -56,29 +36,27 @@ class EasyBlogModelReports extends EasyBlogModelParent
 	 * @access public
 	 * @return integer
 	 */
-	function getTotal()
+	public function getTotal()
 	{
 		// Lets load the content if it doesn't already exist
-		if (empty($this->_total))
-		{
-			$query = $this->_buildQuery();
+		if (!$this->total) {
+			$query = $this->_buildQuery(false, true);
 			$this->_total = $this->_getListCount($query);
 		}
 
 		return $this->_total;
 	}
-	
+
 	/**
 	 * Method to get a pagination object for the categories
 	 *
 	 * @access public
 	 * @return integer
 	 */
-	function getPagination()
+	public function getPagination()
 	{
 		// Lets load the content if it doesn't already exist
-		if (empty($this->_pagination))
-		{
+		if (!$this->pagination) {
 			jimport('joomla.html.pagination');
 			$this->_pagination = new JPagination( $this->getTotal(), $this->getState('limitstart'), $this->getState('limit') );
 		}
@@ -92,53 +70,92 @@ class EasyBlogModelReports extends EasyBlogModelParent
 	 * @access private
 	 * @return string
 	 */
-	function _buildQuery( $publishedOnly = false )
+	public function _buildQuery($publishedOnly = false, $totalOnly = false)
 	{
 		// Get the WHERE and ORDER BY clauses for the query
-		$where		= $this->_buildQueryWhere( $publishedOnly );
-		$orderby	= $this->_buildQueryOrderBy();
-		$db			= EasyBlogHelper::db();
-				
-		$query	= 'SELECT * ';
-		$query	.= 'FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_reports' );
-		$query	.= $where;
-		
-		$query	.= $orderby;
+		$where = $this->_buildQueryWhere($publishedOnly);
+
+		$db = EB::db();
+
+		$query = array();
+		$query[] = 'SELECT * FROM ' . $db->qn('#__easyblog_reports') . ' AS a';
+		$query[] = $where;
+
+		if (! $totalOnly) {
+			$orderby = $this->_buildQueryOrderBy();
+			$query[] = $orderby;
+		}
+
+		$query = implode(' ', $query);
 
 		return $query;
 	}
 
-	function _buildQueryWhere()
+	/**
+	 * Builds the where clause
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function _buildQueryWhere()
 	{
-		$mainframe			= JFactory::getApplication();
-		$db					= EasyBlogHelper::db();
-		
-		$filter_state 		= $mainframe->getUserStateFromRequest( 'com_easyblog.reports.filter_state', 'filter_state', '', 'word' );
-		$search 			= $mainframe->getUserStateFromRequest( 'com_easyblog.reports.search', 'search', '', 'string' );
-		$search 			= $db->getEscaped( trim(JString::strtolower( $search ) ) );
+		$db = EB::db();
+		$filter_state = $this->app->getUserStateFromRequest('com_easyblog.reports.filter_state', 'filter_state', '', 'word');
+		$search	= $this->app->getUserStateFromRequest('com_easyblog.reports.search', 'search', '', 'string');
+		$search	= $db->getEscaped(trim(JString::strtolower($search)));
 
 		$where = array();
 
-		if ($search)
-		{
+		if ($search) {
 			$where[] = ' LOWER( `reason` ) LIKE \'%' . $search . '%\' ';
 		}
 
-		$where 		= ( count( $where ) ? ' WHERE ' . implode( ' AND ', $where ) : '' );
+		$where = (count($where) ? ' WHERE ' . implode (' AND ', $where) : '');
 
 		return $where;
 	}
 
-	function _buildQueryOrderBy()
+	/**
+	 * Builds the order by clause
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function _buildQueryOrderBy()
 	{
-		$mainframe			= JFactory::getApplication();
+		$order = $this->app->getUserStateFromRequest('com_easyblog.reports.filter_order', 'filter_order', 'a.created', 'cmd');
+		$direction = $this->app->getUserStateFromRequest('com_easyblog.reports.filter_order_Dir', 'filter_order_Dir', 'asc', 'word');
 
-		$filter_order		= $mainframe->getUserStateFromRequest( 'com_easyblog.reports.filter_order', 		'filter_order', 	'created', 'cmd' );
-		$filter_order_Dir	= $mainframe->getUserStateFromRequest( 'com_easyblog.reports.filter_order_Dir',	'filter_order_Dir',	'', 'word' );
-
-		$orderby 	= ' ORDER BY '.$filter_order.' '.$filter_order_Dir;
+		$orderby = 'ORDER BY ' . $order . ' ' . $direction;
 
 		return $orderby;
+	}
+
+	/**
+	 * Delete reports for the given id and type
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function deleteReports($id, $type)
+	{
+		$db = EB::db();
+
+		$query = array();
+		$query[] = 'DELETE FROM ' . $db->quoteName('#__easyblog_reports');
+		$query[] = 'WHERE ' . $db->quoteName('obj_id') . '=' . $db->Quote($id);
+		$query[] = 'AND ' . $db->nameQuote('obj_type') . '=' . $db->Quote($type);
+
+		$query = implode(' ', $query);
+		$db->setQuery($query);
+
+		return $db->Query();
 	}
 
 	/**
@@ -147,21 +164,15 @@ class EasyBlogModelReports extends EasyBlogModelParent
 	 * @access public
 	 * @return array
 	 */
-	function getData( $usePagination = true )
+	public function getData($usePagination = true)
 	{
-
-		// Lets load the content if it doesn't already exist
-		if (empty($this->_data))
-		{
+		if (!$this->data) {
 			$query = $this->_buildQuery();
-		
-			if($usePagination)
-			{
-				$this->_data = $this->_getList( $query, $this->getState('limitstart'), $this->getState('limit') );
-			}
-			else
-			{
-				$this->_data = $this->_getList( $query );
+
+			if ($usePagination) {
+				$this->_data = $this->_getList($query, $this->getState('limitstart'), $this->getState('limit'));
+			} else {
+				$this->_data = $this->_getList($query);
 			}
 		}
 

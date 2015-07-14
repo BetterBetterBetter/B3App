@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,61 +9,54 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-class JElementBlogs extends JElement
+jimport('joomla.html.html');
+jimport('joomla.form.formfield');
+
+class JFormFieldModal_Blogs extends JFormField
 {
-	var	$_name = 'Blogs';
 
-	function fetchElement($name, $value, &$node, $control_name)
+	protected $type = 'Modal_Blogs';
+
+	protected function getInput()
 	{
-		require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'constants.php' );
-		require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
+		JHTML::_('behavior.modal');
 
-		$mainframe	= JFactory::getApplication();
-		$doc 		= JFactory::getDocument();
+		require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/includes/easyblog.php');
 
-		EasyBlogHelper::loadHeaders();
+		$app = JFactory::getApplication();
 
-		JHTML::_( 'behavior.modal' );
-
-		$id 		= '';
-		if( $value == '0' )
-		{
-			$value	= JText::_( 'Select an entry' );
+		if ($this->value == '0') {
+			$this->value = JText::_( 'Select an entry' );
+		} else {
+			$post = EB::post($this->value);
+			$value = $blog->title;
 		}
-		else
-		{
-			$blog	= EasyBlogHelper::getTable( 'Blog' );
-			$blog->load( $value );
-			$value	= $blog->title;
-			$id 	= $blog->id;
-		}
+
 		ob_start();
 		?>
-<script type="text/javascript">
-EasyBlog.ready(function($) {
+		<script type="text/javascript">
+		function insertBlog(id, name, alias) {
+			document.id('<?php echo $this->id;?>_id' ).value 	= id;
+			document.id('<?php echo $this->id;?>_name' ).value	= name;
+			SqueezeBox.close();
+		}
+		</script>
 
-	window.insertBlog = function(id, name) {
-		$( '#item_id' ).val( id );
-		$( '#item_value' ).val( name );
-		$.Joomla("squeezebox").close();
-	};
+		<span class="input-append">
+			<input type="text" id="<?php echo $this->id;?>_name" readonly="readonly" value="<?php echo $value; ?>" disabled="disabled" class="input-large disabled" />
+			<a rel="{handler: 'iframe', size: {x: 750, y: 475}}" href="<?php echo JRoute::_('index.php?option=com_easyblog&view=blogs&tmpl=component&browse=1&browsefunction=insertBlog' );?>" class="modal btn btn-primary">
+				<i class="icon-file"></i> <?php echo JText::_('COM_EASYBLOG_MENU_OPTIONS_SELECT_POST'); ?>
+			</a>
+		</span>
 
-});
-</script>
-		<div style="float:left;">
-			<input type="text" id="item_value" readonly="readonly" value="<?php echo $value; ?>" disabled="disabled" style="background: #ffffff;width: 200px;" />
-		</div>
-		<div class="button2-left">
-			<div class="blank">
-				<a rel="{handler: 'iframe', size: {x: 750, y: 475}}" href="<?php echo JRoute::_( 'index.php?option=com_easyblog&view=blogs&tmpl=component&browse=1&browsefunction=insertBlog' );?>" title="Select an Article" class="modal"><?php echo JText::_( 'Select' ); ?></a>
-			</div>
-		</div>
-		<input type="hidden" id="item_id" name="<?php echo $control_name;?>[<?php echo $name;?>]" value="<?php echo $id;?>" />
+		<input type="hidden" id="<?php echo $this->id;?>_id" name="<?php echo $this->name;?>" value="<?php echo $this->value;?>" />
+
 		<?php
-		$html	= ob_get_contents();
+		$output		= ob_get_contents();
 		ob_end_clean();
-		return $html;
+
+		return $output;
 	}
 }

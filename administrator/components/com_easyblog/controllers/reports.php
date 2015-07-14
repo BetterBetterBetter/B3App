@@ -11,35 +11,124 @@
 */
 defined('_JEXEC') or die('Restricted access');
 
-jimport('joomla.application.component.controller');
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerReports extends EasyBlogController
-{	
-	function __construct()
+{
+	public function __construct($config = array())
 	{
-		parent::__construct();
+		parent::__construct($config);
 	}
-	
+
+	/**
+	 * Deletes a reported blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function delete()
+	{
+		// Check for request forgeries
+		EB::checkToken();
+
+		// Get the report id
+		$ids = $this->input->get('cid', array(), 'array');
+
+		if (!$ids) {
+			return;
+		}
+
+		foreach ($ids as $id) {
+
+			$id = (int) $id;
+
+			$report = EB::table('Report');
+			$report->load($id);
+
+			$blog = EB::table('Blog');
+			$blog->load($report->obj_id);
+			$blog->delete();
+
+			// Once the blog post is unpublished, delete the report since action was already performed.
+			$report->delete();
+		}
+
+		$this->info->set('COM_EASYBLOG_BLOGS_DELETED_SUCCESSFULLY', 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=reports');
+	}
+
+	/**
+	 * Unpublishes a blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function unpublish()
+	{
+		// Check for request forgeries
+		EB::checkToken();
+
+		// Get the report id
+		$ids = $this->input->get('cid', array(), 'array');
+
+		if (!$ids) {
+			return;
+		}
+
+		// Get the blogs model
+		$model = EB::model('Blogs');
+
+		foreach ($ids as $id) {
+
+			$id = (int) $id;
+
+			$report = EB::table('Report');
+			$report->load($id);
+
+			$args	= array(&$report->obj_id);
+			$model->publish($args, 0);
+
+			// Once the blog post is unpublished, delete the report since action was already performed.
+			$report->delete();
+		}
+
+		$this->info->set('COM_EASYBLOG_BLOGS_UNPUBLISHED_SUCCESSFULLY', 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=reports');
+	}
+
+	/**
+	 * Allow caller to discard reports
+	 *
+	 * @since	4.0
+	 * @access	public
+	 */
 	public function discard()
 	{
-		JRequest::checkToken() or jexit( 'Invalid Token' );
+		// Check for request forgeries
+		EB::checkToken();
 
 		// @task: Check for acl rules.
-		$this->checkAccess( 'report' );
+		$this->checkAccess('report');
 
-		$ids 	= JRequest::getVar( 'cid' );
+		// Get a list of report ids.
+		$ids = $this->input->get('cid', array(), 'array');
 
-		foreach( $ids as $id )
-		{
-			$id 	= (int) $id;
-
-			$report = EasyBlogHelper::getTable( 'Report' );
-			$report->load($id);
+		foreach ($ids as $id) {
+			$report = EB::table('Report');
+			$report->load((int) $id);
 
 			$report->delete();
 		}
-		
-		$message 	= JText::_( 'COM_EASYBLOG_REPORTS_DISCARDED_SUCCESSFULLY' );		
-		$this->setRedirect( 'index.php?option=com_easyblog&view=reports' , $message , 'info' );
+
+		$message 	= JText::_('COM_EASYBLOG_REPORTS_DISCARDED_SUCCESSFULLY');
+		$this->info->set($message, 'success');
+
+		return $this->app->redirect('index.php?option=com_easyblog&view=reports');
 	}
 }

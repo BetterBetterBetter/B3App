@@ -112,6 +112,8 @@ EasyDiscuss(function($){
 				<?php echo $row->type; ?>
 			</td>
 			<td class="order center">
+				<?php echo $row->ordering; ?>
+				
 				<?php if ($saveOrder) { ?>
 				<?php
 					$condition_up 	= isset($this->ordering[0][$orderkey - 1]);

@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,55 +9,36 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(dirname(__FILE__) . '/table.php');
 
 class EasyBlogTableConfigs extends EasyBlogTable
 {
-	/*
-	 * The key of the current config
-	 * @var string
-	 */
-	var $name = null;
+	public $name = null;
+	public $params = null;
 
-	/*
-	 * Raw parameters values.
-	 * @var string
-	 */
-	var $params	= null;
-
-
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct(& $db )
+	public function __construct(& $db )
 	{
-		parent::__construct( '#__easyblog_configs' , 'name' , $db );
+		parent::__construct('#__easyblog_configs', 'name', $db);
 	}
 
-	/**
-	 * Save the configuration
-	 **/
-	function store( $key = 'config' )
+	public function store($key = 'config')
 	{
-		$db		= $this->getDBO();
+		$db = EB::db();
 
-		$query	= 'SELECT COUNT(*) FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( '#__easyblog_configs') . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'name' ) . '=' . $db->Quote( $key );
-		$db->setQuery( $query );
+		$query	= 'SELECT COUNT(*) FROM ' . $db->nameQuote( '#__easyblog_configs') . ' '
+				. 'WHERE ' . $db->nameQuote('name') . '=' . $db->Quote($key);
+		$db->setQuery($query);
 
-		$exists	= ( $db->loadResult() > 0 ) ? true : false;
+		$exists = $db->loadResult() > 0 ? true : false;
 
-		$data			= new stdClass();
-		$data->name		= empty( $this->name ) ? $key : $this->name ;
-		$data->params	= trim( $this->params );
 
-		if( $exists )
-		{
+		$data = new stdClass();
+		$data->name = empty($this->name) ? $key : $this->name ;
+		$data->params = trim($this->params);
+
+		if ($exists) {
 			return $db->updateObject( '#__easyblog_configs' , $data , 'name' );
 		}
 

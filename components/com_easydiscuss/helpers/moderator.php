@@ -19,12 +19,6 @@ class DiscussModeratorHelper
 	{
 		static $result	= array();
 
-		// Site admin is always a moderator.
-		if( DiscussHelper::isSiteAdmin() )
-		{
-			return true;
-		}
-
 		if( !$userId )
 		{
 			$userId 	= JFactory::getUser()->id;
@@ -33,6 +27,12 @@ class DiscussModeratorHelper
 		// If user id is 0, we know for sure they are not a moderator.
 		if (!$userId) {
 			return false;
+		}
+
+		// Site admin is always a moderator.
+		if(DiscussHelper::isSiteAdmin($userId))
+		{
+			return true;
 		}
 
 		// If category is not supplied, caller might just want to check if

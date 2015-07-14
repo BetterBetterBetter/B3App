@@ -11,8 +11,13 @@
  * See COPYRIGHT.php for copyright notices and details.
  */
 defined('_JEXEC') or die('Restricted access');
+// Get current logged in user id
+$my = JFactory::getUser();
+
+// Get current question post owner user id
+$questionOwner = $question->getOwner()->id;
 ?>
-<?php if( ( $reply->access->canMarkAnswered() && !$question->islock ) || DiscussHelper::isSiteAdmin() ) { ?>
+<?php if( ( $reply->access->canMarkAnswered() && !$question->islock && $my->id == $questionOwner) ||  DiscussHelper::isSiteAdmin() ) { ?>
 	<?php if( !$question->isresolve && $reply->access->canMarkAnswered() ) { ?>
 	<div class="discuss-accept-answer">
 		<span id="accept-button-<?php echo $reply->id;?>">

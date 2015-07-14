@@ -1,149 +1,178 @@
 <?php
 /**
-* @version		$Id: menuitem.php 14401 2010-01-26 14:10:00Z louis $
-* @package		Joomla.Framework
-* @subpackage	Parameter
-* @copyright	Copyright (C) 2005 - 2010 Open Source Matters. All rights reserved.
+* @package		EasyBlog
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
-* Joomla! is free software. This version may have been modified pursuant
+* EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
 * is derivative of works licensed under the GNU General Public License or
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
+defined('_JEXEC') or die('Unauthorized Access');
 
-// Check to ensure this file is within the rest of the framework
-defined('JPATH_BASE') or die();
+JFormHelper::loadFieldClass('groupedlist');
 
-/**
- * Renders a menu item element
- *
- * @package 	Joomla.Framework
- * @subpackage	Parameter
- * @since		1.5
- */
+jimport('joomla.html.html');
+jimport('joomla.form.formfield');
 
-class JElementEasyBlogMenuItem extends JElement
+class JFormFieldEasyBlogMenuItem extends JFormFieldGroupedList
 {
-	/**
-	* Element name
-	*
-	* @access	protected
-	* @var		string
-	*/
-	var	$_name = 'EasyBlogMenuItem';
+	protected $type = 'EasyBlogMenuItem';
 
-	function fetchElement($name, $value, &$node, $control_name)
+	protected function getGroups()
 	{
-		require_once( JPATH_ROOT . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'com_easyblog' . DIRECTORY_SEPARATOR . 'constants.php' );
-		require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
+		// Include engine
+		require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/includes/easyblog.php');
 
-		$db = EasyBlogHelper::db();
+		// Initialize variables.
+		$groups = array();
 
-		$menuType = $this->_parent->get('menu_type');
-		if (!empty($menuType)) {
-			$where = ' WHERE menutype = '.$db->Quote($menuType);
-		} else {
-			$where = ' WHERE 1';
-		}
+		// Initialize some field attributes.
+		$menuType = (string) $this->element['menu_type'];
+		$published = $this->element['published'] ? explode(',', (string) $this->element['published']) : array();
+		$disable = $this->element['disable'] ? explode(',', (string) $this->element['disable']) : array();
 
-		// load the list of menu types
-		// TODO: move query to model
-		$query = 'SELECT menutype, title' .
-				' FROM #__menu_types' .
-				' ORDER BY title';
-		$db->setQuery( $query );
-		$menuTypes = $db->loadObjectList();
+		// Get the menu items.
+		$items = $this->getMenuLinks($menuType, 0, 0, $published);
 
-		if ($state = $node->attributes('state')) {
-			$where .= ' AND published = '.(int) $state;
-		}
 
-		$where .= ' AND `link` LIKE ' . $db->Quote('%com_easyblog%');
 
-		// load the list of menu items
-		// TODO: move query to model
-		$query = 'SELECT id, parent, name, menutype, type, link' .
-				' FROM #__menu' .
-				$where .
-				' ORDER BY menutype, parent, ordering'
-				;
-
-		$db->setQuery($query);
-
-		$menuItems = $db->loadObjectList();
-
-		// establish the hierarchy of the menu
-		// TODO: use node model
-		$children = array();
-
-		if ($menuItems)
+		// Build group for a specific menu type.
+		if ($menuType)
 		{
-			// first pass - collect children
-			foreach ($menuItems as $v)
+			// Initialize the group.
+			$groups[$menuType] = array();
+
+			// Build the options array.
+			foreach ($items as $link)
 			{
-				$pt 	= $v->parent;
-				$list 	= @$children[$pt] ? $children[$pt] : array();
-				array_push( $list, $v );
-				$children[$pt] = $list;
+				$groups[$menuType][] = JHtml::_('select.option', $link->value, $link->text, 'value', 'text', in_array($link->type, $disable));
 			}
 		}
-
-		// second pass - get an indent list of the items
-		$list = JHTML::_('menu.treerecurse', 0, '', array(), $children, 9999, 0, 0 );
-
-		// assemble into menutype groups
-		$n = count( $list );
-		$groupedList = array();
-		foreach ($list as $k => $v) {
-			$groupedList[$v->menutype][] = &$list[$k];
-		}
-
-		// assemble menu items to the array
-		$options 	= array();
-		$options[]	= JHTML::_('select.option', '', '- '.JText::_('Select Item').' -');
-
-		foreach ($menuTypes as $type)
+		// Build groups for all menu types.
+		else
 		{
-			if( ! isset($groupedList[$type->menutype]) )
-				continue;
-
-			if ($menuType == '')
+			// Build the groups arrays.
+			foreach ($items as $menu)
 			{
-				$options[]	= JHTML::_('select.option',  '0', '&nbsp;', 'value', 'text', true);
-				$options[]	= JHTML::_('select.option',  $type->menutype, $type->title . ' - ' . JText::_( 'Top' ), 'value', 'text', true );
-			}
+				// Initialize the group.
+				$groups[$menu->menutype] = array();
 
-			if (isset( $groupedList[$type->menutype] ))
-			{
-				$n = count( $groupedList[$type->menutype] );
-				for ($i = 0; $i < $n; $i++)
+				// Build the options array.
+				foreach ($menu->links as $link)
 				{
-					$item = &$groupedList[$type->menutype][$i];
-					
-					//If menutype is changed but item is not saved yet, use the new type in the list
-					if ( JRequest::getString('option', '', 'get') == 'com_menus' ) {
-						$currentItemArray = JRequest::getVar('cid', array(0), '', 'array');
-						$currentItemId = (int) $currentItemArray[0];
-						$currentItemType = JRequest::getString('type', $item->type, 'get');
-						if ( $currentItemId == $item->id && $currentItemType != $item->type) {
-							$item->type = $currentItemType;
-						}
-					}
-					
-					$disable = strpos($node->attributes('disable'), $item->type) !== false ? true : false;
-
-					if(! $disable )
-					{
-						$disable    = strpos($item->link, 'com_easyblog') !== false ? false : true;
-					}
-
-					$options[] = JHTML::_('select.option',  $item->id, '&nbsp;&nbsp;&nbsp;' .$item->treename, 'value', 'text', $disable );
-
+					$groups[$menu->menutype][] = JHtml::_(
+						'select.option', $link->value, $link->text, 'value', 'text',
+						in_array($link->type, $disable)
+					);
 				}
 			}
 		}
 
-		return JHTML::_('select.genericlist',  $options, ''.$control_name.'['.$name.']', 'class="inputbox"', 'value', 'text', $value, $control_name.$name);
+		// Merge any additional groups in the XML definition.
+		$groups = array_merge(parent::getGroups(), $groups);
+
+		return $groups;
+
+	}
+
+	protected function getMenuLinks($menuType = null, $parentId = 0, $mode = 0, $published=array() )
+	{
+		$db = EasyBlogHelper::db();
+		$query = $db->getQuery(true);
+
+		$query->select('a.id AS value, a.title AS text, a.level, a.menutype, a.type, a.template_style_id, a.checked_out');
+		$query->from('#__menu AS a');
+		$query->join('LEFT', $db->nameQuote('#__menu').' AS b ON a.lft > b.lft AND a.rgt < b.rgt');
+
+		// Filter by the type
+		if ($menuType) {
+			$query->where('(a.menutype = '.$db->quote($menuType).' OR a.parent_id = 0)');
+		}
+
+		if ($parentId) {
+			if ($mode == 2) {
+				// Prevent the parent and children from showing.
+				$query->join('LEFT', '#__menu AS p ON p.id = '.(int) $parentId);
+				$query->where('(a.lft <= p.lft OR a.rgt >= p.rgt)');
+			}
+		}
+
+		if (!empty($published)) {
+			if (is_array($published)) $published = '(' . implode(',', $published) .')';
+			$query->where('a.published IN ' . $published);
+		}
+
+		$query->where('a.published != -2');
+
+		$query->where('a.link LIKE ' . $db->Quote('%com_easyblog%') );
+
+		$query->group('a.id, a.title, a.level, a.menutype, a.type, a.template_style_id, a.checked_out, a.lft');
+		$query->order('a.lft ASC');
+
+		// Get the options.
+		$db->setQuery($query);
+
+		$links = $db->loadObjectList();
+
+		// Check for a database error.
+		if ($error = $db->getErrorMsg()) {
+			JError::raiseWarning(500, $error);
+			return false;
+		}
+
+		// Pad the option text with spaces using depth level as a multiplier.
+		foreach ($links as &$link) {
+			$link->text = str_repeat('- ', $link->level).$link->text;
+		}
+
+		if (empty($menuType)) {
+			// If the menutype is empty, group the items by menutype.
+			$query->clear();
+			$query->select('*');
+			$query->from('#__menu_types');
+			$query->where('menutype <> '.$db->quote(''));
+			$query->order('title, menutype');
+			$db->setQuery($query);
+
+			$menuTypes = $db->loadObjectList();
+
+			// Check for a database error.
+			if ($error = $db->getErrorMsg()) {
+				JError::raiseWarning(500, $error);
+				return false;
+			}
+
+			// Create a reverse lookup and aggregate the links.
+			$rlu = array();
+			foreach ($menuTypes as &$type) {
+				$rlu[$type->menutype] = &$type;
+				$type->links = array();
+			}
+
+			// Loop through the list of menu links.
+			foreach ($links as &$link) {
+				if (isset($rlu[$link->menutype])) {
+					$rlu[$link->menutype]->links[] = &$link;
+
+					// Cleanup garbage.
+					unset($link->menutype);
+				}
+			}
+
+			$easyBlogMenuTypes  = array();
+
+			foreach ($menuTypes as $mtype) {
+				if( count( $mtype->links ) > 0 )
+				{
+					$easyBlogMenuTypes[] = $mtype;
+				}
+			}
+
+			return $easyBlogMenuTypes;
+		} else {
+			return $links;
+		}
 	}
 }

@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,40 +9,21 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'table.php' );
+require_once(__DIR__ . '/table.php');
 
 class EasyBlogTableOauthPost extends EasyBlogTable
 {
-	var $id			= null;
-	var $oauth_id	= null;
-	var $post_id	= null;
-	var $created	= null;
-	var $modified	= null;
-	var $sent		= null;
+	public $id = null;
+	public $oauth_id = null;
+	public $post_id	= null;
+	public $created	= null;
+	public $modified = null;
+	public $sent = null;
 
-	/**
-	 * Constructor for this class.
-	 *
-	 * @return
-	 * @param object $db
-	 */
-	function __construct( $db )
+	public function __construct( $db )
 	{
 		parent::__construct( '#__easyblog_oauth_posts' , 'id' , $db );
-	}
-
-	function loadByOauthId( $blogId , $id )
-	{
-	    $db		= $this->getDBO();
-
-		$query	= 'SELECT * FROM ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( $this->_tbl ) . ' '
-				. 'WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'oauth_id' ) . '=' . $db->Quote( $id ) . ' '
-				. 'AND ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'post_id' ) . '=' . $db->Quote( $blogId );
-
-	    $db->setQuery( $query );
-		$result = $db->loadResult();
-		return $this->bind( $result );
 	}
 }

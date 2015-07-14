@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,143 +9,79 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'helper.php' );
-require_once( EBLOG_HELPERS . DIRECTORY_SEPARATOR . 'date.php' );
+require_once(JPATH_COMPONENT . '/views/views.php');
 
 class EasyBlogViewDashboard extends EasyBlogView
 {
-	function showToolbar( $current , $user )
-	{
-		$acl			= EasyBlogACLHelper::getRuleSet();
-		$config			= EasyBlogHelper::getConfig();
-
-		$joomlaVersion	= EasyBlogHelper::getJoomlaVersion();
-
-		$homeItemId		= EasyBlogRouter::getItemid( 'latest' );
-		$logoutURL		= base64_encode( EasyBlogRouter::_('index.php?option=com_easyblog&view=latest&Itemid=' . $homeItemId , false ) );
-
-		$model			= $this->getModel('Blogs');
-		$total			= $model->getTotalPending();
-
-		$isTeamAdmin		= EasyBlogHelper::isTeamAdmin();
-		$totalTeamRequest	= 0;
-
-		if($isTeamAdmin)
-		{
-			$teamModel = $this->getModel('TeamBlogs');
-			$totalTeamRequest	= $teamModel->getTotalRequest();
-		}
-
-		// @task: Get total draft entries
-		$draftsModel	= $this->getModel( 'Drafts' );
-		$totalDrafts	= $draftsModel->getTotal();
-
-		//get the logout link
-		$logoutActionLink = '';
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			$logoutActionLink = 'index.php?option=com_users&task=user.logout';
-		}
-		else
-		{
-			$logoutActionLink = 'index.php?option=com_user&task=logout';
-		}
-
-		// @task: Determine if the current user is a blogger or not.
-		$isBlogger	= EasyBlogHelper::isSiteAdmin() || $acl->rules->add_entry;
-
-		$tpl	= new CodeThemes('dashboard');
-
-		$tpl->set( 'isBlogger' 			, $isBlogger );
-		$tpl->set( 'totalPending'		, $total );
-		$tpl->set( 'user'				, $user );
-		$tpl->set( 'current' 			, $current );
-		$tpl->set( 'acl' 				, $acl );
-		$tpl->set( 'config' 			, $config );
-		$tpl->set( 'logoutURL' 			, $logoutURL );
-		$tpl->set( 'logoutActionLink'   , $logoutActionLink );
-		$tpl->set( 'isTeamAdmin' 		, $isTeamAdmin );
-		$tpl->set( 'totalTeamRequest'	, $totalTeamRequest );
-		$tpl->set( 'totalDrafts'		, $totalDrafts );
-		return $tpl->fetch( 'dashboard.toolbar.php' );
-	}
-
 	/**
-	 * Main access to the dashboard here.
+	 * Default display for dashboard
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	function display( $tmpl = null )
+	public function display($tmpl = null)
 	{
-		$mainframe	= JFactory::getApplication();
-		$document	= JFactory::getDocument();
-		$my			= JFactory::getUser();
-		$config		= EasyBlogHelper::getConfig();
+		// Ensure that the user is logged in
+		EB::requireLogin();
 
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
+		// Set views breadcrumbs
+		$this->setViewBreadcrumb($this->getName());
+
+		$user = EB::user($this->my->id);
+
+		// Get the page title for this page.
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_PAGE_TITLE'));
+		$this->setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Retrieve a list of blog posts ordered by the popularity
+		$blogModel = EB::model('Blog');
+		$posts = $blogModel->getBlogsBy('blogger', $this->my->id, 'popular', 5);
+		$posts = EB::formatter('list', $posts);
+
+		// Get the most recent blog post by the current user.
+		$latest = $blogModel->getLatestPostByAuthor($this->my->id);
+
+		// Retrieve a list of categories created by the user
+		$categoriesModel = EB::model('Categories');
+		$categories = $categoriesModel->getCategoriesByBlogger($this->my->id);
+
+		// Get total pending entries
+		$pending = 0;
+
+		// Retrieve the total number of pending posts
+		if ($this->acl->get('manage_pending')) {
+
+	        // Get total pending blog posts
+	        $model = EB::model('Blogs');
+	        $pending = $model->getTotalPending();
 		}
 
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->setUser($my);
+		// Get most commented post from this author
+		$mostCommentedPosts = $blogModel->getMostCommentedPostByAuthor($this->my->id, 5);
 
-		//setting pathway
-		$pathway	= $mainframe->getPathway();
+		// Get a list of recent comments made on the author's post
+		$commentsModel = EB::model('Comments');
+		$recentComments = $commentsModel->getRecentCommentsOnAuthor($this->my->id, 5);
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-		{
-			$pathway->addItem( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB'), '' );
-		}
+		// Get a list of top commenters on the person's blog
+		$topCommenters = $commentsModel->getTopCommentersForAuthorsPost($this->my->id, 5);
 
-		$title					= EasyBlogHelper::getPageTitle( JText::_( 'COM_EASYBLOG_DASHBOARD_PAGE_TITLE' ) );
+		$this->set('topCommenters', $topCommenters);
+		$this->set('recentComments', $recentComments);
+		$this->set('mostCommentedPosts', $mostCommentedPosts);
+		$this->set('pending', $pending);
+		$this->set('latest', $latest);
+		$this->set('posts', $posts);
+		$this->set('categories', $categories);
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-
-		//getting the blog statistic from various model file.
-		$modelB				= $this->getModel( 'Blog' );
-		$modelC				= $this->getModel( 'Category' );
-		$modelT				= $this->getModel( 'Tags' );
-		$modelCmmt			= $this->getModel( 'Comment' );
-		$modelTB			= $this->getModel( 'Teamblogs' );
-		$tagsModel			= $this->getModel( 'Tags' );
-		$tags				= $tagsModel->getTags();
-
-		$categoriesModel	= $this->getModel( 'Categories' );
-		$categories			= EasyBlogHelper::populateCategories('', '', 'select', 'category_id', '' , true, true, true);
-
-		$blogStat	= new StdClass();
-		$blogStat->blog			= $modelB->getTotalBlogs( $my->id );
-		$blogStat->category		= $modelC->getTotalCategory( $my->id );
-		$blogStat->tag			= $modelT->getTotalTags( $my->id );
-		$blogStat->comment		= $modelCmmt->getTotalComment( $my->id );
-		$blogStat->subscriber	= $modelB->getTotalBlogSubscribers( $my->id );
-		$blogStat->team			= $modelTB->getTotalTeamJoined( $my->id );
-		$blogStat->totalHits 	= $modelB->getTotalHits( $my->id );
-
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		$data			= EasyBlogHelper::activityGet( $my->id, EBLOG_STREAM_NUM_ITEMS, '');
-
-		$activities			= $data[0];
-		$currentDateRange	= $data[1];
-		$nextStreamItem		= EasyBlogHelper::activityHasNextItems( $my->id, EBLOG_STREAM_NUM_ITEMS, $currentDateRange['startdate']);
-
-		$theme		= new CodeThemes('dashboard');
-		$theme->set( 'tags'			, $tags );
-		$theme->set( 'categories'	, $categories );
-		$theme->set( 'blogStat' 	, $blogStat );
-		$theme->set( 'activities' 	, $activities );
-		$theme->set( 'hasNextStream' 	, count( $nextStreamItem ) );
-		$theme->set( 'currentDate' 	, $currentDateRange );
-
-		echo $theme->fetch( 'dashboard.php' );
+		parent::display('dashboard/main/default');
 	}
 
-	function bindTags( $arrayData )
+	public function bindTags($arrayData)
 	{
 		$result	= array();
 
@@ -161,7 +97,7 @@ class EasyBlogViewDashboard extends EasyBlogView
 		return $result;
 	}
 
-	function bindContribute( $contribution = '' )
+	public function bindContribute($contribution = '')
 	{
 		if( $contribution )
 		{
@@ -174,1452 +110,777 @@ class EasyBlogViewDashboard extends EasyBlogView
 		return false;
 	}
 
-	/*
-	 * @since 1.0
-	 * Responsible to display the write entry form.
+	/**
+	 * Deprecated since 5.0. Use @composer instead.
 	 *
-	 * @param	null
-	 * @return	null
+	 * @deprecated	5.0
 	 */
-	function write()
+	public function write()
 	{
-		$document		= JFactory::getDocument();
-		$config 		= EasyBlogHelper::getConfig();
-		$mainframe		= JFactory::getApplication();
-		$acl			= EasyBlogACLHelper::getRuleSet();
-		$siteAdmin		= EasyBlogHelper::isSiteAdmin();
-		$my 			= JFactory::getUser();
-
-		// set the editor title based on operation
-		$editorTitle 		= '';
-
-		// just to inform the view that this is edit operation
-		$showDraftStatus	= true;
-		$isEdit				= false;
-
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
-		}
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB'), EasyBlogRouter::_( 'index.php?option=com_easyblog&view=dashboard' ) );
-		}
-
-		$this->setPathway( JText::_( 'COM_EASYBLOG_DASHBOARD_WRITE_BREADCRUMB' ) );
-
-		if( !$acl->rules->add_entry )
-		{
-			$mainframe->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=dashboard' , false ) , JText::_('COM_EASYBLOG_NO_PERMISSION_TO_CREATE_BLOG') );
-			$mainframe->close();
-		}
-
-		// enable datetime picker
-		EasyBlogDateHelper::enableDateTimePicker();
-
-		// Add the Calendar includes to the document <head> section
-		JHTML::_('behavior.calendar');
-
-		// Add modal behavior
-		JHTML::_( 'behavior.modal' );
-
-		// Load the JEditor object
-		if( $config->get( 'layout_editor_author' ) )
-		{
-			// Get user's parameters
-			$userParams 	= EasyBlogHelper::getRegistry( $my->params );
-
-			$editorType 	= $userParams->get( 'editor' , $config->get( 'layout_editor' ) );
-
-			$editor 		= JFactory::getEditor( $editorType );
-		}
-		else
-		{
-			$editor 	= JFactory::getEditor( $config->get('layout_editor' ) );
-		}
-
-
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->setUser($my);
-
-		$model				= $this->getModel( 'Blog' );
-		$categoriesModel	= $this->getModel( 'Categories' );
-		$publishedOnly		= true;
-		$categoryItems		= $categoriesModel->getParentCategories( '' , 'all' , $publishedOnly, true );
-		$categories			= array();
-
-		if( $categoryItems )
-		{
-			foreach( $categoryItems as $categoryItem )
-			{
-				$category	= EasyBlogHelper::getTable( 'Category' );
-				$category->bind( $categoryItem );
-
-				$categories[]	= $category;
-			}
-		}
-
-		$trackbacksModel	= $this->getModel( 'TrackbackSent' );
-		$blogContributed	= '';
-		$trackbacks			= '';
-		$external			= '';
-		$extGroupId			= '';
-
-		// @task: See if there's any uid in the query string.
-		// @since 3.5
-		$source				= JRequest::getVar( 'source' );
-		$uid				= JRequest::getInt( 'uid' );
-
-		// get blogid if exists
-		$blogId			= JRequest::getVar( 'blogid' , '' );
-
-		// Test if draft id exists
-		$draftId		= JRequest::getVar( 'draft_id' , '' );
-
-		// test if this is a under approval post or not.
-		$underApproval	= JRequest::getVar( 'approval' , '');
-
-		// Load blog table
-		$blog		= EasyBlogHelper::getTable( 'Blog' , 'Table' );
-		$blog->load( $blogId );
-
-		// Test if this blog belongs to the team and the current browser is the team admin.
-		$teamblogModel		= $this->getModel( 'TeamBlogs' );
-		$teamContribution	= $teamblogModel->getBlogContributed( $blog->id );
-
-		// Check if the person has access to create a new blog post
-		if( $blog->id && $blog->created_by != $my->id && !$siteAdmin && empty($acl->rules->moderate_entry) && !$teamContribution )
-		{
-			$url  = 'index.php?option=com_easyblog&view=dashboard';
-			$mainframe->redirect( EasyBlogRouter::_( $url , false ) , JText::_('COM_EASYBLOG_NO_PERMISSION_TO_CREATE_BLOG') );
-		}
-
-		// This will be the team blog checking
-		$isCurrentTeamAdmin	= false;
-		if( $teamContribution && !$siteAdmin && empty($acl->rules->moderate_entry) )
-		{
-			$isCurrentTeamAdmin	= $teamblogModel->checkIsTeamAdmin( $my->id , $teamContribution->team_id );
-
-			// Test if the user has access to this team posting.
-			if( !$isCurrentTeamAdmin && $blog->created_by != $my->id )
-			{
-				$url  = 'index.php?option=com_easyblog&view=dashboard';
-				$mainframe->redirect( EasyBlogRouter::_( $url , false ) , JText::_('COM_EASYBLOG_NO_PERMISSION_TO_CREATE_BLOG') );
-			}
-		}
-
-		$tmpBlogData		= EasyBlogHelper::getSession('tmpBlogData');
-		$loadFromSession	= false;
-
-		$blogSource 		= '';
-
-		if(isset($tmpBlogData))
-		{
-			$loadFromSession	= true;
-			$blog->bind($tmpBlogData);
-
-			// reprocess the date offset here.
-			$tzoffset			= EasyBlogDateHelper::getOffSet();
-
-			if(!empty( $blog->created ))
-			{
-				$date 			= EasyBlogHelper::getDate( $blog->created,  $tzoffset);
-				$blog->created	= $date->toMySQL();
-			}
-
-			if( !empty( $blog->publish_up ) && $blog->publish_up != '0000-00-00 00:00:00')
-			{
-				$date 				= EasyBlogHelper::getDate( $blog->publish_up,  $tzoffset);
-				$blog->publish_up	= $date->toMySQL();
-			}
-
-			if( !empty( $blog->publish_down ) && $blog->publish_down != '0000-00-00 00:00:00')
-			{
-				$date 				= EasyBlogHelper::getDate( $blog->publish_down,  $tzoffset);
-				$blog->publish_down	= $date->toMySQL();
-			}
-
-
-			//bind the content from previous form
-			$blog->content  = $tmpBlogData[ 'write_content' ];
-
-			$blog->tags = array();
-			if( isset( $tmpBlogData[ 'tags' ] ) )
-			{
-				$blog->tags		= $this->bindTags( $tmpBlogData[ 'tags' ] );
-			}
-
-			// metas
-			$meta				= new stdClass();
-			$meta->id			= '';
-			$meta->keywords		= isset( $tmpBlogData['keywords'] ) ? $tmpBlogData['keywords'] : '';
-			$meta->description	= isset( $tmpBlogData['description'] ) ? $tmpBlogData['description'] : '';
-
-			if(isset($tmpBlogData['blog_contribute']))
-			{
-				$blogContributed	= $this->bindContribute( $tmpBlogData[ 'blog_contribute' ] );
-			}
-
-			$contributionSource	= isset( $tmpBlogData['blog_contribute_source'] ) ? $tmpBlogData['blog_contribute_source'] : '';
-
-			if( !empty( $contributionSource ) && $contributionSource != 'easyblog' && !$uid )
-			{
-				$external			= true;
-				$extGroupId			= $tmpBlogData[ 'blog_contribute' ];
-				$blogSource 		= 'group';
-			}
-
-			if( !empty( $contributionSource ) && $contributionSource != 'easyblog' && $uid && $source == 'jomsocial.event')
-			{
-				$external			= true;
-				$uid				= $tmpBlogData[ 'blog_contribute' ];
-				$blogSource			= 'event';
-			}
-		}
-
-		// Check if this is an edited post and if it has draft.
-		$draft			= EasyBlogHelper::getTable( 'Draft' , 'Table' );
-		$isDraft		= false;
-
-		if( !empty( $draftId ) )
-		{
-			$draft->load( $draftId );
-			$blog->load( $draft->entry_id );
-			$blog->bind( $draft );
-
-			$blog->tags		= empty( $draft->tags ) ? array() : $this->bindTags( explode( ',' , $draft->tags ) );
-
-			// metas
-			$meta				= new stdClass();
-			$meta->id			= '';
-			$meta->keywords		= $draft->metakey;
-			$meta->description	= $draft->metadesc;
-
-			if( !empty( $draft->trackbacks ) )
-			{
-				$blog->unsaveTrackbacks	= $draft->trackbacks;
-			}
-
-			if( $draft->blog_contribute )
-			{
-				$blogContributed	= $this->bindContribute( $draft->blog_contribute );
-			}
-			$blog->tags 	= array();
-
-			if( !empty( $draft->tags ) )
-			{
-				$blog->tags		= $this->bindTags( explode( ',' , $draft->tags ) );
-			}
-
-			$blog->set( 'id' , $draft->entry_id );
-			$blogId		= $blog->id;
-			$isDraft	= true;
-		}
-		else
-		{
-			// We only want to load drafts that has a blog id.
-			if( $blog->id )
-			{
-				$draft->loadByEntry( $blog->id );
-			}
-
-		}
-
-		// set page title
-		if ( !empty( $blogId ) )
-		{
-			$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_EDIT_POST') );
-
-			// @task: Set the page title
-			parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-			$editorTitle 	= JText::_('COM_EASYBLOG_DASHBOARD_EDIT_POST');
-
-			// check if previous status is not Draft
-			if ( $blog->published == POST_ID_DRAFT ) {
-				$showDraftStatus	= true;
-			}
-
-			$isEdit = true;
-
-			//perform some title string formatting
-			$blog->title	= $this->escape($blog->title);
-		}
-		else
-		{
-			$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_WRITE_POST') );
-
-			// @task: Set the page title
-			parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-			$editorTitle	= JText::_('COM_EASYBLOG_DASHBOARD_WRITE_POST');
-
-			// set the default publishing status only if it is a brand new creation page.
-			if(!$loadFromSession && !$isDraft )
-			{
-				// by default, all new post MUST BE set to draft
-				$blog->published 	= $config->get('main_blogpublishing', '3');
-			}
-		}
-
-		//get all tags ever created.
-		$newTagsModel	= $this->getModel( 'Tags' );
-		$blog->newtags	= $newTagsModel->getTags();
-
-		//prepare initial blog settings.
-		$isPrivate		= $config->get('main_blogprivacy', '0');
-		$allowComment	= $config->get('main_comment', 1);
-		$allowSubscribe	= $config->get('main_subscription', 1);
-		$showFrontpage	= $config->get('main_newblogonfrontpage', 0);
-		$sendEmails		= $config->get('main_sendemailnotifications', 1);
-
-		$isSiteWide		= (isset($blog->issitewide)) ? $blog->issitewide : '1';
-
-		$teamblogModel	= $this->getModel( 'TeamBlogs' );
-		$teams			= ( !empty($blog->created_by) ) ? $teamblogModel->getTeamJoined($blog->created_by) : $teamblogModel->getTeamJoined($my->id);
-
-		if(! empty($blog->id))
-		{
-			$isPrivate		= $blog->private;
-			$allowComment	= $blog->allowcomment;
-			$allowSubscribe	= ($config->get('main_subscription'))? $blog->subscription : 0;
-			$showFrontpage	= $blog->frontpage;
-			$sendEmails		= $blog->send_notification_emails;
-
-
-			//get user teamblog
-			$teams				= $teamblogModel->getTeamJoined( $blog->created_by );
-
-			//@task: List all trackbacks
-			$trackbacks			= $trackbacksModel->getSentTrackbacks( $blogId );
-		}
-
-		if( $loadFromSession || $isDraft )
-		{
-			$isPrivate			= $blog->private;
-			$allowComment		= $blog->allowcomment;
-			$allowSubscribe		= $blog->subscription;
-			$showFrontpage		= $blog->frontpage;
-			$sendEmails			= $blog->send_notification_emails;
-
-		}
-
-		$author = null;
-		//if site admin then get get blog creator and include a javascript function to change author.
-		if($siteAdmin || !empty($acl->rules->moderate_entry) || ( isset( $teamContribution ) && $isCurrentTeamAdmin ) )
-		{
-			if(!empty($blog->created_by))
-			{
-				$creator	= JFactory::getUser($blog->created_by);
-				$author		= EasyBlogHelper::getTable( 'Profile', 'Table' );
-				$author->setUser( $creator );
-				unset($creator);
-			}
-		}
-
-		//check if can upload image or not.
-		$useImageManager = $config->get('main_media_manager', 1);
-
-		if( !isset( $meta ) )
-		{
-			$meta 				= new stdClass();
-			$meta->id 			= '';
-			$meta->keywords		= '';
-			$meta->description 	= '';
-		}
-
-		if( empty($blog->created_by) || $blog->created_by == $my->id || $siteAdmin || !empty($acl->rules->moderate_entry) || $teamContribution )
-		{
-			$blog->tags 	= isset( $blog->tags ) && !empty($blog->tags) ? $blog->tags : array();
-
-			if(!$loadFromSession && !$isDraft )
-			{
-				// get the tag only if it is not loaded from the session value
-				if( $blogId )
-				{
-					$tagsModel		= $this->getModel( 'PostTag' );
-					$blog->tags		= $tagsModel->getBlogTags( $blogId );
-
-					// get meta tags
-					$metaModel		= $this->getModel('Metas');
-					$meta			= $metaModel->getPostMeta($blogId);
-				}
-			}
-
-			$onlyPublished		= ( empty( $blogId ) ) ? true : false;
-			$isFrontendWrite	= true;
-			$nestedCategories	= '';
-
-			$defaultCategory		= JRequest::getInt( 'categoryId' );
-
-			$menu				= JFactory::getApplication()->getMenu()->getActive();
-
-			if( $menu && isset( $menu->params ) )
-			{
-				$param 	= EasyBlogHelper::getRegistry();
-				$param->load( $menu->params );
-
-				$catId	= $param->get( 'categoryId' );
-
-				if( $catId )
-				{
-					$defaultCategory	= $catId;
-				}
-			}
-
-			// @task: If blog is being edited, it should contain a category_id property.
-			$defaultCategory		= ( empty( $blog->category_id ) ) ? $defaultCategory : $blog->category_id;
-
-			if( $config->get( 'layout_dashboardcategoryselect') == 'select' )
-			{
-				$nestedCategories	= EasyBlogHelper::populateCategories( '' , '' , 'select' , 'category_id', $defaultCategory , true , $onlyPublished , $isFrontendWrite );
-			}
-
-			echo $this->showToolbar( __FUNCTION__ , $user );
-
-			$tpl		= new CodeThemes('dashboard');
-			$blogger_id = ( !isset($blog->created_by) ) ? $user->id   : $blog->created_by;
-
-
-			$content	= $blog->intro;
-
-			// Append the readmore if necessary
-			if( !empty($blog->intro) && !empty( $blog->content ) )
-			{
-				$content	.=  '<hr id="system-readmore" />';
-			}
-
-			$content	.= $blog->content;
-
-			$defaultCategoryName	= '';
-
-			if( empty( $defaultCategory ) )
-			{
-				//get default category if configured.
-				$defaultCategory	= EasyBlogHelper::getDefaultCategoryId();
-			}
-
-			if( !empty( $defaultCategory ) )
-			{
-				$categoryTbl		= EasyBlogHelper::getTable( 'Category' );
-				$categoryTbl->load( $defaultCategory );
-				$defaultCategoryName	= $categoryTbl->title;
-			}
-
-			if( $draft->id != 0 && $isDraft )
-			{
-				if( !empty( $draft->external_source ) )
-				{
-					$external   = true;
-					$extGroupId = $draft->external_group_id;
-				}
-			}
-			else if( !$loadFromSession )
-			{
-				// If writing is for an external source, we need to tell the editor to strip down some unwanted features
-				$external	= JRequest::getVar( 'external' , false );
-
-				//check if this is a external group contribution.
-				$extGroupId =  EasyBlogHelper::getHelper( 'Groups' )->getGroupContribution( $blog->id );
-
-				if( !empty($extGroupId) )
-				{
-					$external   = $extGroupId;
-					$blogSource 		= 'group';
-				}
-
-				if( !empty( $uid ) )
-				{
-					$external	= $uid;
-					$blogSource = 'event';
-				}
-
-				$externalEventId	= EasyBlogHelper::getHelper( 'Event' )->getContribution( $blog->id );
-
-				if( !empty( $externalEventId ) )
-				{
-					$external		= $externalEventId;
-					$blogSource 	= 'event';
-				}
-			}
-
-			// If there's a tag (maybe from the draft area, we need to add the tags data back)
-			if( $isDraft && !empty($blog->tags) )
-			{
-				$blog->newtags	= array_merge( $blog->newtags , $blog->tags );
-			}
-
-
-
-			// Add the breadcrumbs
-			$breadcrumbs 	= array( $editorTitle => '' );
-
-			$tpl->set( 'teamContribution'	, $teamContribution );
-			$tpl->set( 'isCurrentTeamAdmin'	, $isCurrentTeamAdmin );
-			$tpl->set( 'breadcrumbs'		, $breadcrumbs );
-			$tpl->set( 'external'			, $external );
-			$tpl->set( 'extGroupId'			, $extGroupId );
-			$tpl->set( 'defaultCategory'	, $defaultCategory );
-			$tpl->set( 'defaultCategoryName'	, $defaultCategoryName );
-			$tpl->set( 'content'			, $content );
-			$tpl->set( 'blogger_id'			, $blogger_id );
-			$tpl->set( 'draft'				, $draft );
-			$tpl->set( 'isDraft'			, $isDraft );
-			$tpl->set( 'isPending'			, $underApproval );
-			$tpl->set( 'isEdit'				, $isEdit );
-			$tpl->set( 'showDraftStatus'	, $showDraftStatus );
-			$tpl->set( 'editorTitle' 		, $editorTitle );
-			$tpl->set( 'meta' 				, $meta );
-			$tpl->set( 'editor' 			, $editor );
-			$tpl->set( 'trackbacks'			, $trackbacks );
-			$tpl->set( 'categories' 		, $categories );
-			$tpl->set( 'blog' 				, $blog );
-			$tpl->set( 'user'				, $user );
-			$tpl->set( 'isPrivate' 			, $isPrivate);
-			$tpl->set( 'allowComment' 		, $allowComment);
-			$tpl->set( 'subscription' 		, $allowSubscribe);
-			$tpl->set( 'trackbacks'			, $trackbacks );
-			$tpl->set( 'frontpage'			, $showFrontpage );
-			$tpl->set( 'author'				, $author );
-			$tpl->set( 'useImageManager'	, $useImageManager );
-			$tpl->set( 'nestedCategories'	, $nestedCategories );
-			$tpl->set( 'teams'				, $teams );
-			$tpl->set( 'isSiteWide'			, $isSiteWide );
-			$tpl->set( 'send_notification_emails'			, $sendEmails );
-
-
-
-			// @since: 3.5
-			// The unique external source and id.
-			$tpl->set( 'blogSource'			, $blogSource );
-			$tpl->set( 'source'				, $source );
-			$tpl->set( 'uid'				, $uid );
-
-			// @since: 3.6
-			// Media manager options
-			$tpl->set( 'session'			, JFactory::getSession() );
-
-			// Load media manager and get info about the files.
-			require_once( EBLOG_CLASSES . DIRECTORY_SEPARATOR . 'mediamanager.php' );
-
-			$mediamanager	= new EasyBlogMediaManager();
-			$userFolders	= $mediamanager->getInfo( EasyBlogMediaManager::getAbsolutePath('' , 'user') , 'folders' );
-			$userFiles		= $mediamanager->getInfo( EasyBlogMediaManager::getAbsolutePath('' , 'user') , 'files' );
-
-			$sharedFolders	= $mediamanager->getInfo( EasyBlogMediaManager::getAbsolutePath( '' , 'shared' ) , 'folders' );
-			$sharedFiles 	= $mediamanager->getInfo( EasyBlogMediaManager::getAbsolutePath( '' , 'shared' ) , 'files' );
-
-			$tpl->set( 'userFolders' , $userFolders );
-			$tpl->set( 'userFiles'	 , $userFiles );
-			$tpl->set( 'sharedFolders' , $sharedFolders );
-			$tpl->set( 'sharedFiles'	, $sharedFiles );
-
-			// @rule: Test if the user is already associated with Flickr
-			$oauth		= EasyBlogHelper::getTable( 'Oauth' );
-			$associated	= $oauth->loadByUser( $my->id , EBLOG_OAUTH_FLICKR );
-			$tpl->set( 'flickrAssociated' , $associated );
-
-
-			echo $tpl->fetch( 'dashboard.write.php' );
-		}
-		else
-		{
-			$mainframe->redirect(EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard', false), JText::_('COM_EASYBLOG_NO_PERMISSION_TO_EDIT_BLOG'), 'error');
-		}
+		$this->entries();
 	}
 
 	/**
-	 * Function to show user profile
+	 * Retrieves the dropbox data for the current user
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	function profile()
+	private function getFlickrData()
 	{
-		$mainframe	= JFactory::getApplication();
-		$my			= JFactory::getUser();
-		$config		= EasyBlogHelper::getConfig();
+		// Test if the user is already associated with dropbox
+		$oauth  = EB::table('OAuth');
 
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
+		// Test if the user is associated with flickr
+		$state	= $oauth->loadByUser($this->my->id, EBLOG_OAUTH_FLICKR);
+
+		$data   = new stdClass();
+		$data->associated	= $state;
+		$data->callback  = 'flickr' . rand();
+		$data->redirect  = base64_encode(rtrim(JURI::root(), '/') . '/index.php?option=com_easyblog&view=media&layout=flickrLogin&tmpl=component&callback=' . $data->callback);
+
+		// Default login to the site
+		$data->login = rtrim(JURI::root(), '/') . '/index.php?option=com_easyblog&controller=oauth&task=request&type=' . EBLOG_OAUTH_FLICKR . '&tmpl=component&redirect=' . $data->redirect;
+
+
+		if ($this->app->isAdmin()) {
+			$data->login = rtrim(JURI::root(), '/') . '/administrator/index.php?option=com_easyblog&c=oauth&task=request&type=' . EBLOG_OAUTH_FLICKR . '&tmpl=component&redirect=' . $data->redirect . '&id=' . $this->my->id;
 		}
 
-		JHTML::_('behavior.formvalidation');
+		return $data;
+	}
 
-		$document	= JFactory::getDocument();
+	/**
+	 * Displays the edit profile screen
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function profile()
+	{
+		// Require user to be logged in
+		EB::requireLogin();
 
-		$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_SETTINGS_PAGE_TITLE') );
+		// Get the page title for this page.
+		$title 	= EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_SETTINGS_PAGE_TITLE'));
+		$this->setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
+		// Set views breadcrumbs
+		$this->setViewBreadcrumb($this->getName());
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_SETTINGS_BREADCRUMB'), '');
 
-		$pathway	= $mainframe->getPathway();
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-			$pathway->addItem(JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB'), EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard'));
+		// Get editor
+		$editor = JFactory::getEditor();
 
-		$pathway->addItem(JText::_('COM_EASYBLOG_DASHBOARD_SETTINGS_BREADCRUMB'), '');
+		// Load the user's profile
+		$profile = EB::user($this->my->id);
 
-		$profile	= EasyBlogHelper::getTable( 'Profile', 'Table' );
-		$profile->load($my->id);
+		// Get feedburner data
+		$feedburner	= EB::table('Feedburner');
+		$feedburner->load($this->my->id);
 
-		$editor 	= JFactory::getEditor( $config->get('layout_editor' ) );
+		// Get user's adsense code
+		$adsense	= EB::table('Adsense');
+		$adsense->load($this->my->id);
 
-		$avatarIntegration = $config->get( 'layout_avatarIntegration', 'default' );
+		// Get meta info for this blogger
+		$metasModel = EB::model('Metas');
+		$meta		= $metasModel->getMetaInfo(META_TYPE_BLOGGER, $this->my->id);
 
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
+		// Load twitter data for this user
+		$twitter = EB::table('Oauth');
+		$twitter->load(array('user_id' => $this->my->id, 'type' => EBLOG_OAUTH_TWITTER));
 
-		//default blogger permalink to username if not found.
-		if(empty($profile->permalink))
-		{
-			$profile->permalink = $my->username;
-		}
+		// Load linkedin data for this user
+		$linkedin = EB::table('Oauth');
+		$linkedin->load(array('user_id' => $this->my->id, 'type' => EBLOG_OAUTH_LINKEDIN));
 
-		$feedburner	= EasyBlogHelper::getTable( 'Feedburner' , 'Table' );
-		$feedburner->load( $my->id );
+		// Load facebook data for this user
+		$facebook = EB::table('Oauth');
+		$facebook->load(array('user_id' => $this->my->id, 'type' => EBLOG_OAUTH_FACEBOOK));
 
-		$adsense	= EasyBlogHelper::getTable( 'Adsense' , 'Table' );
-		$adsense->load( $my->id );
+		// Load users params
+		$params = $profile->getParam();
 
-		//get meta info for this blogger
-		$model		= $this->getModel( 'Metas' );
-		$meta		= $model->getMetaInfo(META_TYPE_BLOGGER, $my->id);
-
-		$twitter	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
-		$twitter->loadByUser( $my->id , EBLOG_OAUTH_TWITTER );
-
-		$linkedin	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
-		$linkedin->loadByUser( $my->id , EBLOG_OAUTH_LINKEDIN );
-
-		$facebook	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
-		$facebook->loadByUser( $my->id , EBLOG_OAUTH_FACEBOOK );
-
-		//multi blogger themes
-		$userparams		= EasyBlogHelper::getRegistry($profile->get('params'));
 		$multithemes	= new stdClass();
-		$multithemes->enable = $config->get('layout_enablebloggertheme', true);
+		$multithemes->enable = $this->config->get('layout_enablebloggertheme', true);
 
-		if( !is_array($config->get('layout_availablebloggertheme' ) ) )
-		{
-			$multithemes->availableThemes	= explode('|', $config->get('layout_availablebloggertheme' ) );
+		if( !is_array($this->config->get('layout_availablebloggertheme'))) {
+			$multithemes->availableThemes	= explode('|', $this->config->get('layout_availablebloggertheme' ) );
 		}
 
-		$multithemes->selectedTheme = $userparams->get('theme', 'global');
+		$multithemes->selectedTheme = $params->get('theme', 'global');
 
-		echo $this->showToolbar( __FUNCTION__ , $user );
+		$this->set('params', $params);
+		$this->set('editor', $editor);
+		$this->set('feedburner', $feedburner);
+		$this->set('adsense', $adsense);
+		$this->set('profile', $profile);
+		$this->set('meta', $meta);
+		$this->set('multithemes', $multithemes);
+		$this->set('facebook', $facebook);
+		$this->set('linkedin', $linkedin);
+		$this->set('twitter', $twitter);
 
-		// Add the breadcrumbs
-		$breadcrumbs	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_EDIT_PROFILE' ) => '' );
-
-		$editor			= JFactory::getEditor( $config->get('layout_editor' ) );
-
-		$tpl	= new CodeThemes('dashboard');
-		$tpl->set( 'editor'		, $editor );
-		$tpl->set( 'breadcrumbs'		, $breadcrumbs );
-		$tpl->set( 'google_profile_url' , $userparams->get( 'google_profile_url' ) );
-		$tpl->set( 'show_google_profile_url' , $userparams->get( 'show_google_profile_url' ) );
-		$tpl->set( 'facebook'	, $facebook );
-		$tpl->set( 'linkedin' 	, $linkedin );
-		$tpl->set( 'my'			, $my );
-		$tpl->set( 'feedburner'	, $feedburner );
-		$tpl->set( 'editor'		, $editor );
-		$tpl->set( 'twitter'	, $twitter );
-		$tpl->set( 'adsense'	, $adsense );
-		$tpl->set( 'profile'	, $profile );
-		$tpl->set( 'config'		, $config );
-		$tpl->set( 'avatarIntegration', $avatarIntegration );
-		$tpl->set( 'meta'		, $meta );
-		$tpl->set( 'multithemes', $multithemes );
-
-		echo $tpl->fetch( 'dashboard.profile.php' );
-
+		parent::display('dashboard/account/default');
 	}
 
-	/*
-	 * Responsible to display draft entries from the site.
+	/**
+	 * Displays a list of blog posts created on the site
 	 *
-	 * @params	null
-	 * @return	null
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
 	 */
-	function drafts()
+	public function entries()
 	{
-		$mainframe	= JFactory::getApplication();
-		$my			= JFactory::getUser();
-		$acl		= EasyBlogACLHelper::getRuleSet();
-		$config	= EasyBlogHelper::getConfig();
-		$document	= JFactory::getDocument();
+		// Only allow logged in users on this page
+		EB::requireLogin();
 
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
+		// Ensure that the user has access to this section
+		$this->checkAcl('add_entry');
+
+		//check if this is coming from write layout or not.
+		$isWrite = $this->getLayout() == 'write' ? 1 : 0;
+
+		// Get the page title
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_ENTRIES_PAGE_TITLE'));
+		$this->setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Set the breadcrumbs
+		$this->setViewBreadcrumb('dashboard');
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_ENTRIES_BREADCRUMB'), '');
+
+		// Determines if the user is filtering posts by states
+		$state = $this->input->get('filter', 'all', 'default');
+
+		if ($state != 'all') {
+			$state = (int) $state;
 		}
 
-		$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_DRAFTS_PAGE_TITLE') );
+		// Determines if the user is searching for post
+		$search = $this->input->get('post-search', '', 'string');
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
+		// Determines if the blog posts should be filtered by specific category
+		$categoryFilter = $this->input->get('category', 0, 'int');
 
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
+		// Get limit
+		$limit = $this->config->get('layout_pagination_dashboard_post_per_page');
 
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB') , EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard') );
+		// Retrieve the posts
+		$model = EB::model('Dashboard');
+		$result = $model->getEntries($this->my->id, array('category' => $categoryFilter, 'state' => $state, 'search' => $search, 'limit' => $limit));
 
-		$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_DRAFTS_BREADCRUMB') , '' );
+		// Get pagination
+		$pagination = $model->getPagination();
 
-		$model		= $this->getModel( 'Drafts' );
+		$pagination->setAdditionalUrlParam('view', 'dashboard');
+		$pagination->setAdditionalUrlParam('layout', 'entries');
 
-		$filter		= JRequest::getWord( 'filter' , 'all' , 'GET' );
-		$search		= JRequest::getVar( 'post-search' , false , 'POST' );
-		$data		= $model->getData( true , $my->id );
-		$pagination	= $model->getPagination();
+		if ($categoryFilter) {
+			$pagination->setAdditionalUrlParam('category', $categoryFilter);
+		}
 
-		$entries	= array();
-		for( $i = 0; $i < count( $data ); $i++ )
-		{
-			$entry		=& $data[ $i ];
+		if ($state) {
+			$pagination->setAdditionalUrlParam('filter', $state);
+		}
 
-			$draft		= EasyBlogHelper::getTable( 'Draft' , 'Table' );
-			$draft->bind( $entry );
+		if ($search) {
+			$pagination->setAdditionalUrlParam('post-search', $search);
+		}
 
-			$category	= EasyBlogHelper::getTable( 'Category' , 'Table' );
-			$category->load( $entry->category_id );
+		// Format the posts
+		$posts = EB::formatter('list', $result);
 
-			$draft->category	= $category->title;
+		// Get oauth clients
+		$clients = array('twitter', 'facebook', 'linkedin');
+		$oauthClients = array();
 
-			if( empty( $draft->tags ) )
-			{
-				$draft->tags	= array();
+		foreach ($clients as $client) {
+			$oauth 	= EB::table('OAuth');
+			$exists = $oauth->load(array('user_id' => $this->my->id, 'type' => $client));
+
+			if ($exists && $this->acl->get("update_" . $client) && $this->config->get('integrations_' . $client . '_centralized_and_own')) {
+				$oauthClients[]	= $oauth;
 			}
-			else
-			{
-				$draft->tags	= explode( ',' , $draft->tags );
-
-				$draft->_tags = array();
-				foreach($draft->tags as $tag)
-				{
-					$_tag = new stdClass();
-					$_tag->title = $tag;
-					$draft->_tags[] = $_tag;
-				}
-			}
-
-			$draft->content			= $draft->intro . $draft->content;
-
-			$entries[]	= $draft;
-		}
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		// Add the breadcrumbs
-		$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_DRAFTS' ) => '' );
-
-
-		$tpl	= new CodeThemes('dashboard');
-		$tpl->set( 'breadcrumbs' 	, $breadcrumbs );
-		$tpl->set( 'filter'	, $filter );
-		$tpl->set( 'user'	, $user );
-		$tpl->set( 'entries' , $entries );
-		$tpl->set( 'pagination' , $pagination );
-		$tpl->set( 'search' , $search );
-
-		echo $tpl->fetch( 'dashboard.drafts.php' );
-	}
-
-	/*
-	 * Display list of blog entries created.
-	 *
-	 * @param	null
-	 * @return	null
-	 */
-	function entries()
-	{
-		$mainframe	= JFactory::getApplication();
-		$my			= JFactory::getUser();
-		$acl		= EasyBlogACLHelper::getRuleSet();
-		$config		= EasyBlogHelper::getConfig();
-		$document	= JFactory::getDocument();
-
-		// @rule: Test if the user is currently logged in.
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
 		}
 
-		$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_ENTRIES_PAGE_TITLE') );
+		// Get a list of categories on the site
+		$categoryModel = EB::model('Categories');
+		$rows = $categoryModel->getCategoriesUsedByBlogger($this->my->id);
+		$categories	= array();
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB') , EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard') );
-		}
-		$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_ENTRIES_BREADCRUMB') , '' );
-
-		$model		= $this->getModel( 'Blogs' );
-		$blogModel	= $this->getModel( 'Blog' );
-		$oauthModel	= $this->getModel( 'Oauth' );
-
-		$filter		= JRequest::getWord( 'filter' , 'all' , 'REQUEST' );
-		$search		= JRequest::getVar( 'post-search' , false);
-
-		// determine whether this user should retrive all blog posts from other bloggers as well or not.
-		$queryType	= 'blogger';
-		$queryID	= $my->id;
-
-		if( !empty( $acl->rules->moderate_entry ) )
-		{
-			$queryType	= '';
-			$queryID	= '';
-		}
-
-		// Detect the current post type.
-		$postType	= JRequest::getVar( 'postType' , 'posts' );
-
-		$entries	= $blogModel->getBlogsBy( $queryType , $queryID , 'latest' , 0 , $filter , $search, '', '', '', true , true , array() , array() , $postType );
-
-		$entries	= EasyBlogHelper::formatBlog( $entries );
-		$pagination	= $blogModel->getPagination();
-
-
-		// @rule: Retrieve total standard blog posts
-		$postCount			= $blogModel->getBlogPostsCount( $my->id );
-
-		// @rule: Retrieve total micro posts
-		$microPostCount 	= $blogModel->getMicroPostsCount( $my->id );
-
-		// Social sharing
-		$consumers	= array();
-		$users		= array( 'twitter' => $my->id , 'facebook' => $my->id , 'linkedin' => $my->id );
-
-		JTable::addIncludePath( EBLOG_TABLES );
-		foreach( $users as $type => $id )
-		{
-			$consumer	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
-			$consumer->loadByUser( $id , $type );
-
-			$consumers[]= $consumer;
-		}
-
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		$urlType	='';
-
-		if( !is_null( $postType ) )
-		{
-			$urlType	= '&postType=' . $postType;
-		}
-
-		$tpl		= new CodeThemes('dashboard');
-
-		// Add the breadcrumbs
-		$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_POSTS' ) => '' );
-
-		$tpl->set( 'breadcrumbs' 	, $breadcrumbs );
-		$tpl->set( 'postType'		, $postType );
-		$tpl->set( 'urlType' 		, $urlType );
-		$tpl->set( 'postCount'		, $postCount );
-		$tpl->set( 'microPostCount'	, $microPostCount );
-		$tpl->set( 'consumers'		, $consumers );
-		$tpl->set( 'filter'			, $filter );
-		$tpl->set( 'user'			, $user );
-		$tpl->set( 'entries' 		, $entries );
-		$tpl->set( 'pagination' 	, $pagination );
-		$tpl->set( 'search' 		, $search );
-		$tpl->set( 'config' 		, $config );
-
-		echo $tpl->fetch( 'dashboard.entries.php' );
-	}
-
-	/*
-	 * Display recent comments posted on the current logged in user's blog
-	 * entries.
-	 * @param	null
-	 * @return	null
-	 */
-	function comments()
-	{
-		$mainframe	= JFactory::getApplication();
-
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
-		}
-
-		$config		= EasyBlogHelper::getConfig();
-		$document	= JFactory::getDocument();
-
-
-		$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_COMMENTS_PAGE_TITLE') );
-
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-
-		$pathway	= $mainframe->getPathway();
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-		{
-			$pathway->addItem( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB'), EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard') );
-		}
-
-		$pathway->addItem( JText::_( 'COM_EASYBLOG_DASHBOARD_COMMENTS_BREADCRUMB' ), '' );
-
-		$my			= JFactory::getUser();
-		$acl		= EasyBlogACLHelper::getRuleSet();
-		$model		= $this->getModel( 'Comment' );
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
-
-		$search		= JRequest::getVar('post-search', '');
-		$filter		= JRequest::getWord( 'filter' , 'all' , 'REQUEST' );
-		$sort		= 'latest';
-
-		if( $acl->rules->manage_comment )
-		{
-			$comments	= $model->getComments(0, '' , $sort, '', $search, $filter);
-		}
-		else
-		{
-			$comments	= $model->getComments(0, $my->id, $sort, '', $search, $filter);
-		}
-
-		$pagination	= $model->getPagination();
-
-		JTable::addIncludePath( EBLOG_TABLES );
-		for($i = 0; $i < count( $comments ); $i++)
-		{
-			$row			=& $comments[$i];
-			$row->comment	= (JString::strlen($row->comment) > 150) ? JString::substr($row->comment, 0, 150) . '...' : $row->comment;
-			$row->comment	= EasyBlogCommentHelper::parseBBCode($row->comment);
-			$row->comment	= strip_tags( $row->comment , '<img>' );
-			$row->isOwner	= EasyBlogHelper::isMineBlog($my->id, $row->blog_owner);
-
-			$profile		= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$profile->load( $row->created_by );
-			$row->author	= $profile;
-		}
-
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		// Add the breadcrumbs
-		$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_COMMENTS' ) => '' );
-
-		$theme	= new CodeThemes('dashboard');
-		$theme->set( 'breadcrumbs'	, $breadcrumbs );
-		$theme->set( 'search'	, $search );
-		$theme->set( 'filter'	, $filter );
-		$theme->set( 'comments' , $comments );
-		$theme->set( 'pagination' , $pagination );
-
-		echo $theme->fetch( 'dashboard.comments.php' );
-	}
-
-	/*
-	 * Display all categories created by the user
-	 * @param	null
-	 * @return	null
-	 */
-	function categories()
-	{
-		$document	= JFactory::getDocument();
-		$config	= EasyBlogHelper::getConfig();
-
-		$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_CATEGORIES_PAGE_TITLE') );
-
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB') , EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard') );
-
-		$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_CATEGORIES_BREADCRUMB') , '' );
-
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
-		}
-
-		$my				= JFactory::getUser();
-		$user			= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
-
-		$order			= JRequest::getVar( 'order' , 'latest' );
-		$model			= $this->getModel( 'Categories' );
-		$rows			= $model->getCategoriesByBlogger( $my->id , $order );
-		$pagination		= $model->getPaginationByBlogger( $my->id );
-		$categories		= array();
-
-		$catRuleItems	= EasyBlogHelper::getTable( 'CategoryAclItem' , 'Table' );
-		$categoryRules	= $catRuleItems->getAllRuleItems();
-
-		$category		= EasyBlogHelper::getTable( 'Category' , 'Table' );
-		$assignedACL	= $category->getAssignedACL();
-
-		if( count( $rows ) > 0 )
-		{
-			JTable::addIncludePath( EBLOG_TABLES );
-			foreach( $rows as $row )
-			{
-				$category	= EasyBlogHelper::getTable( 'Category' , 'Table' );
+		if (count($rows) > 0) {
+			foreach ($rows as $row) {
+				$category	= EB::table('Category');
 				$category->bind( $row );
 
 				$categories[]	= $category;
 			}
 		}
 
-		$parentList = EasyBlogHelper::populateCategories('', '', 'select', 'parent_id', '0');
+		$revisionModel = EB::model('Revisions');
 
-		$editor 	= JFactory::getEditor( $config->get('layout_editor' ) );
+		// lets preload the revisions count.
+		if ($posts) {
+			$pIds = array();
 
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		// Add the breadcrumbs
-		$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_CATEGORIES' ) => '' );
-
-		$theme	= new CodeThemes('dashboard');
-		$theme->set( 'breadcrumbs'	, $breadcrumbs );
-		$theme->set( 'editor'		, $editor );
-		$theme->set( 'order'		, $order );
-		$theme->set( 'user'			, $user );
-		$theme->set( 'categories'	, $categories );
-		$theme->set( 'pagination'	, $pagination );
-		$theme->set( 'config'		, $config );
-		$theme->set( 'parentList'	, $parentList );
-		$theme->set( 'categoryRules', $categoryRules );
-		$theme->set( 'assignedACL'	, $assignedACL );
-
-
-		echo $theme->fetch( 'dashboard.categories.php' );
-	}
-
-	/*
-	 * Display category creation / edit page
-	 * @param	null
-	 * @return	null
-	 */
-	function category()
-	{
-		$document	= JFactory::getDocument();
-		$config	= EasyBlogHelper::getConfig();
-		$document->setTitle( JText::_('COM_EASYBLOG_DASHBOARD_CATEGORIES_PAGE_TITLE') . EasyBlogHelper::getPageTitle($config->get('main_title')) );
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB') , EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard') );
-
-		$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_CATEGORIES_BREADCRUMB') , '' );
-
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
-		}
-
-		$catId		= JRequest::getVar( 'id' , '' );
-		$category	= EasyBlogHelper::getTable( 'Category' , 'Table' );
-		$category->load( $catId );
-
-		$my			= JFactory::getUser();
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
-
-
-		$catRuleItems	= EasyBlogHelper::getTable( 'CategoryAclItem' , 'Table' );
-		$categoryRules	= $catRuleItems->getAllRuleItems();
-
-		$assignedACL	= $category->getAssignedACL();
-
-		$parentList		= EasyBlogHelper::populateCategories('', '', 'select', 'parent_id', $category->parent_id);
-		$editor			= JFactory::getEditor( $config->get('layout_editor' ) );
-
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		$theme	= new CodeThemes('dashboard');
-		$theme->set( 'editor'		, $editor );
-		$theme->set( 'user'			, $user );
-		$theme->set( 'config'		, $config );
-		$theme->set( 'parentList'	, $parentList );
-		$theme->set( 'categoryRules', $categoryRules );
-		$theme->set( 'assignedACL'	, $assignedACL );
-		$theme->set( 'category'		, $category );
-
-
-		echo $theme->fetch( 'dashboard.category.php' );
-	}
-
-
-	/*
-	 * Display a list of tags created by the user.
-	 *
-	 * @param	null
-	 * @return	null
-	 */
-	function tags()
-	{
-		$config	= EasyBlogHelper::getConfig();
-		$my			= JFactory::getUser();
-		$document	= JFactory::getDocument();
-
-		$title					= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_TAGS_PAGE_TITLE') );
-
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB'), EasyBlogRouter::_( 'index.php?option=com_easyblog&view=dashboard' ) );
-
-		$this->setPathway( JText::_( 'COM_EASYBLOG_DASHBOARD_TAGS_BREADCRUMB' ) );
-
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
-		}
-
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->setUser($my);
-
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		$model		= $this->getModel( 'Tags' );
-
-		$sort		= 'post';
-		$tags		= $model->getTagsByBlogger($my->id, false, $sort);
-
-		// we do no want pagination on this page.
-		$pagination	= null;
-
-		$config		= EasyBlogHelper::getConfig();
-
-
-		// Add the breadcrumbs
-		$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_TAGS' ) => '' );
-
-		$tpl	= new CodeThemes('dashboard');
-		$tpl->set( 'breadcrumbs'	, $breadcrumbs );
-		$tpl->set( 'user'	, $user );
-		$tpl->set( 'tags'	, $tags );
-		$tpl->set( 'pagination'	, $pagination );
-		$tpl->set( 'config' , $config );
-		$tpl->set( 'filter'		, 'all' );
-		echo $tpl->fetch( 'dashboard.tags.php' );
-	}
-
-	function review()
-	{
-		$this->pending(true);
-	}
-
-
-	/**
-	 * Responsible to output a list of pending blog posts.
-	 *
-	 */
-	function pending( $isReview = false )
-	{
-		$app	= JFactory::getApplication();
-		$my		= JFactory::getUser();
-		$acl	= EasyBlogACLHelper::getRuleSet();
-		$config	= EasyBlogHelper::getConfig();
-		$doc	= JFactory::getDocument();
-
-		if( !EasyBlogHelper::isLoggedIn() )
-		{
-			$uri		= JFactory::getURI();
-			$return		= $uri->toString();
-
-			$component	= ( EasyBlogHelper::getJoomlaVersion() >= '1.6' ) ? 'com_users' : 'com_user';
-
-			$url	= 'index.php?option='.$userComponent.'&view=login';
-			$url	.= '&return='.base64_encode($return);
-
-			$app->redirect( EasyBlogRouter::_( $url , false ) , JText::_('COM_EASYBLOG_YOU_MUST_LOGIN_FIRST') );
-		}
-
-		if( !$isReview )
-		{
-			if( empty($acl->rules->manage_pending) || empty($acl->rules->publish_entry))
-			{
-				EasyBlogHelper::setMessageQueue( JText::_( 'COM_EASYBLOG_NOT_ALLOWED' )  , 'error');
-				$app->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=dashboard' , false ) );
-				return;
+			foreach($posts as $post) {
+				$pIds[] = $post->id;
 			}
-		}
 
-		// @task: Set the page title.
-		self::setPageTitle( JText::_( 'COM_EASYBLOG_DASHBOARD_PENDING_PAGE_TITLE' ) , null , true );
-
-		// @task: Add breadcrumbs
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB'), EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard') );
-		}
-		$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_PENDING_BREADCRUMB'), '' );
-
-		// @task: Add the internal breadcrumbs for EasyBlog
-		$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_PENDING_YOUR_REVIEW' ) => '' );
-		if( $isReview )
-		{
-			$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_POST_UNDER_REVIEWS' ) => '' );
-		}
-
-		// @task: Render user object
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
-
-		$typeId		= ( $isReview ) ? $my->id : '';
-
-		// @task: Get the current search value
-		$search		= JRequest::getString( 'post-search' , false , 'POST' );
-
-		// @task: Retrieve the data
-		$model		= $this->getModel( 'Blog' );
-
-		$entries	= $model->getPending( $typeId , 'latest' , 0 , $search , false , '' , true );
-		$pagination	= $model->getPagination();
-		$entries	= EasyBlogHelper::formatDraftBlog( $entries );
-
-		for($i = 0; $i < count($entries); $i++)
-		{
-			$row				=& $entries[$i];
-			$row->isOwner		= EasyBlogHelper::isMineBlog($my->id, $row->created_by);
-
-			$profile			= EasyBlogHelper::getTable( 'Profile', 'Table' );
-			$profile->load( $row->created_by );
-
-			$row->author		= $profile;
-			$row->displayName	= $profile->getName();
-			$row->avatar		= $profile->getAvatar();
-		}
-
-		$oauthModel	= $this->getModel( 'Oauth' );
-		$data		= $oauthModel->getConsumers( $my->id );
-		$consumers	= array();
-
-		if( count( $data ) > 0 )
-		{
-			for( $i = 0; $i < count( $data ); $i++ )
-			{
-				$row		=& $data[ $i ];
-				$consumer	= EasyBlogHelper::getTable( 'Oauth' , 'Table' );
-				$consumer->bind( $row );
-
-				$consumers[]= $consumer;
-			}
-		}
-
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-
-		$tpl	= new CodeThemes('dashboard');
-		$tpl->set( 'breadcrumbs', $breadcrumbs );
-		$tpl->set( 'entries'	, $entries );
-		$tpl->set( 'pagination' , $pagination );
-		$tpl->set( 'search' 	, $search );
-		$tpl->set( 'consumers'	, $consumers );
-		$tpl->set( 'isReview'	, $isReview );
-
-		echo $tpl->fetch( 'dashboard.pending.php' );
-	}
-
-	function teamblogs()
-	{
-		$mainframe	= JFactory::getApplication();
-		$acl		= EasyBlogACLHelper::getRuleSet();
-		$config		= EasyBlogHelper::getConfig();
-		$document	= JFactory::getDocument();
-		$my			= JFactory::getUser();
-
-		$title	= EasyBlogHelper::getPageTitle( JText::_('COM_EASYBLOG_DASHBOARD_TEAMBLOG_PAGE_TITLE') );
-
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
-
-		if( ! EasyBlogRouter::isCurrentActiveMenu( 'dashboard' ) )
-		{
-			$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB'), EasyBlogRouter::_('index.php?option=com_easyblog&view=dashboard') );
+			$revisionModel->getRevisionCount($pIds, 'cache');
 		}
 
 
-		$this->setPathway( JText::_('COM_EASYBLOG_DASHBOARD_TEAMBLOG_BREADCRUMB'), '' );
+		foreach ($posts as $post) {
 
-		if(! EasyBlogHelper::isLoggedIn())
-		{
-			EasyBlogHelper::showLogin();
-			return;
+			// Get revisions
+			$versions = $revisionModel->getAllRevisions($post->id);
+			$post->versions = $versions;
 		}
 
-		if(! EasyBlogHelper::isTeamAdmin())
-		{
-			EasyBlogHelper::showAccessDenied();
-			return;
-		}
+		$this->set('pagination', $pagination);
+		$this->set('posts', $posts);
+		$this->set('search', $search);
 
-		// get all the team request that this user assigned as admin.
-		$tbRequest	= $this->getModel( 'TeamBlogs' );
+		$this->set('categoryFilter', $categoryFilter);
+		$this->set('categories', $categories);
+		$this->set('oauthClients', $oauthClients);
+		$this->set('state', $state);
+		$this->set('isWrite', $isWrite);
 
-		$myId		= (EasyBlogHelper::isSiteAdmin()) ? '' : $my->id;
-		$requests	= $tbRequest->getTeamBlogRequest( $myId );
-		$pagination	= $tbRequest->getPagination();
-
-		// Add the breadcrumbs
-		$breadcrumbs 	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_TEAM_REQUEST' ) => '' );
-
-		$user		= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
-		echo $this->showToolbar( __FUNCTION__ , $user );
-
-		$tpl	= new CodeThemes('dashboard');
-		$tpl->set( 'user'	, $user );
-		$tpl->set( 'requests' , $requests );
-		$tpl->set( 'pagination' , $pagination );
-		$tpl->set( 'breadcrumbs'	, $breadcrumbs );
-		echo $tpl->fetch( 'dashboard.teamblog.request.php' );
+		echo parent::display('dashboard/entries/default');
 	}
 
 	/**
-	 * Micro blogging layout
+	 * Displays a list of versions for the blog post
 	 *
-	 * @since	3.0.7706
+	 * @since	4.0
 	 * @access	public
-	 * @param	null
-	 * @return 	null
+	 * @param	string
+	 * @return
 	 */
-	public function microblog()
+	public function compare()
 	{
-		$mainframe	= JFactory::getApplication();
-		$config		= EasyBlogHelper::getConfig();
-		$acl		= EasyBlogACLHelper::getRuleSet();
+		// Only allow logged in users on this page
+		EB::requireLogin();
+		//Get Revisions table
+		$revisionModel = EB::model('Revisions');
+		// get blogid
+		$blogId			= JRequest::getVar( 'blogid' , '' );
 
-		if (!EasyBlogHelper::isLoggedIn()) {
+		//Load the version for the blog post
+		$versions		= $revisionModel->getAllBlogs($blogId);
 
-			if ($config->get( 'main_login_provider' ) == 'easysocial') {
+		$this->set('versions', $versions);
 
-				$easysocial 	= EasyBlogHelper::getHelper( 'EasySocial' );
+		echo parent::display('dashboard/version/default');
+	}
 
-				if ($easysocial->exists()) {
+	/**
+	 * Displays a comparison of two versions for the blog post
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function diff()
+	{
+		require(JPATH_ADMINISTRATOR . '/components/com_easyblog/includes/htmldiff/html_diff.php');
 
-					JFactory::getApplication()->redirect(FRoute::login(array(), false));
+		// Only allow logged in users on this page
+		EB::requireLogin();
 
-					return;
-				}
-				
+		//Get revision table
+		$Revision = EB::table('Revision');
+
+		// get blogid
+		$versionId			= JRequest::getVar( 'id' , '' );
+		$postId			= JRequest::getVar( 'post_id' , '' );
+
+		//Load the version for the blog post
+		$currentBlog		= $Revision->getCurrentBlog($postId);
+		$compareBlog		= $Revision->getCompareBlog($versionId);
+
+		$currentData	= json_decode($currentBlog->params);
+		$compareData	= json_decode($compareBlog->params);
+
+		$diff	=	html_diff($currentData->intro,$compareData->intro, true);
+
+		// Get category title
+		$category = EB::table('Category');
+		$category->load($currentData->category_id);
+		$dataArr = array();
+		$dataArr['catOld'] = $category->title;
+		$category->load($compareData->category_id);
+		$dataArr['catNew'] = $category->title;
+
+		$this->set('currentData', $currentData);
+		$this->set('compareData', $compareData);
+		$this->set('dataArr', $dataArr);
+		$this->set('diff', $diff);
+		$this->set('blogId', $postId);
+		$this->set('versionId', $versionId);
+
+		echo parent::display('dashboard/version/compare');
+	}
+
+	/**
+	 * Displays comments on the dashboard
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function comments()
+	{
+		// Ensure that the user is logged in
+		EB::requireLogin();
+
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_COMMENTS_PAGE_TITLE'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Set views breadcrumbs
+		$this->setViewBreadcrumb($this->getName());
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_COMMENTS_BREADCRUMB'), '');
+
+		// Load up comments model
+		$model = EB::model('Comment');
+
+		// Filters
+		$search = $this->input->get('post-search', '', 'string');
+		$filter = $this->input->get('filter', 'all', 'word');
+		$sort = 'latest';
+
+		// Get limit
+		$limit = $this->config->get('layout_pagination_dashboard_comment_per_page');
+
+		// If the user is allowed to manage comments, allow them to view all comments
+		if ($this->acl->get('manage_comment')) {
+			$result = $model->getComments(0, '', $sort, '', $search, $filter, $limit);
+		} else {
+
+			// Only retrieve comments made by them
+			$result = $model->getComments(0, $this->my->id, $sort, '', $search, $filter, $limit);
+		}
+
+		// Get pagination
+		$pagination	= $model->getPagination();
+		$comments = array();
+
+		if ($result) {
+
+			foreach ($result as $row) {
+
+				$comment = EB::table('Comment');
+				$comment->bind($row);
+
+				$comment->isOwner = $this->my->id == $row->blog_owner;
+
+				$comments[] = $comment;
 			}
-
-			EasyBlogHelper::showLogin();
-			return;
 		}
 
-		$my		= JFactory::getuser();
-		$user	= EasyBlogHelper::getTable( 'Profile' , 'Table' );
-		$user->load( $my->id );
+		$this->set('search', $search);
+		$this->set('filter', $filter);
+		$this->set('comments', $comments);
+		$this->set('pagination', $pagination);
 
-		// @rule: Test if microblogging is allowed
-		if( !$config->get( 'main_microblog' ) )
-		{
-			EasyBlogHelper::setMessageQueue( JText::_( 'COM_EASYBLOG_NOT_ALLOWED' )  , 'error');
-			JFactory::getApplication()->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=dashboard' , false ) );
+		parent::display('dashboard/comments/default');
+	}
+
+	/**
+	 * Displays categories
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function categories()
+	{
+		// Ensure that the user is logged in
+		EB::requireLogin();
+
+		// Check if the user is allowed to create categories
+		$this->checkAcl('create_category');
+
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_CATEGORIES_PAGE_TITLE'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Set views breadcrumbs
+		$this->setViewBreadcrumb($this->getName());
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_CATEGORIES_BREADCRUMB'), '');
+
+		// Get model
+		$model = EB::model('Categories');
+
+		// Get filters
+		$order = $this->input->get('order', '', 'cmd');
+		$search = $this->input->get('search', '', 'default');
+
+
+		// Get categories
+		$rows = $model->getCategoriesByBlogger($this->my->id, $order, $search);
+
+		$pagination = $model->getPaginationByBlogger($this->my->id, $search);
+
+		$categories = array();
+
+		$catRuleItems = EB::table('CategoryAclItem');
+		$categoryRules = $catRuleItems->getAllRuleItems();
+
+		$category = EB::table('Category');
+		$assignedACL = $category->getAssignedACL();
+
+		if (count($rows) > 0) {
+
+			foreach ($rows as $row) {
+				$category = EB::table('Category');
+				$category->bind( $row );
+
+				$categories[]	= $category;
+			}
 		}
 
-		// @rule: Test ACL if add entry is allowed
-		if( !$acl->rules->add_entry )
-		{
-			$mainframe->redirect( EasyBlogRouter::_( 'index.php?option=com_easyblog&view=dashboard' , false ) , JText::_('COM_EASYBLOG_NO_PERMISSION_TO_CREATE_BLOG') );
-			$mainframe->close();
+		// Get editor
+		$editor	= JFactory::getEditor();
+
+		$this->set('editor', $editor);
+		$this->set('order', $order);
+		$this->set('search', $search);
+		$this->set('categories', $categories);
+		$this->set('pagination', $pagination);
+		$this->set('categoryRules', $categoryRules);
+		$this->set('assignedACL', $assignedACL);
+
+		parent::display('dashboard/categories/default');
+	}
+
+	/**
+	 * Displays a list of tags on the dashboard
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function tags()
+	{
+		// Require user to be logged in
+		EB::requireLogin();
+
+		// Ensure that the user has access to the tags page
+		$this->checkAcl('create_tag');
+
+		// Set the page title
+		$title 	= EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_TAGS_PAGE_TITLE'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Set the breadcrumbs
+		$this->setViewBreadcrumb('dashboard');
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_TAGS_BREADCRUMB'));
+
+		// Load the tags
+		$model = EB::model('Tags');
+
+		// Get the current search behavior
+		$search = $this->input->get('search', '', 'default');
+
+		// Get the current sorting behavior
+		$sort = $this->input->get('sort', 'post', 'cmd');
+
+		// Render the tags
+		$tags = $model->getBloggerTags($this->my->id, $sort, $search);
+
+		$this->set('search', $search);
+		$this->set('sort', $sort);
+		$this->set('tags', $tags);
+
+		parent::display('dashboard/tags/default');
+	}
+
+	/**
+	 * Displays a list of team requests
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function requests()
+	{
+		// Require the user to be logged in.
+		EB::requireLogin();
+
+		// Ensure that the user really has access to this listing
+		if (!EB::isSiteAdmin() && !EB::isTeamAdmin()) {
+			$this->info->set('COM_EASYBLOG_NOT_ALLOWED', 'error');
+			return $this->app->redirect(EBR::_('index.php?option=com_easyblog&view=dashboard', false));
 		}
 
-		$document		= JFactory::getDocument();
+		// Set the page title
+		$title 	= EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_REQUESTS_PAGE_TITLE'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
 
-		$title			= EasyBlogHelper::getPageTitle( JText::_( 'COM_EASYBLOG_DASHBOARD_SHARE_A_STORY_TITLE' ) );
+		// Set the breadcrumbs
+		$this->setViewBreadcrumb('dashboard');
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB_REQUESTS'));
 
-		// @task: Set the page title
-		parent::setPageTitle( $title , false , $config->get( 'main_pagetitle_autoappend' ) );
+		$model = EB::model('TeamBlogs');
+		$userId = EB::isSiteAdmin() ? '' : $this->my->id;
 
-		// Add toolbar to the output
-		echo $this->showToolbar( __FUNCTION__ , $user );
+		$requests = $model->getRequests($userId);
+
+		foreach ($requests as &$request) {
+
+			$request->user = EB::user($request->user_id);
+
+			$request->team = EB::table('Teamblog');
+			$request->team->load($request->team_id);
+
+			$request->date = EB::date($request->created);
+		}
+
+		$this->set('requests', $requests);
+
+		parent::display('dashboard/requests/default');
+	}
+
+	/**
+	 * Displays a list of post revisions from user.
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function revisions()
+	{
+		// Require user to be logged in
+		EB::requireLogin();
+
+		// Set the page title
+		$title 	= EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_REVISIONS_PAGE_TITLE'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Set the breadcrumbs
+		$this->setViewBreadcrumb('dashboard');
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB_REVISIONS'));
+
+		// Get filters
+		$search = $this->input->get('post-search', '', 'string');
+		$state = $this->input->get('state', '', 'string');
+
+		$postId = $this->input->get('uid', 0, 'int');
+
+		$options = array();
+		$options['userId'] = $this->my->id;
+
+		if ($search) {
+			$options['search'] = $search;
+		}
+
+		if ($state != 'all') {
+			$options['state'] = (int) $state;
+		}
+
+		if ($postId) {
+			$options['postId'] = $postId;
+		}
+
+		// Get model
+		$model = EB::model('Revisions');
+		$rows  = $model->getRevisions($options);
+
+		// Get pagination
+		$pagination	= $model->getPagination();
+
+		// Format our result
+		$posts = array();
+		if ($rows) {
+			foreach ($rows as $row) {
+				$uid = $row->post_id . '.' . $row->id;
+				$post = EB::Post($uid);
+
+				$post->revisionOrdering = $row->ordering;
+
+				$posts[]	= $post;
+			}
+		}
+
+		$activePost = '';
+		if ($postId) {
+			$activePost = EB::post($postId);
+		}
+
+		$this->set('activePost', $activePost);
+		$this->set('posts', $posts);
+		$this->set('pagination', $pagination);
+		$this->set('search', $search);
+		$this->set('state', $state);
+
+		parent::display('dashboard/revisions/default');
+	}
+
+	/**
+	 * Displays a list of user's blog posts that are submitted for admin approval
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function pending()
+	{
+		// Require user to be logged in
+		EB::requireLogin();
+
+		// Set the page title
+		$title 	= EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB_POST_UNDER_REVIEWS'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Set the breadcrumbs
+		$this->setViewBreadcrumb('dashboard');
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB_POST_UNDER_REVIEWS'));
+
+		// Get filters
+		$search = $this->input->get('post-search', '', 'string');
+
+		// Get model
+		$model = EB::model('Blog');
+		$rows  = $model->getPending($this->my->id, 'latest', 0, $search, false, '', true);
+
+		// Get pagination
+		$pagination	= $model->getPagination();
+
+		// Format our result
+		$posts = array();
+
+		foreach ($rows as $row) {
+			$uid = $row->post_id . '.' . $row->id;
+			$post = EB::Post($uid);
+			$post->tags = $post->getTags();
+
+			$posts[]	= $post;
+		}
+
+		$this->set('posts', $posts);
+		$this->set('pagination', $pagination);
+		$this->set('search', $search);
+
+		parent::display('dashboard/pending/default');
+	}
+
+	/**
+	 * Displays a list of blog posts pending the admin's approval
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function moderate()
+	{
+		// Require user to be logged in
+		EB::requireLogin();
+
+		// User must have access to view pending blog posts
+		if (!$this->acl->get('manage_pending') && !$this->acl->get('publish_entry') && !EB::isSiteAdmin()) {
+			return JError::raiseError(500, JText::_('COM_EASYBLOG_NO_PERMISSION_TO_MODERATE_BLOG'));
+		}
+
+		// Set the page title
+		$title = EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_PENDING_PAGE_TITLE'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
+
+		// Set the breadcrumbs
+		$this->setViewBreadcrumb('dashboard');
+		$this->setPathway(JText::_('COM_EASYBLOG_DASHBOARD_BREADCRUMB_PENDING_YOUR_REVIEW'));
+
+		// Get filters
+		$search = $this->input->get('post-search', '', 'string');
+
+		$model = EB::model('Pending');
+		$rows = $model->getBlogs();
+
+		// Get pagination
+		$pagination	= $model->getPagination();
+
+		// Format our result
+		$posts = array();
+
+		foreach ($rows as $row) {
+			$uid = $row->post_id . '.' . $row->id;
+			$post = EB::Post($uid);
+			$post->tags = $post->getTags();
+
+			$posts[] = $post;
+		}
+
+		$this->set('posts', $posts);
+		$this->set('pagination', $pagination);
+		$this->set('search', $search);
+
+		parent::display('dashboard/moderate/default');
+	}
+
+	/**
+	 * Displays the quickpost layout
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function quickpost()
+	{
+		// Require user to be logged in
+		EB::requireLogin();
+
+		// Test if microblogging is allowed
+		if (!$this->config->get('main_microblog')) {
+			$this->info->set(JText::_('COM_EASYBLOG_NOT_ALLOWED'), 'error');
+
+			return $this->app->redirect(EB::_('index.php?option=com_easyblog&view=dashboard', false));
+		}
+
+		// Test ACL if add entry is allowed
+		if (!$this->acl->get('add_entry') ) {
+			return $this->app->redirect(EB::_('index.php?option=com_easyblog&view=dashboard', false));
+		}
+
+		// Set the page title
+		$title 	= EB::getPageTitle(JText::_('COM_EASYBLOG_DASHBOARD_SHARE_A_STORY_TITLE'));
+		parent::setPageTitle($title, false, $this->config->get('main_pagetitle_autoappend'));
 
 		// Get active tabs
-		$activeType		= JRequest::getVar( 'type' , 'text' );
+		$active = $this->input->get('type', 'standard', 'word');
 
-		// Add the breadcrumbs
-		$breadcrumbs	= array( JText::_( 'COM_EASYBLOG_DASHBOARD_BREADCRUMB_SHARE_STORY' ) => '' );
+		// Get a list of available auto post sites
+		$facebook = EB::oauth()->isUserAssociated('facebook', $this->my->id);
+		$twitter = EB::oauth()->isUserAssociated('twitter', $this->my->id);
+		$linkedin = EB::oauth()->isUserAssociated('linkedin', $this->my->id);
 
-		// @task: Retrieve existing categories
-		$categoryModel	= $this->getModel( 'Categories' );
-		$categories		= EasyBlogHelper::populateCategories( '' , '' , 'select' , 'category_id' , '' , true , true , true );
+		// Retrieve existing tags
+		$tagsModel = EB::model('Tags');
+		$tags = $tagsModel->getTags();
 
-		// @task: Retrieve existing tags
-		$tagsModel		= $this->getModel( 'Tags' );
-		$tags			= $tagsModel->getTags();
+		$this->set('facebook', $facebook);
+		$this->set('twitter', $twitter);
+		$this->set('linkedin', $linkedin);
 
-		$template		= new CodeThemes( 'dashboard' );
-		$template->set( 'activeType'	, $activeType );
-		$template->set( 'categories'	, $categories );
-		$template->set( 'breadcrumbs'	, $breadcrumbs );
-		$template->set( 'tags'			, $tags );
-		echo $template->fetch( 'dashboard.microblog.php' );
-	}
+		$this->set('active', $active);
+		$this->set('tags', $tags);
 
-	/*
-	 * List down bloggers from the site for the admin to change authors.
-	 *
-	 * @param	null
-	 * @return	null
-	 */
-	public function listCategories()
-	{
-		// Anyone with moderate_entry acl is also allowed to change author.
-		$acl		= EasyBlogACLHelper::getRuleSet();
-
-		$model		= $this->getModel( 'Categories' );
-		$rows		= $model->getCategoriesHierarchy();
-		$pagination	= $model->getPagination();
-
-		JFactory::getDocument()->addStyleSheet( rtrim( JURI::root() , '/') . '/components/com_easyblog/assets/css/reset.css' );
-
-		for($i = 0; $i < count($rows); $i++ )
-		{
-			$item   =& $rows[$i];
-
-			$category   = EasyBlogHelper::getTable('Category');
-			$category->load( $item->id );
-			$item->avatar	= $category->getAvatar();
-		}
-
-		$orderDir	= JRequest::getVar('filter_order_Dir', '', 'REQUEST');
-		switch($orderDir)
-		{
-			case 'asc':
-				$orderDir = 'desc';
-				break;
-			case 'desc':
-			default:
-				$orderDir = 'asc';
-		}
-
-		$order			= JRequest::getVar('filter_order', 'name', 'REQUEST');
-		$search			= JRequest::getVar('search', '', 'REQUEST');
-		$filter_state	= JRequest::getVar('filter_state', 'P', 'REQUEST');
-
-		$tpl = new CodeThemes('dashboard');
-		$tpl->set( 'categories' 	, $rows );
-		$tpl->set( 'pagination'		, $pagination );
-		$tpl->set( 'orderDir'		, $orderDir );
-		$tpl->set( 'order'			, $order );
-		$tpl->set( 'search'			, $search );
-		$tpl->set( 'filter_state'	, $filter_state );
-
-		echo $tpl->fetch( 'dashboard.list.categories.php' );
-		return;
+		parent::display('dashboard/quickpost/default');
 	}
 }

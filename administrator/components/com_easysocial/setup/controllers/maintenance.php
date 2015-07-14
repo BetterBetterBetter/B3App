@@ -107,7 +107,7 @@ class EasySocialControllerMaintenance extends EasySocialSetupController
 	 */
 	public function syncProfiles()
 	{
-		// Hardcoded to sync 10083883 users at a time.
+		// Hardcoded to sync 10091279 users at a time.
 		$limit 		= 100;
 
 		// Fetch first $limit items to be processed.

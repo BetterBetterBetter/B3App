@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,140 +9,112 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-require_once( dirname( dirname( __FILE__ ) ) . DIRECTORY_SEPARATOR . 'views.php' );
+require_once(JPATH_ADMINISTRATOR . '/components/com_easyblog/views.php');
 
-class EasyBlogViewEasyblog extends EasyBlogViewParent
+class EasyBlogViewEasyblog extends EasyBlogAdminView
 {
-	function display($tpl = null)
+	public function display($tpl = null)
 	{
-		//Load pane behavior
-		jimport('joomla.html.pane');
+		$this->setHeading('COM_EASYBLOG_DASHBOARD');
 
-		//initialise variables
-		$document	= JFactory::getDocument();
-		$user		= JFactory::getUser();
-		
-		$this->assignRef( 'user'		, $user );
+		// Get the model
+		$model = EB::model('Stats');
 
-		parent::display($tpl);
+		// Get the total number of posts
+		$totalPosts = $model->getTotalPosts();
+		$totalComments = $model->getTotalComments();
+		$totalCategories = $model->getTotalCategories();
+		$totalAuthors = $model->getTotalAuthors();
+		$totalTags = $model->getTotalTags();
+		$totalTeams = $model->getTotalTeams();
 
-	}
+		// Get comments history
+		$commentsHistory = $model->getCommentsHistory();
 
-	function addButton( $link, $image, $text, $description = '' , $newWindow = false , $acl = '' )
-	{
-		$db 	= EasyBlogHelper::db();
-		$count 	= 0;
+		// Format the tickets for comments
+		$commentsTicks = array();
+		$commentsCreated = array();
+		$i = 0;
 
-		if( !empty( $acl ) && EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			if(!JFactory::getUser()->authorise('easyblog.manage.' . $acl , 'com_easyblog') )
-			{
-				return '';
-			}
-		}
-		// Add some notification icons here.
-		if( $image == 'reports.png' )
-		{
-			// Get total reported items
-			$query	= 'SELECT COUNT(1) FROM #__easyblog_reports';
-			$db->setQuery( $query );
-			$count 	= $db->loadResult();
+		foreach ($commentsHistory->dates as $dateString) {
+
+			// Normalize the date string first
+			$dateString = str_ireplace('/', '-', $dateString);
+			$date = EB::date($dateString);
+
+			$commentsTicks[] = array($i, $date->format('jS M'));
+			$commentsCreated[] = array($i, $commentsHistory->count[$i]);
+			$i++;
 		}
 
-		if( $image == 'pending.png' )
-		{
-			// Get total reported items
-			$query	= 'SELECT COUNT(1) FROM #__easyblog_drafts';
-			$query 	.= ' WHERE ' . EasyBlogHelper::getHelper( 'SQL' )->nameQuote( 'pending_approval' ) . '=' . $db->Quote( 1 );
-			$db->setQuery( $query );
-			$count 	= $db->loadResult();
+		// Get posts history
+		$postsHistory = $model->getPostsHistory();
+
+		// Format the ticks for the posts
+		$postsTicks = array();
+		$postsCreated = array();
+		$i = 0;
+
+		foreach ($postsHistory->dates as $dateString) {
+			// Normalize the date string first
+			$dateString = str_ireplace('/', '-', $dateString);
+			$date = EB::date($dateString);
+
+			$postsTicks[] = array($i, $date->format('jS M'));
+			$postsCreated[]	= array($i, $postsHistory->count[$i]);
+			$i++;
 		}
 
-		$target	= "";
+		$postsCreated = json_encode($postsCreated);
+		$postsTicks = json_encode($postsTicks);
+		$commentsCreated = json_encode($commentsCreated);
+		$commentsTicks = json_encode($commentsTicks);
 
-		if( $newWindow )
-		{
-			$target	= ' target="_blank"';
-		}
-?>
-	<li>
-		<a href="<?php echo $link;?>"<?php if( $count > 0 ){ ?> class="has-notification"<?php }?><?php echo $target;?>>
-			<?php echo JHTML::_('image', 'administrator/components/com_easyblog/assets/images/'.$image, $text );?>
-			<span class="item-title">
-				<span><?php echo $text;?></span>
-				<?php if( $count > 0 ){ ?>
-				<b><?php echo $count; ?></b>
-				<?php } ?>
-			</span>
-		</a>
-		<div class="item-description">
-			<div class="tipsArrow"></div>
-			<div class="tipsBody"><?php echo $description;?></div>
-		</div>
-	</li>
-<?php
+		// Get the recent comments
+		$comments = $model->getRecentComments();
+
+		// Get the recent blog posts
+		$posts = $model->getRecentPosts();
+
+		// Get the pending posts
+		$pending = $model->getPendingPosts();
+
+		$this->set('comments', $comments);
+		$this->set('commentsTicks', $commentsTicks);
+		$this->set('commentsCreated', $commentsCreated);
+		$this->set('pending', $pending);
+		$this->set('posts', $posts);
+		$this->set('totalTeams', $totalTeams);
+		$this->set('totalTags', $totalTags);
+		$this->set('postsCreated', $postsCreated);
+		$this->set('postsTicks', $postsTicks);
+		$this->set('postsHistory', $postsHistory);
+		$this->set('totalAuthors', $totalAuthors);
+		$this->set('totalCategories', $totalCategories);
+		$this->set('totalComments', $totalComments);
+		$this->set('totalPosts', $totalPosts);
+
+		parent::display('easyblog/default');
 	}
 
-	function getTotalEntries()
-	{
-		$db		= EasyBlogHelper::db();
-
-		$query	= 'SELECT COUNT(1) FROM #__easyblog_post';
-		$db->setQuery( $query );
-		return $db->loadResult();
-	}
-
-	function getTotalComments()
-	{
-		$db		= EasyBlogHelper::db();
-
-		$query	= 'SELECT COUNT(1) FROM #__easyblog_comment';
-		$db->setQuery( $query );
-		return $db->loadResult();
-	}
-
-	function getTotalUnpublishedEntries()
-	{
-		$db		= EasyBlogHelper::db();
-
-		$query	= 'SELECT COUNT(1) FROM #__easyblog_post where `published`=' . $db->Quote( 0 );
-		$db->setQuery( $query );
-		return $db->loadResult();
-	}
-
-	function getTotalTags()
-	{
-		$db		= EasyBlogHelper::db();
-
-		$query	= 'SELECT COUNT(1) FROM #__easyblog_tag';
-		$db->setQuery( $query );
-		return $db->loadResult();
-	}
-
-	function getTotalCategories()
-	{
-		$db		= EasyBlogHelper::db();
-
-		$query	= 'SELECT COUNT(1) FROM #__easyblog_category';
-		$db->setQuery( $query );
-		return $db->loadResult();
-	}
-
-	function getRecentNews()
-	{
-		return EasyBlogHelper::getRecentNews();
-	}
-
-	function registerToolbar()
+	/**
+	 * Generates the toolbar buttons
+	 *
+	 * @since	5.0
+	 * @access	public
+	 * @param	string
+	 * @return	
+	 */
+	public function registerToolbar()
 	{
 		// Set the titlebar text
-		JToolBarHelper::title( JText::_( 'COM_EASYBLOG' ), 'home');
+		JToolBarHelper::title(JText::_('COM_EASYBLOG'), 'easyblog');
 
-		if( EasyBlogHelper::getJoomlaVersion() >= '1.6' )
-		{
-			JToolBarHelper::preferences('com_easyblog');
-		}
+		// Add toolbar buttons
+		JToolBarHelper::addNew('new', JText::_('COM_EASYBLOG_COMPOSE_NEW_POST'));
+		JToolBarHelper::custom('purgeCache', 'trash', '', JText::_('COM_EASYBLOG_PURGE_CACHE_BUTTON'), false);
+		JToolBarHelper::preferences('com_easyblog');
 	}
 }

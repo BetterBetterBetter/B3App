@@ -149,33 +149,23 @@ class EasyDiscussInstaller
 
 	private function checkConfig()
 	{
-		$query	= 'SELECT COUNT(*) FROM ' . $this->db->nameQuote( '#__discuss_configs' )
-				. ' WHERE ' . $this->db->nameQuote( 'name' ) . ' = ' . $this->db->quote( 'config' );
+		$query = 'SELECT COUNT(*) FROM ' . $this->db->nameQuote('#__discuss_configs')
+				. ' WHERE ' . $this->db->nameQuote('name') . ' = ' . $this->db->quote('config');
 
-		$this->db->setQuery( $query );
+		$this->db->setQuery($query);
 
-		if( !$this->db->loadResult() )
-		{
-			$file		= JPATH_ADMINISTRATOR . '/components/com_easydiscuss/configuration.ini';
-			$registry	= JRegistry::getInstance( 'easydiscuss' );
+		if (!$this->db->loadResult()) {
 
-			if( $this->getJoomlaVersion() >= '1.6' )
+			$config = JPATH_ADMINISTRATOR . '/components/com_easydiscuss/configuration.ini';
+			$contents = JFile::read($config);
+
+			$obj = new stdClass();
+			$obj->name = 'config';
+			$obj->params = $contents;
+
+			if (!$this->db->insertObject('#__discuss_configs', $obj))
 			{
-				$raw		= JFile::read($file);
-				$registry->loadString( $raw );
-			}
-			else
-			{
-				$registry->loadFile( $file , 'INI' , 'easydiscuss' );
-			}
-
-			$obj			= new stdClass();
-			$obj->name		= 'config';
-			$obj->params	= $registry->toString( 'INI' , 'easydiscuss' );
-
-			if( !$this->db->insertObject( '#__discuss_configs', $obj ) )
-			{
-				$this->setMessage( 'Warning : The system encounter an error when it tries to create default config. Please kindly proceed to the configuration and save manually.', 'warning' );
+				$this->setMessage('Warning : The system encounter an error when it tries to create default config. Please kindly proceed to the configuration and save manually.', 'warning');
 			}
 		}
 	}
@@ -2058,6 +2048,34 @@ class EasyDiscussDatabaseUpdate
 			$this->db->query();
 
 			$query 	= 'ALTER TABLE ' . $this->db->nameQuote( '#__discuss_posts' ) . ' ADD INDEX `idx_post_search2a` (`published`, `private`)';
+			$this->db->setQuery( $query );
+			$this->db->query();
+		}
+
+		if( !$this->isIndexKeyExists('#__discuss_posts', 'idx_user_replies') )
+		{
+			$query 	= 'ALTER TABLE ' . $this->db->nameQuote( '#__discuss_posts' ) . ' ADD INDEX `idx_user_replies` (`user_id`, `published`, `parent_id`)';
+			$this->db->setQuery( $query );
+			$this->db->query();
+		}
+
+		if( !$this->isIndexKeyExists('#__discuss_posts', 'idx_post_cat_published') )
+		{
+			$query 	= 'ALTER TABLE ' . $this->db->nameQuote( '#__discuss_posts' ) . ' ADD INDEX `idx_post_cat_published` (`category_id`, `published`)';
+			$this->db->setQuery( $query );
+			$this->db->query();
+		}
+
+		if( !$this->isIndexKeyExists('#__discuss_mailq', 'idx_mailq_pending') )
+		{
+			$query 	= 'ALTER TABLE ' . $this->db->nameQuote( '#__discuss_mailq' ) . ' ADD INDEX `idx_mailq_pending` (`status`, `created`)';
+			$this->db->setQuery( $query );
+			$this->db->query();
+		}
+
+		if( !$this->isIndexKeyExists('#__discuss_category', 'idx_cat_childs') )
+		{
+			$query 	= 'ALTER TABLE ' . $this->db->nameQuote( '#__discuss_category' ) . ' ADD INDEX `idx_cat_childs` (`parent_id`, `published`, `lft`)';
 			$this->db->setQuery( $query );
 			$this->db->query();
 		}

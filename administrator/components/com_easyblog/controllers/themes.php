@@ -1,7 +1,7 @@
 <?php
 /**
 * @package		EasyBlog
-* @copyright	Copyright (C) 2010 Stack Ideas Private Limited. All rights reserved.
+* @copyright	Copyright (C) 2010 - 2014 Stack Ideas Sdn Bhd. All rights reserved.
 * @license		GNU/GPL, see LICENSE.php
 * EasyBlog is free software. This version may have been modified pursuant
 * to the GNU General Public License, and as distributed it includes or
@@ -9,183 +9,125 @@
 * other free or open source software licenses.
 * See COPYRIGHT.php for copyright notices and details.
 */
-defined('_JEXEC') or die('Restricted access');
+defined('_JEXEC') or die('Unauthorized Access');
 
-jimport('joomla.application.component.controller');
+require_once(JPATH_COMPONENT . '/controller.php');
 
 class EasyBlogControllerThemes extends EasyBlogController
 {
-	function __construct()
+	public function __construct()
 	{
 		parent::__construct();
 
 		$this->registerTask( 'apply' , 'save' );
 		$this->registerTask( 'addTheme' , 'addTheme' );
 		$this->registerTask( 'removeSetting' , 'removeSetting' );
-
-	}
-
-	public function removeSetting()
-	{
-		// Check for request forgeries
-		JRequest::checkToken() or jexit( 'Invalid Token' );
-		$config = EasyBlogHelper::getConfig();
-		$element	= JRequest::getVar( 'element' );
-
-		// Get the names to delete
-		$names	= JRequest::getVar( 'cid' , '' , 'POST' );
-
-		$message	= '';
-		$type		= 'message';
-
-		if( empty( $names ) )
-		{
-			$this->setRedirect( 'index.php?option=com_easyblog&view=theme&element=' . $element  , JText::_( 'COM_EASYBLOG_BLOGS_INVALID_ID' ) , 'error' );
-		}
-
-		$this->updateBlogImage( $element, $names );
-	}
-
-	private function deleteImages( $folders )
-	{
-		jimport( 'joomla.filesystem.folder' );
-		jimport( 'joomla.filesystem.file' );
-
-		$count = 0;
-
-		foreach( $folders as $folder )
-		{
-			if( !JFolder::exists( $folder ) )
-			{
-				continue;
-			}
-
-			$filter 	= EBLOG_BLOG_IMAGE_PREFIX . '*';
-			$images 	= JFolder::files( $folder , $filter , true , true );
-
-			foreach( $images as $image )
-			{
-				JFile::delete( $image );
-				$count++;
-			}
-		}
-
-		return $count;
 	}
 
 	/**
-	 * Allow admin to remove blog images
+	 * Installs a new theme on the site.
 	 *
 	 * @since	1.0
 	 * @access	public
 	 */
-	public function cleanImages()
+	public function upload()
 	{
-		$app 			= JFactory::getApplication();
-		$config 		= EasyBlogHelper::getConfig();
-		$element 		= JRequest::getVar( 'element' );
-		$mainFolder		= JPATH_ROOT . DIRECTORY_SEPARATOR . trim( $config->get( 'main_image_path' ) , '/\\');
-		$shareFolder	= JPATH_ROOT . DIRECTORY_SEPARATOR . trim( $config->get( 'main_shared_path' ) , '/\\');
+		// Check for request forgeries
+		EB::checkToken();
 
-		$mainFolders	= JFolder::folders( $mainFolder , '' , false , true , array());
+		// Get the file from the server.
+		$file 	= $this->input->files->get('package');
 
-		// Delete all blog images from main folders.
-		$count 	= $this->deleteImages( $mainFolders );
+		// Get themes model
+		$model	= EB::model('Themes');
+		$state 	= $model->install($file);
 
-		// Delete all blog images from shared folders.
-		$count 	= $count + $this->deleteImages( array($shareFolder) );
+		$link = 'index.php?option=com_easyblog&view=themes';
 
-
-		$msg 	= JText::sprintf( 'COM_EASYBLOG_THEME_SUCCESSFULLY_CLEANED' , $count );
-
-		if( $count == 0 )
-		{
-			$msg    = JText::_( 'COM_EASYBLOG_THEME_NO_BLOG_IMAGES_FOUND' );
+		if (!$state) {
+			EB::info()->set($model->getError(), 'error');
+			$link = 'index.php?option=com_easyblog&view=themes&layout=install';
+		} else {
+			EB::info()->set(JText::_('COM_EASYBLOG_THEME_INSTALLED_SUCCESS'), 'success');
 		}
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=theme&element=' . $element , $msg , 'message' );
+		$this->app->redirect($link);
+	}
+
+	/**
+	 * Allows caller to recompile the template
+	 *
+	 * @since	4.0
+	 * @access	public
+	 * @param	string
+	 * @return
+	 */
+	public function recompile()
+	{
+		// Check for request forgeries
+		EB::checkToken();
+
+		// Get the theme to recompile
+		$theme = $this->input->get('cid', '', 'array');
+		$theme = isset($theme[0]) ? $theme[0] : '';
+
+
+		// Recompile the theme
+        // @since 4.0
+        // Attach the theme's css
+        $stylesheet = EB::stylesheet('site', $theme);
+        $result = $stylesheet->build();
+
+        $this->info->set(JText::sprintf('COM_EASYBLOG_THEME_COMPILED_SUCCESS', $theme), 'success');
+
+        $this->app->redirect('index.php?option=com_easyblog&view=themes');
 	}
 
 	/**
 	 * Make the provided theme a default theme for EasyBlog
+	 *
+	 * @since	4.0
+	 * @access	public
 	 */
-	public function makeDefault()
+	public function setDefault()
 	{
-		JRequest::checkToken( 'request' ) or die( 'Invalid Token' );
+		// Check for request forgeries
+		EB::checkToken();
 
-		// @task: Check for acl rules.
-		$this->checkAccess( 'theme' );
+		// Check for acl rules.
+		$this->checkAccess('theme');
 
-		$msg    	= '';
+		$element = $this->input->get('cid', '', 'array');
+		$element = $element[0];
 
-		$theme 	= JRequest::getWord( 'element' );
+		if (!$element || !isset($element[0])) {
 
+			EB::info()->set(JText::_('COM_EASYBLOG_THEME_INVALID_THEME_PROVIDED'), 'error');
 
-		if( !empty($theme) )
-		{
-			$config	= EasyBlogHelper::getConfig();
-
-			$config->set( 'layout_theme' , $theme );
-
-			$table	= EasyBlogHelper::getTable( 'Configs' , 'Table' );
-			$table->load( 'config' );
-
-			$table->params	= $config->toString( 'INI' );
-			$table->store();
-
-			// Clear the component's cache
-			$cache = JFactory::getCache('com_easyblog');
-			$cache->clean();
-
-			$msg    = JText::sprintf( 'COM_EASYBLOG_THEME_SET_AS_DEFAULT' , $theme );
+			return $this->app->redirect('index.php?option=com_easyblog&view=themes');
 		}
 
+		// Legacy codes and should be removed soon
+		$this->config->set('layout_theme', $element);
 
-		$this->setRedirect( 'index.php?option=com_easyblog&view=themes' , $msg , 'message' );
+		// Get the configuration object
+		$this->config->set('theme_site', $element);
+
+		$table 	= EB::table('Configs');
+		$table->load('config');
+
+		$table->params 	= $this->config->toString('INI');
+		$table->store();
+
+		// Clear the component's cache
+		$cache = JFactory::getCache('com_easyblog');
+		$cache->clean();
+
+		EB::info()->set(JText::sprintf('COM_EASYBLOG_THEME_SET_AS_DEFAULT', $element), 'success');
+
+		$this->app->redirect('index.php?option=com_easyblog&view=themes');
 	}
 
-
-
-	public function save()
-	{
-		JRequest::checkToken() or die( 'Invalid Token' );
-
-		// @task: Check for acl rules.
-		$this->checkAccess( 'theme' );
-
-		$element 	= JRequest::getVar( 'element' );
-		$params 	= JRequest::getVar( 'params' );
-		$obj 		= EasyBlogHelper::getRegistry( '' );
-
-		foreach( $params as $key => $value )
-		{
-			$obj->set( $key , $value );
-		}
-
-		if( EasyBlogHelper::getJoomlaVersion() >= '3.0' )
-		{
-			// Update creation source.
-			$creation 	= JRequest::getVar( 'creation_source' );
-			$obj->set( 'creation_source' , $creation );
-
-			// Update tags colour scheme.
-			$tagColour 	= JRequest::getVar( 'tags_color_scheme' );
-			$obj->set( 'tags_color_scheme' , $tagColour );
-		}
-
-		$this->updateBlogImage( $element );
-
-		// Store this value in the configs table.
-		$table 	= EasyBlogHelper::getTable( 'Configs' );
-		$table->load( $element );
-		$table->set( 'name'		, $element );
-		$table->set( 'params'	, $obj->toString( 'INI' ) );
-		$table->store( $element );
-
-		$url 		= $this->getTask() == 'apply' ? 'index.php?option=com_easyblog&view=theme&element=' . $element : 'index.php?option=com_easyblog&view=themes';
-
-		$this->setRedirect( $url , JText::_( 'COM_EASYBLOG_THEME_SAVED_SUCCESSFULLY' ) , 'message' );
-	}
 
 	public function updateBlogImage( $element, $exclude = null )
 	{
@@ -343,37 +285,32 @@ class EasyBlogControllerThemes extends EasyBlogController
 
 		$files	= JRequest::getVar( 'names' , '' );
 
-		if( empty( $files ) )
-		{
+		if (empty($files)) {
 			return false;
 		}
 
 		// Ensure the integrity of each items submitted to be an array.
-		if( !is_array( $files ) )
-		{
+		if (!is_array($files)) {
 			$files	= array( $files );
 		}
 
 		$result		= array();
 
-		foreach( $files as $file )
-		{
+		$template 	= EB::template();
+
+		foreach ($files as $file) {
+
 			$dashboard = explode( '/' , $file );
 
-			if( $dashboard[0]=="dashboard" )
-			{
-				$template 	= new CodeThemes( true );
-				$out		= $template->fetch( $dashboard[1] . '.ejs' );
-			}
-			elseif ( $dashboard[0]=="media" )
-			{
-				$template 	= new CodeThemes( true );
-				$out		= $template->fetch( "media." . $dashboard[1] . '.ejs' );
-			}
-			else
-			{
-				$template 	= new CodeThemes();
-				$out		= $template->fetch( $file . '.ejs' );
+			if ($dashboard[0]=="dashboard") {
+				$out		= $template->output('site/dashboard/'.$dashboard[1] . '.ejs' );
+
+			} elseif ($dashboard[0]=="media") {
+				$out		= $template->output( 'site/media/' . $dashboard[1] . '.ejs' );
+
+			} else {
+				$out		= $template->output( 'site/' . $file . '.ejs' );
+
 			}
 
 			$obj			= new stdClass();
@@ -382,7 +319,6 @@ class EasyBlogControllerThemes extends EasyBlogController
 
 			$result[]		= $obj;
 		}
-
 
 		header('Content-type: text/x-json; UTF-8');
 		$json	 		= new Services_JSON();

@@ -1,50 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-	<!-- $Id: user.xml 19516 2010-11-17 06:07:30Z eddieajau $ -->
 <form>
 	<fieldset name="user_details">
 		<field name="name" type="text"
-			class="inputbox"
 			description="COM_USERS_USER_FIELD_NAME_DESC"
-			label="COM_USERS_HEADING_NAME"
+			label="COM_USERS_USER_FIELD_NAME_LABEL"
 			required="true"
 			size="30"
 		/>
-	
+
 		<field name="username" type="text"
-			class="inputbox"
 			description="COM_USERS_USER_FIELD_USERNAME_DESC"
 			label="COM_USERS_USER_FIELD_USERNAME_LABEL"
 			required="true"
 			size="30"
 		/>
-	
+
 		<field name="password" type="password"
 			autocomplete="off"
-			class="inputbox"
+			class="validate-password"
 			description="COM_USERS_USER_FIELD_PASSWORD_DESC"
 			filter="raw"
+			validate="password"
 			label="JGLOBAL_PASSWORD"
 			size="30"
 		/>
-	
+
 		<field name="password2" type="password"
 			autocomplete="off"
-			class="inputbox"
+			class="validate-password"
 			description="COM_USERS_USER_FIELD_PASSWORD2_DESC"
 			filter="raw"
 			label="COM_USERS_USER_FIELD_PASSWORD2_LABEL"
 			size="30"
+			validate="equals"
+			field="password"
 		/>
-	
-		<field name="email" type="text"
-			class="inputbox validate-email"
+
+		<field name="email" type="email"
 			description="COM_USERS_USER_FIELD_EMAIL_DESC"
 			label="JGLOBAL_EMAIL"
 			required="true"
 			size="30"
 			validate="email"
 		/>
-	
+
 		<field
 			name="registerDate"
 			type="calendar"
@@ -70,27 +69,58 @@
 		/>
 
 		<field
+			name="lastResetTime"
+			type="calendar"
+			class="readonly"
+			label="COM_USERS_USER_FIELD_LASTRESET_LABEL"
+			description="COM_USERS_USER_FIELD_LASTRESET_DESC"
+			readonly="true"
+			format="%Y-%m-%d %H:%M:%S"
+			size="22"
+			filter="user_utc"
+		/>
+
+		<field
+			name="resetCount"
+			type="text"
+			class="readonly"
+			label="COM_USERS_USER_FIELD_RESETCOUNT_LABEL"
+			description ="COM_USERS_USER_FIELD_RESETCOUNT_DESC"
+			default="0"
+			readonly="true"
+			/>
+
+		<field
 				name="sendEmail"
 				type="radio"
 				default="0"
+				class="btn-group btn-group-yesno"
 				label="COM_USERS_USER_FIELD_SENDEMAIL_LABEL"
 				description="COM_USERS_USER_FIELD_SENDEMAIL_DESC">
-				<option
-					value="0">JNO</option>
-				<option
-					value="1">JYES</option>
+				<option value="1">JYES</option>
+				<option value="0">JNO</option>
 		</field>
 
 		<field
 				name="block"
 				type="radio"
+				class="btn-group btn-group-yesno"
 				default="0"
 				label="COM_USERS_USER_FIELD_BLOCK_LABEL"
 				description="COM_USERS_USER_FIELD_BLOCK_DESC">
-				<option
-					value="0">JNO</option>
-				<option
-					value="1">JYES</option>
+				<option value="1">JYES</option>
+				<option value="0">JNO</option>
+		</field>
+
+		<field
+			name="requireReset"
+			type="radio"
+			default="0"
+			class="btn-group btn-group-yesno"
+			label="COM_USERS_USER_FIELD_REQUIRERESET_LABEL"
+			description="COM_USERS_USER_FIELD_REQUIRERESET_DESC">
+			<option value="1">JYES</option>
+			<option value="0">JNO</option>
 		</field>
 
 		<field
@@ -98,13 +128,14 @@
 			type="text"
 			class="readonly"
 			label="JGLOBAL_FIELD_ID_LABEL"
-			description ="JGLOBAL_FIELD_ID_DESC"		
+			description ="JGLOBAL_FIELD_ID_DESC"
 			default="0"
 			readonly="true"
 			/>
 
 	</fieldset>
 	<field name="groups" type="hidden" />
+	<field name="twofactor" type="hidden" />
 
 	<fields name="params">
 
@@ -135,7 +166,7 @@
 				<option value="">JOPTION_USE_DEFAULT</option>
 			</field>
 
-			<field name="editor" type="editors"
+			<field name="editor" type="plugins" folder="editors"
 				description="COM_USERS_USER_FIELD_EDITOR_DESC"
 				label="COM_USERS_USER_FIELD_EDITOR_LABEL"
 			>
@@ -155,6 +186,8 @@
 			>
 				<option value="">JOPTION_USE_DEFAULT</option>
 			</field>
+
 		</fieldset>
+
 	</fields>
 </form>

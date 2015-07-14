@@ -1,14 +1,17 @@
 EasyBlog.require()
 	.library(
-		'ui/position',
-		'fancybox',
-		'bookmarklet',
-		'checked',
-		'checkList'
+		"ui/position"
 	)
 	.script(
-		'layout/responsive',
-		'layout/lightbox',
-		'legacy'
+		"layout/template",
+		"layout/responsive",
+		"layout/dialog",
+		"layout/elements",
+		"layout/launcher",
+		"layout/placeholder",
+		"layout/image/popup",
+		"layout/image/gallery",
+		"layout/image/legacy",
+		"subscribe"
 	)
 	.done();

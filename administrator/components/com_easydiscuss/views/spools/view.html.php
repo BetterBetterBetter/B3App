@@ -29,7 +29,7 @@ class EasyDiscussViewSpools extends EasyDiscussAdminView
 		// Initialise variables
 		$mainframe		= JFactory::getApplication();
 
-		$filter_state	= $mainframe->getUserStateFromRequest( 'com_easydiscuss.spools.filter_state', 		'filter_state', 	'*', 'word' );
+		$filter_state	= $mainframe->getUserStateFromRequest( 'com_easydiscuss.spools.filter_state', 		'filter_state', 	'U', 'word' );
 		$search			= $mainframe->getUserStateFromRequest( 'com_easydiscuss.spools.search', 			'search', 			'', 'string' );
 
 		$search			= trim(JString::strtolower( $search ) );
